@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 
 import argparse
 import numpy as np
@@ -18,11 +19,11 @@ if __name__ == '__main__':
     args = arguments.parse_args()
 
     # Expand home path (~) so that pandas knows where to look
-    args.tokenized_fp = os.path.expanduser(args.tokenized_fp + '.json')
-    args.token_counts_fp = os.path.expanduser(args.token_counts_fp + '.json')
+    args.tokenized_fp = os.path.expanduser(args.tokenized_fp)
+    args.token_counts_fp = os.path.expanduser(args.token_counts_fp)
 
-    tokenized_data = json.load(open(args.tokenized_fp, 'r'))
-    token_counts = json.load(open(args.token_counts_fp, 'r'))
+    tokenized_data = json.load(open(args.tokenized_fp + '.json', 'r'))
+    token_counts = json.load(open(args.token_counts_fp + '.json', 'r'))
     N = float(token_counts['__ALL__'])
 
     tokenized_subsampled_data = []
@@ -45,5 +46,5 @@ if __name__ == '__main__':
         tokenized_subsampled_data.append((category, ' '.join(subsampled_doc)))
     print('Reduced tokens from {} to {}'.format(num_original_tokens, num_subsampled_tokens))
     print('Saving vocabulary of size {}'.format(vocab.size()))
-    json.dump(tokenized_subsampled_data, open(args.tokenized_fp + 'subsampled.json', 'w'))
-    np.save('./data/vocab.npy', vocab)
+    json.dump(tokenized_subsampled_data, open(args.tokenized_fp + '_subsampled.json', 'w'))
+    pickle.dump(open('./data/vocab', 'wb'), vocab)

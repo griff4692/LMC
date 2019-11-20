@@ -5,9 +5,12 @@ Embeddings borrowed from https://github.com/ncbi-nlp/BioSentVec/
 import os
 
 import argparse
-import numpy as np
-
 from gensim.models.keyedvectors import KeyedVectors
+import numpy as np
+import pickle
+
+from preprocess.vocab import Vocab
+
 
 if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC (v3) Collect Pretrained Embeddings.')
@@ -17,14 +20,20 @@ if __name__ == '__main__':
 
     # Expand home path (~) so that pandas knows where to look
     args.biowordvec_fp = os.path.expanduser(args.biowordvec_fp)
-
-    vocab = np.load('./data/vocab.npy', allow_pickle=True)
+    vocab = pickle.load(open('./data/vocab', 'rb'))
+    print('Generating embedding matrix for vocab of size={}'.format(vocab.size()))
     vectors = KeyedVectors.load_word2vec_format(args.biowordvec_fp, binary=True)
 
-    DIM = 200
-
+    DIM = vectors.vector_size
     embeddings = np.zeros([vocab.size(), DIM])
+    oov = set()
     for idx in range(1, vocab.size()):
         token = vocab.get_token(idx)
-        embeddings[idx, :] = vectors[token]
+        if token in vectors:
+            embeddings[idx, :] = vectors[token]
+        else:
+            embeddings[idx, :] = np.random.normal(loc=0.0, scale=1.0, size=(DIM, ))
+            oov.add(token)
+    print('Randomly initialized the following tokens...')
+    print(', '.join(list(oov)))
     np.save('./data/embeddings.npy', embeddings)
