@@ -5,7 +5,6 @@ from time import sleep
 
 import argparse
 import numpy as np
-import pandas as pd
 import torch
 from tqdm import tqdm
 
@@ -25,6 +24,11 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--window', default=5, type=int)
 
+    # Model Hyperparameters
+    parser.add_argument('--latent_dim', default=100, type=int, help='z dimension')
+    parser.add_argument('--encoder_input_dim', default=50, type=int, help='embedding dimemsions for encoder')
+    parser.add_argument('--encoder_hidden_dim', default=50, type=int, help='hidden dimension for encoder')
+
     args = parser.parse_args()
 
     # FIX THIS FOR NOW
@@ -42,9 +46,10 @@ if __name__ == '__main__':
     vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
+    vocab_size = vocab.size()
 
     batcher = SkipGramBatchLoader(num_tokens, ignore_idxs)
-    vae_model = VAE()
+    vae_model = VAE(args, vocab_size)
 
     # Make sure it's calculating gradients
     vae_model.train()  # just sets .requires_grad = True
@@ -57,5 +62,6 @@ if __name__ == '__main__':
             center_ids, context_ids = batcher.next(ids, args.window)
             center_ids_tens = torch.LongTensor(center_ids)
             context_ids_tens = torch.LongTensor(context_ids)
-        assert not batcher.has_next()
 
+            vae_model(center_ids_tens, context_ids_tens)
+        assert not batcher.has_next()
