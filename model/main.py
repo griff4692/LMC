@@ -51,6 +51,9 @@ if __name__ == '__main__':
     batcher = SkipGramBatchLoader(num_tokens, ignore_idxs)
     vae_model = VAE(args, vocab_size)
 
+    trainable_params = filter(lambda x: x.requires_grad, vae_model.parameters())
+    optimizer = torch.optim.Adam(trainable_params, lr=0.001)
+
     # Make sure it's calculating gradients
     vae_model.train()  # just sets .requires_grad = True
     for epoch in range(1, args.epochs + 1):
@@ -58,10 +61,28 @@ if __name__ == '__main__':
         print('Starting Epoch={}'.format(epoch))
         batcher.reset()
         num_batches = batcher.num_batches()
+        epoch_joint_loss, epoch_kl_loss, epoch_recon_loss = 0.0, 0.0, 0.0
         for _ in tqdm(range(num_batches)):
+            # Reset gradients
+            optimizer.zero_grad()
+
             center_ids, context_ids = batcher.next(ids, args.window)
             center_ids_tens = torch.LongTensor(center_ids)
             context_ids_tens = torch.LongTensor(context_ids)
+            neg_ids_tens = torch.ones_like(context_ids_tens).long()
 
-            vae_model(center_ids_tens, context_ids_tens)
+            kl_loss, recon_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens)
+            joint_loss = kl_loss + recon_loss
+            joint_loss.backward()  # backpropagate loss
+
+            epoch_kl_loss += kl_loss.item()
+            epoch_recon_loss += recon_loss.item()
+            epoch_joint_loss += joint_loss.item()
+            optimizer.step()
+        epoch_joint_loss /= float(batcher.num_batches())
+        epoch_kl_loss /= float(batcher.num_batches())
+        epoch_recon_loss /= float(batcher.num_batches())
+        sleep(0.1)
+        print('Epoch={}. Joint loss={}.  KL Loss={}. Reconstruction Loss={}'.format(
+            epoch, epoch_joint_loss, epoch_kl_loss, epoch_recon_loss))
         assert not batcher.has_next()
