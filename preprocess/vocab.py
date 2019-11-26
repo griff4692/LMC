@@ -23,6 +23,9 @@ class Vocab:
             return self.w2i[token]
         return -1
 
+    def get_ids(self, tokens):
+        return list(map(self.get_id, tokens))
+
     def get_token(self, id):
         return self.i2w[id]
 

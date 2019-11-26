@@ -101,20 +101,6 @@ def clean_text(text):
     return new_text
 
 
-def preprocess_mimic_to_sentences(text):
-    """
-    Preprocess reports in MIMIC-III.
-    1. remove [**Patterns**] and signature
-    2. split the report into sections
-    3. tokenize sentences and words
-    4. lowercase
-    """
-    for sec in split_heading(clean_text(text)):
-        for sent in sent_tokenize(sec):
-            text = ' '.join(word_tokenize(sent))
-            yield text.lower()
-
-
 def preprocess_mimic(text):
     """
     Preprocess reports in MIMIC-III.
@@ -125,17 +111,6 @@ def preprocess_mimic(text):
     """
     for sec in split_heading(clean_text(text)):
         yield ' '.join(word_tokenize(sec)).lower()
-
-
-def preprocess_pubmed(text):
-    """
-    Preprocess PubMed abstract. (https://www.ncbi.nlm.nih.gov/research/bionlp/APIs/BioC-PubMed/)
-    1. tokenize sentences and words
-    2. lowercase
-    """
-    for sent in sent_tokenize(text):
-        text = ' '.join(word_tokenize(sent))
-        yield text.lower()
 
 
 def test_preprocess_mimic():
@@ -168,14 +143,17 @@ def test_preprocess_pubmed():
 if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC (v3) Note Tokenization.')
     arguments.add_argument('--mimic_fp', default='~/Desktop/mimic/NOTEEVENTS')
+    arguments.add_argument('-debug', default=False, action='store_true')
 
     args = arguments.parse_args()
 
     # Expand home path (~) so that pandas knows where to look
     print('Loading data...')
     args.mimic_fp = os.path.expanduser(args.mimic_fp)
-    df = pd.read_csv(args.mimic_fp + '.csv')
-    print('Loaded data. Tokenizing...')
+    debug_str = '_mini' if args.debug else ''
+    df = pd.read_csv('{}{}.csv'.format(args.mimic_fp, debug_str))
+
+    print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
 
     categories, parsed_docs = [], []
 
@@ -203,5 +181,8 @@ if __name__ == '__main__':
         categories.append(row['CATEGORY'])
         if (row_idx + 1) % 1000 == 0:
             print('Processed {} out of {} rows'.format(row_idx + 1, df.shape[0]))
-    json.dump(list(zip(categories, parsed_docs)), open(args.mimic_fp + '_tokenized.json', 'w'))
-    json.dump(token_cts, open(args.mimic_fp + '_token_counts.json', 'w'))
+    debug_str = '_mini' if args.debug else ''
+    with open(args.mimic_fp + '_tokenized{}.json'.format(debug_str), 'w') as fd:
+        json.dump(list(zip(categories, parsed_docs)), fd)
+    with open(args.mimic_fp + '_token_counts{}.json'.format(debug_str), 'w') as fd:
+        json.dump(token_cts, fd)
