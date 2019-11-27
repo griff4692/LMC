@@ -2,9 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from model.encoder import Encoder
-
-from model.utils import compute_kl
+from encoder import Encoder
+from utils import compute_kl
 
 
 class VAE(nn.Module):
@@ -17,7 +16,7 @@ class VAE(nn.Module):
         self.embeddings_mu = nn.Embedding(vocab_size, args.latent_dim, padding_idx=0)
         self.embeddings_log_sigma = nn.Embedding(vocab_size, 1, padding_idx=0)
         log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
-        self.embeddings_log_sigma.weight.data = torch.FloatTensor(log_weights_init)
+        self.embeddings_log_sigma.weight.data = torch.FloatTensor(log_weights_init).to(args.device)
 
     def _max_margin(self, mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p, margin=1.):
         """
@@ -50,7 +49,7 @@ class VAE(nn.Module):
         """
         :param center_ids: batch_size
         :param context_ids: batch_size, 2 * context_window
-        :return: TBD
+        :return: cost components: KL-Divergence (q(z|w,c) || p(z|w)) and max margin (reconstruction error)
         """
         mu_q, sigma_q = self.encoder(center_ids, context_ids)
         mu_p, sigma_p = self.embeddings_mu(center_ids), self.embeddings_log_sigma(center_ids).exp()
@@ -61,5 +60,3 @@ class VAE(nn.Module):
         kl = compute_kl(mu_q, sigma_q, mu_p, sigma_p).mean()
         max_margin = self._max_margin(mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p).mean()
         return kl, max_margin
-
-

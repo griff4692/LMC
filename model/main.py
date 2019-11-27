@@ -1,4 +1,3 @@
-import json
 import pickle
 import os
 from time import sleep
@@ -8,9 +7,9 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from model.batcher import SkipGramBatchLoader
-from model.vae import VAE
-from preprocess.vocab import Vocab
+from batcher import SkipGramBatchLoader
+from vae import VAE
+from vocab import Vocab
 
 
 if __name__ == '__main__':
@@ -22,6 +21,7 @@ if __name__ == '__main__':
 
     # Training Hyperparameters
     parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
 
     # Model Hyperparameters
@@ -31,16 +31,13 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # FIX THIS FOR NOW
-    args.debug = True
-
     # Load Data
     debug_str = '_mini' if args.debug else ''
     ids_infile = os.path.join(args.data_dir, 'ids{}.npy'.format(debug_str))
     with open(ids_infile, 'rb') as fd:
         ids = np.load(fd)
     num_tokens = len(ids)
-    # the document boundary index (pad_idx=0) is never going to be a center word
+    # The document boundary index (pad_idx = 0) is never going to be a center word
     ignore_idxs = np.where(ids == 0)[0]
     # Load Vocabulary
     vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
@@ -48,11 +45,16 @@ if __name__ == '__main__':
         vocab = pickle.load(fd)
     vocab_size = vocab.size()
 
-    batcher = SkipGramBatchLoader(num_tokens, ignore_idxs)
-    vae_model = VAE(args, vocab_size)
+    device_str = 'gpu' if torch.cuda.is_available() else 'cpu'
+    args.device = torch.device(device_str)
+    print('Training on {}...'.format(device_str))
 
+    batcher = SkipGramBatchLoader(num_tokens, ignore_idxs)
+    vae_model = VAE(args, vocab_size).to(args.device)
+
+    # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, vae_model.parameters())
-    optimizer = torch.optim.Adam(trainable_params, lr=0.001)
+    optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
 
     # Make sure it's calculating gradients
     vae_model.train()  # just sets .requires_grad = True
@@ -67,9 +69,11 @@ if __name__ == '__main__':
             optimizer.zero_grad()
 
             center_ids, context_ids = batcher.next(ids, args.window)
-            center_ids_tens = torch.LongTensor(center_ids)
-            context_ids_tens = torch.LongTensor(context_ids)
-            neg_ids_tens = torch.ones_like(context_ids_tens).long()
+            center_ids_tens = torch.LongTensor(center_ids).to(args.device)
+            context_ids_tens = torch.LongTensor(context_ids).to(args.device)
+
+            neg_ids = np.random.choice(vocab.size(), size=context_ids_tens.shape)
+            neg_ids_tens = torch.LongTensor(vocab.neg_sample(size=context_ids_tens.shape)).to(args.device)
 
             kl_loss, recon_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens)
             joint_loss = kl_loss + recon_loss

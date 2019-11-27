@@ -4,8 +4,10 @@ import pickle
 
 import argparse
 import numpy as np
+from tqdm import tqdm
 
-from preprocess.vocab import Vocab
+from tokens_to_ids import tokens_to_ids
+from vocab import Vocab
 
 
 if __name__ == '__main__':
@@ -32,26 +34,28 @@ if __name__ == '__main__':
         token_counts = json.load(fd)
     N = float(token_counts['__ALL__'])
 
+    # Store subsampled data
     tokenized_subsampled_data = []
-
+    # And vocabulary with word counts
     vocab = Vocab()
-    num_original_tokens, num_subsampled_tokens = 0, 0
-    for category, tokenized_doc_str in tokenized_data:
+    num_docs = len(tokenized_data)
+    for doc_idx in tqdm(range(num_docs)):
+        category, tokenized_doc_str = tokenized_data[doc_idx]
         subsampled_doc = []
         for token in tokenized_doc_str.split():
-            num_original_tokens += 1
             wc = token_counts[token]
+            too_sparse = wc <= args.min_token_count
+            if too_sparse:
+                continue
             frac = wc / N
-            too_sparse = wc < args.min_token_count
             keep_prob = min((np.sqrt(frac / args.subsample_param) + 1) * (args.subsample_param / frac), 1.0)
-            too_frequent = np.random.random() > keep_prob
-            if not too_sparse and not too_frequent:
+            should_keep = np.random.binomial(1, keep_prob) == 1
+            if should_keep:
                 subsampled_doc.append(token)
-                num_subsampled_tokens += 1
-                vocab.add_token(token)
+                vocab.add_token(token, token_support=1)
         tokenized_subsampled_data.append((category, ' '.join(subsampled_doc)))
 
-    print('Reduced tokens from {} to {}'.format(num_original_tokens, num_subsampled_tokens))
+    print('Reduced tokens from {} to {}'.format(int(N), sum(vocab.support)))
     print('Saving vocabulary of size {}'.format(vocab.size()))
     subsampled_out_fn = args.tokenized_fp + ('_subsampled_mini.json' if args.debug else '_subsampled.json')
     with open(subsampled_out_fn, 'w') as fd:
@@ -59,3 +63,6 @@ if __name__ == '__main__':
     vocab_out_fn = './data/vocab_mini.pk' if args.debug else './data/vocab.pk'
     with open(vocab_out_fn, 'wb') as fd:
         pickle.dump(vocab, fd)
+
+    print('Converting to id matrix...')
+    tokens_to_ids(args, token_infile=subsampled_out_fn)

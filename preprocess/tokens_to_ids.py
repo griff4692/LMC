@@ -6,21 +6,14 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
-from preprocess.vocab import Vocab
+from vocab import Vocab
 
 
-if __name__ == '__main__':
-    arguments = argparse.ArgumentParser('MIMIC (v3) Note Tokens to Ids.')
-
-    arguments.add_argument('--tokenized_fp', default='~/Desktop/mimic/NOTEEVENTS_tokenized_subsampled')
-    arguments.add_argument('-debug', default=False, action='store_true')
-
-    args = arguments.parse_args()
-
-    args.tokenized_fp = os.path.expanduser(args.tokenized_fp)
+def tokens_to_ids(args, token_infile=None):
     debug_str = '_mini' if args.debug else ''
 
-    token_infile = '{}{}.json'.format(args.tokenized_fp, debug_str)
+    if token_infile is None:
+        token_infile = '{}{}.json'.format(args.tokenized_fp, debug_str)
     with open(token_infile, 'r') as fd:
         tokens = json.load(fd)
 
@@ -42,3 +35,15 @@ if __name__ == '__main__':
     out_fn = 'data/ids{}.npy'.format(debug_str)
     with open(out_fn, 'wb') as fd:
         np.save(fd, np.array(ids, dtype=int))
+
+
+if __name__ == '__main__':
+    arguments = argparse.ArgumentParser('MIMIC (v3) Note Tokens to Ids.')
+
+    arguments.add_argument('--tokenized_fp', default='~/Desktop/mimic/NOTEEVENTS_tokenized_subsampled')
+    arguments.add_argument('-debug', default=False, action='store_true')
+
+    args = arguments.parse_args()
+
+    args.tokenized_fp = os.path.expanduser(args.tokenized_fp)
+    tokens_to_ids(args)

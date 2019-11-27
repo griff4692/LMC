@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 
 """
-Preprocess PubMed abstracts or MIMIC-III reports
+Preprocess MIMIC-III reports
 """
 
 MIMIC_BOILERPLATE = {
