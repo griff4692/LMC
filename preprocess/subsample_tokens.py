@@ -19,8 +19,6 @@ if __name__ == '__main__':
 
     args = arguments.parse_args()
 
-    args.debug = True
-
     # Expand home path (~) so that pandas knows where to look
     args.tokenized_fp = os.path.expanduser(args.tokenized_fp)
     args.token_counts_fp = os.path.expanduser(args.token_counts_fp)

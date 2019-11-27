@@ -17,14 +17,10 @@ if __name__ == '__main__':
 
     args = arguments.parse_args()
 
-    # TODO remove
-    args.debug = True
-
     args.tokenized_fp = os.path.expanduser(args.tokenized_fp)
     debug_str = '_mini' if args.debug else ''
 
     token_infile = '{}{}.json'.format(args.tokenized_fp, debug_str)
-    print(token_infile)
     with open(token_infile, 'r') as fd:
         tokens = json.load(fd)
 

@@ -1,19 +1,30 @@
 from collections import defaultdict
 import json
+from multiprocessing import Pool
 import os
-
 import re
 
-from nltk import word_tokenize
-
 import argparse
+from nltk import word_tokenize
 import pandas as pd
+from tqdm import tqdm
 
 
 """
 Preprocess PubMed abstracts or MIMIC-III reports
 """
 
+MIMIC_BOILERPLATE = {
+    'addendum :',
+    'admission date :',
+    'discharge date :',
+    'date of birth :',
+    'sex : m',
+    'sex : f',
+    'service :',
+}
+
+BOILERPLATE_REGEX = re.compile('|'.join(MIMIC_BOILERPLATE))
 
 SECTION_TITLES = re.compile(
     r'('
@@ -125,19 +136,11 @@ def test_preprocess_mimic():
     assert sents[2] == 'compared to the previous tracing of no diagnostic interim change .'
 
 
-def test_preprocess_pubmed():
-    # from https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pubmed.cgi/BioC_xml/30096728/ascii
-
-    text = 'A novel chiral porous-layer stationary phase was developed for use in open-tubular ' \
-           'nano liquid chromatography. The stationary phase was prepared by an in-situ ' \
-           'polymerization of 3-chloro-2-hydroxypropylmethacrylate (HPMA-Cl) and ethylene ' \
-           'dimethacrylate (EDMA). The reactive chloro groups at the surface of the porous ' \
-           'stationary phase were reacted with beta-Cyclodextrin (beta-CD). '
-    sents = [sen for sen in preprocess_pubmed(text)]
-    assert sents[2] == 'the reactive chloro groups at the surface of the porous stationary phase ' \
-                       'were reacted with beta-cyclodextrin ( beta-cd ) .'
-
-
+def preprocess_mimic_doc(text):
+    tokenized_doc = ' '.join(list(preprocess_mimic(text)))
+    tokenized_cleaned_doc = re.sub(BOILERPLATE_REGEX, '', tokenized_doc).strip()
+    tokenized_cleaned_doc = re.sub('\s+', ' ', tokenized_cleaned_doc)
+    return tokenized_cleaned_doc
 
 
 if __name__ == '__main__':
@@ -155,32 +158,18 @@ if __name__ == '__main__':
 
     print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
 
-    categories, parsed_docs = [], []
+    categories = df['CATEGORY'].tolist()
+    p = Pool(processes=10)
+    parsed_docs = tqdm(p.map(preprocess_mimic_doc, df['TEXT'].tolist()))
+    p.close()
 
-    MIMIC_BOILERPLATE = {
-        'addendum :',
-        'admission date :',
-        'discharge date :',
-        'date of birth :',
-        'sex : m',
-        'sex : f',
-        'service :',
-    }
+    print('Finished tokenization.  Now collecting word counts.')
 
-    BOILERPLATE_REGEX = re.compile('|'.join(MIMIC_BOILERPLATE))
     token_cts = defaultdict(int)
-    for row_idx, row in df.iterrows():
-        row = row.to_dict()
-        tokenized_doc = ' '.join(list(preprocess_mimic(row['TEXT'])))
-        tokenized_cleaned_doc = re.sub(BOILERPLATE_REGEX, '', tokenized_doc).strip()
-        tokenized_cleaned_doc = re.sub('\s+', ' ', tokenized_cleaned_doc)
-        for token in tokenized_cleaned_doc.split():
+    for doc in parsed_docs:
+        for token in doc.split():
             token_cts[token] += 1
             token_cts['__ALL__'] += 1
-        parsed_docs.append(tokenized_cleaned_doc)
-        categories.append(row['CATEGORY'])
-        if (row_idx + 1) % 1000 == 0:
-            print('Processed {} out of {} rows'.format(row_idx + 1, df.shape[0]))
     debug_str = '_mini' if args.debug else ''
     with open(args.mimic_fp + '_tokenized{}.json'.format(debug_str), 'w') as fd:
         json.dump(list(zip(categories, parsed_docs)), fd)
