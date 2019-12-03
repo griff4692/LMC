@@ -1,7 +1,9 @@
-.idea/
+idea/
 *.pyc
 __pycache__
 preprocess/*.pyc
 preprocess/data/
 BSG/*.pyc
 model/weights/
+screenlog.*
+
