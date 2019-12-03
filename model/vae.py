@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from encoder import Encoder
-from utils import compute_kl
+from compute_utils import compute_kl
 
 
 class VAE(nn.Module):

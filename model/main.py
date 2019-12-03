@@ -9,12 +9,14 @@ import torch
 from tqdm import tqdm
 
 from batcher import SkipGramBatchLoader
+from utils import restore_model
 from vae import VAE
+from vocab import Vocab
 
 import sys
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 
-from vocab import Vocab
+
 
 
 if __name__ == '__main__':
@@ -62,23 +64,7 @@ if __name__ == '__main__':
     vae_model = VAE(args, vocab_size).to(args.device)
     checkpoint_state = None
     if args.restore_experiment is not None:
-        checkpoint_dir = os.path.join('weights', args.restore_experiment)
-        checkpoint_fns = os.listdir(checkpoint_dir)
-        max_checkpoint_epoch, latest_checkpoint_idx = -1, -1
-        for cidx, checkpoint_fn in enumerate(checkpoint_fns):
-            checkpoint_epoch = int(checkpoint_fn[-5])
-            max_checkpoint_epoch = max(max_checkpoint_epoch, checkpoint_epoch)
-            if checkpoint_epoch == max_checkpoint_epoch:
-                latest_checkpoint_idx = cidx
-        latest_checkpoint_fn = os.path.join(checkpoint_dir, checkpoint_fns[cidx])
-        print('Loading model from {}'.format(latest_checkpoint_fn))
-        checkpoint_state = torch.load(latest_checkpoint_fn)
-        print('Previous checkpoint at epoch={}...'.format(max_checkpoint_epoch))
-        for k, v in checkpoint_state['losses'].items():
-            print('{}={}'.format(k, v))
-        for k, v in checkpoint_state['args'].items():
-            print('{}={}'.format(k, v))
-        vae_model.load_state_dict(checkpoint_state['model_state_dict'])
+        restore_model(vae_model, vocab_size, args.restore_experiment)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, vae_model.parameters())
@@ -135,6 +121,7 @@ if __name__ == '__main__':
         state_dict.update({'optimizer_state_dict': optimizer.state_dict()})
         args_dict = {'args': {arg: getattr(args, arg) for arg in vars(args)}}
         state_dict.update(args_dict)
+        state_dict.update({'vocab': vocab})
         # Serialize model and statistics
         checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
         print('Saving model state to {}'.format(checkpoint_fp))
