@@ -12,8 +12,8 @@ from vocab import Vocab
 
 if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC (v3) Note Subsampling of Already Tokenized Data.')
-    arguments.add_argument('--tokenized_fp', default='~/Desktop/mimic/NOTEEVENTS_tokenized')
-    arguments.add_argument('--token_counts_fp', default='~/Desktop/mimic/NOTEEVENTS_token_counts')
+    arguments.add_argument('--tokenized_fp', default='data/mimic/NOTEEVENTS_tokenized')
+    arguments.add_argument('--token_counts_fp', default='data/mimic/NOTEEVENTS_token_counts')
 
     arguments.add_argument('-debug', default=False, action='store_true')
     arguments.add_argument('--min_token_count', default=5, type=int)

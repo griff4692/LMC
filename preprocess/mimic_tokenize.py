@@ -145,7 +145,7 @@ def preprocess_mimic_doc(text):
 
 if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC (v3) Note Tokenization.')
-    arguments.add_argument('--mimic_fp', default='~/Desktop/mimic/NOTEEVENTS')
+    arguments.add_argument('--mimic_fp', default='data/mimic/NOTEEVENTS')
     arguments.add_argument('-debug', default=False, action='store_true')
 
     args = arguments.parse_args()

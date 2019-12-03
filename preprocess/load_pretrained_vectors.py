@@ -9,7 +9,7 @@ from gensim.models.keyedvectors import KeyedVectors
 import numpy as np
 import pickle
 
-from preprocess.vocab import Vocab
+from vocab import Vocab
 
 
 if __name__ == '__main__':

@@ -1,5 +1,6 @@
 import pickle
 import os
+from shutil import rmtree
 from time import sleep
 
 import argparse
@@ -9,6 +10,10 @@ from tqdm import tqdm
 
 from batcher import SkipGramBatchLoader
 from vae import VAE
+
+import sys
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+
 from vocab import Vocab
 
 
@@ -18,11 +23,14 @@ if __name__ == '__main__':
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
     parser.add_argument('--data_dir', default='../preprocess/data/')
+    parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
+    parser.add_argument('--restore_experiment', default=None, help='Experiment name from which to restore.')
 
     # Training Hyperparameters
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
+    parser.add_argument('--batch_size', default=32, type=int)
 
     # Model Hyperparameters
     parser.add_argument('--latent_dim', default=100, type=int, help='z dimension')
@@ -45,16 +53,45 @@ if __name__ == '__main__':
         vocab = pickle.load(fd)
     vocab_size = vocab.size()
 
-    device_str = 'gpu' if torch.cuda.is_available() else 'cpu'
+    device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     args.device = torch.device(device_str)
     print('Training on {}...'.format(device_str))
 
-    batcher = SkipGramBatchLoader(num_tokens, ignore_idxs)
+    batcher = SkipGramBatchLoader(num_tokens, ignore_idxs, batch_size=args.batch_size)
+
     vae_model = VAE(args, vocab_size).to(args.device)
+    checkpoint_state = None
+    if args.restore_experiment is not None:
+        checkpoint_dir = os.path.join('weights', args.restore_experiment)
+        checkpoint_fns = os.listdir(checkpoint_dir)
+        max_checkpoint_epoch, latest_checkpoint_idx = -1, -1
+        for cidx, checkpoint_fn in enumerate(checkpoint_fns):
+            checkpoint_epoch = int(checkpoint_fn[-5])
+            max_checkpoint_epoch = max(max_checkpoint_epoch, checkpoint_epoch)
+            if checkpoint_epoch == max_checkpoint_epoch:
+                latest_checkpoint_idx = cidx
+        latest_checkpoint_fn = os.path.join(checkpoint_dir, checkpoint_fns[cidx])
+        print('Loading model from {}'.format(latest_checkpoint_fn))
+        checkpoint_state = torch.load(latest_checkpoint_fn)
+        print('Previous checkpoint at epoch={}...'.format(max_checkpoint_epoch))
+        for k, v in checkpoint_state['losses'].items():
+            print('{}={}'.format(k, v))
+        for k, v in checkpoint_state['args'].items():
+            print('{}={}'.format(k, v))
+        vae_model.load_state_dict(checkpoint_state['model_state_dict'])
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, vae_model.parameters())
     optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
+    if checkpoint_state is not None:
+        optimizer.load_state_dict(checkpoint_state['optimizer_state_dict'])
+
+    # Create model experiments directory or clear if it already exists
+    weights_dir = os.path.join('weights', args.experiment)
+    if os.path.exists(weights_dir):
+        print('Clearing out previous weights in {}'.format(weights_dir))
+        rmtree(weights_dir)
+    os.mkdir(weights_dir)
 
     # Make sure it's calculating gradients
     vae_model.train()  # just sets .requires_grad = True
@@ -90,3 +127,15 @@ if __name__ == '__main__':
         print('Epoch={}. Joint loss={}.  KL Loss={}. Reconstruction Loss={}'.format(
             epoch, epoch_joint_loss, epoch_kl_loss, epoch_recon_loss))
         assert not batcher.has_next()
+
+        # Serializing everything from model weights and optimizer state, to to loss function and arguments
+        losses_dict = {'losses': {'joint': epoch_joint_loss, 'kl': epoch_kl_loss, 'recon': epoch_recon_loss}}
+        state_dict = {'model_state_dict': vae_model.state_dict()}
+        state_dict.update(losses_dict)
+        state_dict.update({'optimizer_state_dict': optimizer.state_dict()})
+        args_dict = {'args': {arg: getattr(args, arg) for arg in vars(args)}}
+        state_dict.update(args_dict)
+        # Serialize model and statistics
+        checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
+        print('Saving model state to {}'.format(checkpoint_fp))
+        torch.save(state_dict, checkpoint_fp)
