@@ -17,8 +17,6 @@ import sys
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 
 
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Main script for Bayesian Skip Gram Model')
 
