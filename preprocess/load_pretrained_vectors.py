@@ -8,13 +8,14 @@ import argparse
 from gensim.models.keyedvectors import KeyedVectors
 import numpy as np
 import pickle
+from tqdm import tqdm
 
 from vocab import Vocab
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('MIMIC (v3) Collect Pretrained Embeddings.')
-    parser.add_argument('--biowordvec_fp', default='~/Desktop/BioWordVec_PubMed_MIMICIII_d200.vec.bin')
+    parser.add_argument('--biowordvec_fp', default='~/BioWordVec_PubMed_MIMICIII_d200.vec.bin')
     parser.add_argument('-debug', action='store_true', default=False)
 
     args = parser.parse_args()
@@ -26,13 +27,14 @@ if __name__ == '__main__':
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
 
-    print('Generating embedding matrix for vocab of size={}'.format(vocab.size()))
+    print('Loading pre-trained vectors...')
     vectors = KeyedVectors.load_word2vec_format(args.biowordvec_fp, binary=True)
 
     DIM = vectors.vector_size
     embeddings = np.zeros([vocab.size(), DIM])
     oov = set()
-    for idx in range(1, vocab.size()):
+    print('Generating embedding matrix for vocab of size={}'.format(vocab.size()))
+    for idx in tqdm(range(1, vocab.size())):
         token = vocab.get_token(idx)
         if token in vectors:
             embeddings[idx, :] = vectors[token]
@@ -41,4 +43,4 @@ if __name__ == '__main__':
             oov.add(token)
     print('Randomly initialized the following tokens...')
     print(', '.join(list(oov)))
-    np.save('./data/embeddings.npy', embeddings)
+    np.save('./data/embeddings{}.npy'.format(debug_str), embeddings)

@@ -53,12 +53,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Main script for Bayesian Skip Gram Model')
 
     # Functional Arguments
+    parser.add_argument('-cpu', action='store_true', default=False)
     parser.add_argument('--eval_fp', default='../preprocess/data/')
     parser.add_argument('--experiment', default='debug', help='Save path in weights/ for experiment.')
 
     args = parser.parse_args()
 
-    device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
     print('Evaluating on {}...'.format(device_str))
 

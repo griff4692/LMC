@@ -20,16 +20,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Main script for Bayesian Skip Gram Model')
 
     # Functional Arguments
+    parser.add_argument('-cpu', action='store_true', default=False)
     parser.add_argument('-debug', action='store_true', default=False)
     parser.add_argument('--data_dir', default='../preprocess/data/')
     parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
     parser.add_argument('--restore_experiment', default=None, help='Experiment name from which to restore.')
 
     # Training Hyperparameters
+    parser.add_argument('--batch_size', default=256, type=int)
     parser.add_argument('--epochs', default=25, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
-    parser.add_argument('--batch_size', default=256, type=int)
+    parser.add_argument('-use_pretrained', default=False, action='store_true')
 
     # Model Hyperparameters
     parser.add_argument('--encoder_hidden_dim', default=64, type=int, help='hidden dimension for encoder')
@@ -53,22 +55,29 @@ if __name__ == '__main__':
         vocab = pickle.load(fd)
     vocab_size = vocab.size()
 
-    device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
     print('Training on {}...'.format(device_str))
 
     batcher = SkipGramBatchLoader(num_tokens, ignore_idxs, batch_size=args.batch_size)
 
-    vae_model = VAE(args, vocab_size).to(args.device)
-    checkpoint_state = None
+    # Load pretrained word embeddings if requested
+    pretrained_in_fn = '../preprocess/data/embeddings{}.npy'.format(debug_str)
+    pretrained_embeddings = None
+    if args.use_pretrained:
+        with open(pretrained_in_fn, 'rb') as fd:
+            pretrained_embeddings = np.load(fd)
+            assert vocab.size() == pretrained_embeddings.shape[0]
+
+    vae_model = VAE(args, vocab_size, pretrained_embeddings=pretrained_embeddings).to(args.device)
     if args.restore_experiment is not None:
-        restore_model(vae_model, vocab_size, args.restore_experiment)
+        prev_args, vae_model, vocab, optimizer_state = restore_model(args.restore_experiment)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, vae_model.parameters())
     optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
-    if checkpoint_state is not None:
-        optimizer.load_state_dict(checkpoint_state['optimizer_state_dict'])
+    if args.restore_experiment is not None:
+        optimizer.load_state_dict(optimizer_state)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join('weights', args.experiment)
