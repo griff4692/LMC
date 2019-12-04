@@ -24,7 +24,6 @@ def print_batch(vocab, center_ids, context_ids):
         print('{} --> {}'.format(x, ' '.join(y)))
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Main script for Bayesian Skip Gram Model')
 
