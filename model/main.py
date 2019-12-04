@@ -17,6 +17,12 @@ import sys
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 
 
+def print_batch(vocab, center_ids, context_ids):
+    for i in range(len(center_ids)):
+        x = vocab.get_token(center_ids[i])
+        y = [vocab.get_token(id) for id in context_ids[i]]
+        print('{} --> {}'.format(x, ' '.join(y)))
+
 
 
 if __name__ == '__main__':
