@@ -6,4 +6,4 @@ preprocess/data/
 BSG/*.pyc
 model/weights/
 screenlog.*
-
+eval_data/

@@ -13,14 +13,19 @@ from vocab import Vocab
 
 
 if __name__ == '__main__':
-    arguments = argparse.ArgumentParser('MIMIC (v3) Collect Pretrained Embeddings.')
-    arguments.add_argument('--biowordvec_fp', default='~/Desktop/BioWordVec_PubMed_MIMICIII_d200.vec.bin')
+    parser = argparse.ArgumentParser('MIMIC (v3) Collect Pretrained Embeddings.')
+    parser.add_argument('--biowordvec_fp', default='~/Desktop/BioWordVec_PubMed_MIMICIII_d200.vec.bin')
+    parser.add_argument('-debug', action='store_true', default=False)
 
-    args = arguments.parse_args()
+    args = parser.parse_args()
 
     # Expand home path (~) so that pandas knows where to look
+    debug_str = '_mini' if args.debug else ''
     args.biowordvec_fp = os.path.expanduser(args.biowordvec_fp)
-    vocab = pickle.load(open('./data/vocab', 'rb'))
+    vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
+    with open(vocab_infile, 'rb') as fd:
+        vocab = pickle.load(fd)
+
     print('Generating embedding matrix for vocab of size={}'.format(vocab.size()))
     vectors = KeyedVectors.load_word2vec_format(args.biowordvec_fp, binary=True)
 
