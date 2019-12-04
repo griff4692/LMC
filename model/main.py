@@ -9,7 +9,7 @@ import torch
 from tqdm import tqdm
 
 from batcher import SkipGramBatchLoader
-from utils import restore_model
+from model_utils import restore_model
 from vae import VAE
 from vocab import Vocab
 
@@ -34,15 +34,16 @@ if __name__ == '__main__':
     parser.add_argument('--restore_experiment', default=None, help='Experiment name from which to restore.')
 
     # Training Hyperparameters
-    parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--epochs', default=25, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
-    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--batch_size', default=256, type=int)
 
     # Model Hyperparameters
-    parser.add_argument('--latent_dim', default=100, type=int, help='z dimension')
-    parser.add_argument('--encoder_input_dim', default=50, type=int, help='embedding dimemsions for encoder')
-    parser.add_argument('--encoder_hidden_dim', default=50, type=int, help='hidden dimension for encoder')
+    parser.add_argument('--encoder_hidden_dim', default=64, type=int, help='hidden dimension for encoder')
+    parser.add_argument('--encoder_input_dim', default=64, type=int, help='embedding dimemsions for encoder')
+    parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
+    parser.add_argument('--latent_dim', default=200, type=int, help='z dimension')
 
     args = parser.parse_args()
 

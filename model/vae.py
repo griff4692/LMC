@@ -12,13 +12,15 @@ class VAE(nn.Module):
 
         self.encoder = Encoder(args, vocab_size)
 
+        self.margin = args.hinge_loss_margin or 1.0
+
         # The output representations of words(used in KL regularization and max_margin).
         self.embeddings_mu = nn.Embedding(vocab_size, args.latent_dim, padding_idx=0)
         self.embeddings_log_sigma = nn.Embedding(vocab_size, 1, padding_idx=0)
         log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
         self.embeddings_log_sigma.weight.data = torch.FloatTensor(log_weights_init).to(args.device)
 
-    def _max_margin(self, mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p, margin=1.):
+    def _max_margin(self, mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p):
         """
         Computes a sum over context words margin(hinge loss).
         :param pos_context_words:  a tensor with true context words ids [batch_size x window_size]
@@ -42,7 +44,7 @@ class VAE(nn.Module):
         kl_pos = compute_kl(mu_q_flat, sigma_q_flat, pos_mu_p_flat, pos_sigma_p_flat).reshape(batch_size, -1)
         kl_neg = compute_kl(mu_q_flat, sigma_q_flat, neg_mu_p_flat, neg_sigma_p_flat).view(batch_size, -1)
 
-        hinge_loss = (kl_pos - kl_neg + margin).clamp_min_(0)
+        hinge_loss = (kl_pos - kl_neg + self.margin).clamp_min_(0)
         return hinge_loss
 
     def forward(self, center_ids, context_ids, neg_context_ids=None):
