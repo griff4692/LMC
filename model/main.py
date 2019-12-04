@@ -1,6 +1,7 @@
 import pickle
 import os
 from shutil import rmtree
+import sys
 from time import sleep
 
 import argparse
@@ -11,10 +12,8 @@ from tqdm import tqdm
 from batcher import SkipGramBatchLoader
 from model_utils import restore_model
 from vae import VAE
-from vocab import Vocab
-
-import sys
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+from vocab import Vocab
 
 
 def print_batch(vocab, center_ids, context_ids):
