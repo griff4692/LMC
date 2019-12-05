@@ -55,7 +55,7 @@ class VAE(nn.Module):
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
-    def forward(self, center_ids, context_ids, neg_context_ids, num_contexts):
+    def forward(self, center_ids, context_ids, neg_context_ids, num_contexts, device):
         """
         :param center_ids: batch_size
         :param context_ids: batch_size, 2 * context_window
@@ -66,7 +66,7 @@ class VAE(nn.Module):
         # Mask padded context ids
         batch_size, num_context_ids = context_ids.size()
         mask_size = torch.Size([batch_size, num_context_ids])
-        mask = mask_2D(mask_size, num_contexts)
+        mask = mask_2D(mask_size, num_contexts).to(device)
 
         mu_q, sigma_q = self.encoder(center_ids, context_ids, mask)
 

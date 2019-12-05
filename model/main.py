@@ -105,7 +105,7 @@ if __name__ == '__main__':
             neg_ids = np.random.choice(vocab.size(), size=context_ids_tens.shape)
             neg_ids_tens = torch.LongTensor(vocab.neg_sample(size=context_ids_tens.shape)).to(args.device)
 
-            kl_loss, recon_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts)
+            kl_loss, recon_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts, args.device)
             joint_loss = kl_loss + recon_loss
             joint_loss.backward()  # backpropagate loss
 
