@@ -98,14 +98,14 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            center_ids, context_ids = batcher.next(ids, args.window)
+            center_ids, context_ids, num_contexts = batcher.next(ids, args.window)
             center_ids_tens = torch.LongTensor(center_ids).to(args.device)
             context_ids_tens = torch.LongTensor(context_ids).to(args.device)
 
             neg_ids = np.random.choice(vocab.size(), size=context_ids_tens.shape)
             neg_ids_tens = torch.LongTensor(vocab.neg_sample(size=context_ids_tens.shape)).to(args.device)
 
-            kl_loss, recon_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens)
+            kl_loss, recon_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts)
             joint_loss = kl_loss + recon_loss
             joint_loss.backward()  # backpropagate loss
 

@@ -19,7 +19,7 @@ def restore_model(restore_name):
     checkpoint_fns = os.listdir(checkpoint_dir)
     max_checkpoint_epoch, latest_checkpoint_idx = -1, -1
     for cidx, checkpoint_fn in enumerate(checkpoint_fns):
-        checkpoint_epoch = int(checkpoint_fn[-5])
+        checkpoint_epoch = int(checkpoint_fn.split('_')[-1].split('.')[0])
         max_checkpoint_epoch = max(max_checkpoint_epoch, checkpoint_epoch)
         if checkpoint_epoch == max_checkpoint_epoch:
             latest_checkpoint_idx = cidx

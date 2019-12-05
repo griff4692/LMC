@@ -37,11 +37,14 @@ class SkipGramBatchLoader:
         batch_idxs = self.batches[self.batch_ct]
         center_ids = ids[batch_idxs]
         context_ids = np.zeros([self.batch_size, window_size * 2], dtype=int)
+        actual_window_sizes = []
         for batch_idx, center_idx in enumerate(batch_idxs):
             example_context_ids = self.extract_context_ids(ids, center_idx, window_size)
-            context_ids[batch_idx, :len(example_context_ids)] = example_context_ids
+            actual_window_size = len(example_context_ids)
+            context_ids[batch_idx, :actual_window_size] = example_context_ids
+            actual_window_sizes.append(actual_window_size)
         self.batch_ct += 1
-        return center_ids, context_ids
+        return center_ids, context_ids, actual_window_sizes
 
     def reset(self):
         batch_idxs = np.array(list(set(np.arange(self.N)) - set(self.ignore_idxs)))
