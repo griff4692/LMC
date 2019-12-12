@@ -13,6 +13,7 @@ from batcher import SkipGramBatchLoader
 from model_utils import restore_model
 from vae import VAE
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+from doc_ids import parse_doc_ids
 from vocab import Vocab
 
 
@@ -45,6 +46,13 @@ if __name__ == '__main__':
     # Load Data
     debug_str = '_mini' if args.debug else ''
 
+    ids_infile = os.path.join(args.data_dir, 'ids{}.npy'.format(debug_str))
+    print('Loading data...')
+    with open(ids_infile, 'rb') as fd:
+        ids = np.load(fd)
+        if not ids[0] == 0:
+            ids = np.insert(ids, [0], 0)
+
     # Load Vocabulary
     print('Loading vocabulary...')
     vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
@@ -53,35 +61,17 @@ if __name__ == '__main__':
     token_vocab_size = vocab.size()
     print('Loaded vocabulary of size={}...'.format(token_vocab_size))
 
-    ids_infile = os.path.join(args.data_dir, 'ids{}.npy'.format(debug_str))
-    print('Loading data...')
-    with open(ids_infile, 'rb') as fd:
-        ids = np.load(fd)
-        if not ids[0] == 0:
-            ids = np.insert(ids, [0], 0)
-
     print('Collecting document information...')
-    # TODO make this part of preprocessing
-    num_tokens = len(ids)
-    # The document boundary index (pad_idx = 0) is never going to be a center word
-    doc_pos_idxs = np.where(ids == 0)[0]
-    num_docs = len(doc_pos_idxs)
-    doc_ids = []
-    for doc_num, doc_pos_idx in enumerate(doc_pos_idxs):
-        doc_id = vocab.add_token('doc@ids[{}]'.format(doc_pos_idx))
-        if doc_num + 1 == len(doc_pos_idxs):
-            doc_len = len(ids) - doc_pos_idx
-        else:
-            doc_len = doc_pos_idxs[doc_num + 1] - doc_pos_idx
-        doc_ids += [doc_id] * doc_len
-        ids[doc_pos_idx] = -doc_id  # Make doc_ids be negative so we know difference between word and document easily
-    full_vocab_size = vocab.size()
+    doc_pos_idxs, doc_ids, doc_id_range = parse_doc_ids(vocab, ids, doc2vec=args.doc2vec)
+    if not vocab.size() == token_vocab_size:
+        assert args.doc2vec
+        print('We have added {} doc_ids as pseudo documents'.format(vocab.size() - token_vocab_size))
 
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
     print('Training on {}...'.format(device_str))
 
-    batcher = SkipGramBatchLoader(num_tokens, doc_pos_idxs, batch_size=args.batch_size, doc2vec=args.doc2vec)
+    batcher = SkipGramBatchLoader(len(ids), doc_pos_idxs, batch_size=args.batch_size, doc2vec=args.doc2vec)
 
     # Load pretrained word embeddings if requested
     pretrained_in_fn = '../preprocess/data/embeddings{}.npy'.format(debug_str)
@@ -91,8 +81,7 @@ if __name__ == '__main__':
             pretrained_embeddings = np.load(fd)
             assert vocab.size() == pretrained_embeddings.shape[0]
 
-    vae_model = VAE(args, full_vocab_size, pretrained_embeddings=pretrained_embeddings, num_docs=num_docs
-                    ).to(args.device)
+    vae_model = VAE(args, vocab.size(), pretrained_embeddings=pretrained_embeddings).to(args.device)
     if args.restore_experiment is not None:
         prev_args, vae_model, vocab, optimizer_state = restore_model(args.restore_experiment)
 
@@ -109,9 +98,6 @@ if __name__ == '__main__':
         rmtree(weights_dir)
     os.mkdir(weights_dir)
 
-    # Documents are stored at the end of the vocabulary
-    doc_id_range = np.arange(token_vocab_size, full_vocab_size)
-
     # Make sure it's calculating gradients
     vae_model.train()  # just sets .requires_grad = True
     for epoch in range(1, args.epochs + 1):
@@ -124,14 +110,14 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            center_ids, context_ids, num_contexts = batcher.next(ids, doc_ids, args.window, add_doc_context=args.doc2vec)
+            center_ids, context_ids, num_contexts = batcher.next(ids, doc_ids, args.window,
+                                                                 add_doc_id_as_context=args.doc2vec)
             center_ids_tens = torch.LongTensor(center_ids).to(args.device)
             context_ids_tens = torch.LongTensor(context_ids).to(args.device)
 
             neg_ids = vocab.neg_sample(size=context_ids_tens.shape)
             if args.doc2vec:
-                neg_doc_ids = np.random.choice(doc_id_range, size=(args.batch_size))
-                neg_ids[:, 0] = neg_doc_ids
+                neg_ids[:, 0] = np.random.choice(doc_id_range, size=(args.batch_size))
             neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
 
             kl_loss, recon_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts, args.device)

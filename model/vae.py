@@ -7,10 +7,10 @@ from compute_utils import kl_spher, mask_2D
 
 
 class VAE(nn.Module):
-    def __init__(self, args, vocab_size, num_docs=None, pretrained_embeddings=None):
+    def __init__(self, args, vocab_size, pretrained_embeddings=None):
         super(VAE, self).__init__()
 
-        self.encoder = Encoder(args, vocab_size, doc_vocab_size=num_docs + 1)
+        self.encoder = Encoder(args, vocab_size)
 
         self.margin = args.hinge_loss_margin or 1.0
 
