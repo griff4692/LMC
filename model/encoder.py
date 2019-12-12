@@ -5,12 +5,12 @@ import torch.utils.data
 
 
 class Encoder(nn.Module):
-    def __init__(self, args, vocab_size):
+    def __init__(self, args, vocab_size, var_dim):
         super(Encoder, self).__init__()
         self.embeddings = nn.Embedding(vocab_size, args.encoder_input_dim, padding_idx=0)
         self.f = nn.Linear(args.encoder_input_dim * 2, args.encoder_hidden_dim, bias=True)
         self.u = nn.Linear(args.encoder_hidden_dim, args.latent_dim, bias=True)
-        self.v = nn.Linear(args.encoder_hidden_dim, 1, bias=True)
+        self.v = nn.Linear(args.encoder_hidden_dim, var_dim, bias=True)
         
     def forward(self, center_ids, context_ids, mask):
         """

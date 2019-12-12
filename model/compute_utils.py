@@ -3,6 +3,21 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.distributions.kl import kl_divergence
 
 
+def compute_kl(mu_a, sigma_a, mu_b, sigma_b, device=None):
+    """
+    :param mu_a: mean vector of batch_size x dim
+    :param sigma_a: standard deviation of batch_size x {1, dim}
+    :param mu_b: mean vector of batch_size x dim
+    :param sigma_b: standard deviation of batch_size x {1, dim}
+    :return: computes KL-Divergence between 2 diagonal Gaussian (a||b)
+    """
+    var_dim = sigma_a.size()[-1]
+    assert sigma_b.size()[-1] == var_dim
+    if var_dim == 1:
+        return kl_spher(mu_a, sigma_a, mu_b, sigma_b)
+    return kl_diag(mu_a, sigma_a, mu_b, sigma_b, device=device)
+
+
 def kl_spher(mu_a, sigma_a, mu_b, sigma_b):
     """
     :param mu_a: mean vector of batch_size x dim
@@ -20,14 +35,17 @@ def kl_spher(mu_a, sigma_a, mu_b, sigma_b):
     return res
 
 
-def kl_diag(mu_a, sigma_a, mu_b, sigma_b):
+def kl_diag(mu_a, sigma_a, mu_b, sigma_b, device=None):
     """
     :param mu_a: mean vector of batch_size x dim
-    :param sigma_a: standard deviation of batch_size x 1
+    :param sigma_a: standard deviation of batch_size x dim
     :param mu_b: mean vector of batch_size x dim
-    :param sigma_b: standard deviation of batch_size x 1
-    :return: computes KL-Divergence between 2 spherical Gaussian (a||b)
+    :param sigma_b: standard deviation of batch_size x dim
+    :return: computes KL-Divergence between 2 diagonal Gaussians (a||b)
     """
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     batch_size, components = mu_a.size()
     _, var_dim = sigma_a.size()
 
@@ -39,10 +57,10 @@ def kl_diag(mu_a, sigma_a, mu_b, sigma_b):
         sigma_a_tiled = sigma_a
         sigma_b_tiled = sigma_b
 
-    a_covar = torch.zeros(batch_size, components, components)
+    a_covar = torch.zeros(batch_size, components, components).to(device)
+    b_covar = a_covar.clone()
     a_covar[:, range(components), range(components)] = sigma_a_tiled
 
-    b_covar = torch.zeros(batch_size, components, components)
     b_covar[:, range(components), range(components)] = sigma_b_tiled
 
     dist_a = MultivariateNormal(mu_a, covariance_matrix=a_covar)

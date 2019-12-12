@@ -10,7 +10,7 @@ import torch
 from tqdm import tqdm
 
 from batcher import SkipGramBatchLoader
-from model_utils import restore_model
+from model_utils import restore_model, save_checkpoint
 from vae import VAE
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from doc_ids import parse_doc_ids
@@ -34,12 +34,13 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
     parser.add_argument('-use_pretrained', default=False, action='store_true')
+    parser.add_argument('-full_variance', default=False, action='store_true')
 
     # Model Hyperparameters
     parser.add_argument('--encoder_hidden_dim', default=64, type=int, help='hidden dimension for encoder')
     parser.add_argument('--encoder_input_dim', default=64, type=int, help='embedding dimemsions for encoder')
     parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
-    parser.add_argument('--latent_dim', default=200, type=int, help='z dimension')
+    parser.add_argument('--latent_dim', default=100, type=int, help='z dimension')
 
     args = parser.parse_args()
 
@@ -81,12 +82,13 @@ if __name__ == '__main__':
             pretrained_embeddings = np.load(fd)
             assert vocab.size() == pretrained_embeddings.shape[0]
 
-    vae_model = VAE(args, vocab.size(), pretrained_embeddings=pretrained_embeddings).to(args.device)
+    model = (VAE(args, vocab.size(), pretrained_embeddings=pretrained_embeddings, full_variance=args.full_variance)
+                 .to(args.device))
     if args.restore_experiment is not None:
-        prev_args, vae_model, vocab, optimizer_state = restore_model(args.restore_experiment)
+        prev_args, model, vocab, optimizer_state = restore_model(args.restore_experiment)
 
     # Instantiate Adam optimizer
-    trainable_params = filter(lambda x: x.requires_grad, vae_model.parameters())
+    trainable_params = filter(lambda x: x.requires_grad, model.parameters())
     optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
     if args.restore_experiment is not None:
         optimizer.load_state_dict(optimizer_state)
@@ -99,7 +101,7 @@ if __name__ == '__main__':
     os.mkdir(weights_dir)
 
     # Make sure it's calculating gradients
-    vae_model.train()  # just sets .requires_grad = True
+    model.train()  # just sets .requires_grad = True
     for epoch in range(1, args.epochs + 1):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
         print('Starting Epoch={}'.format(epoch))
@@ -120,7 +122,7 @@ if __name__ == '__main__':
                 neg_ids[:, 0] = np.random.choice(doc_id_range, size=(args.batch_size))
             neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
 
-            kl_loss, recon_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts, args.device)
+            kl_loss, recon_loss = model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts)
             joint_loss = kl_loss + recon_loss
             joint_loss.backward()  # backpropagate loss
 
@@ -138,13 +140,5 @@ if __name__ == '__main__':
 
         # Serializing everything from model weights and optimizer state, to to loss function and arguments
         losses_dict = {'losses': {'joint': epoch_joint_loss, 'kl': epoch_kl_loss, 'recon': epoch_recon_loss}}
-        state_dict = {'model_state_dict': vae_model.state_dict()}
-        state_dict.update(losses_dict)
-        state_dict.update({'optimizer_state_dict': optimizer.state_dict()})
-        args_dict = {'args': {arg: getattr(args, arg) for arg in vars(args)}}
-        state_dict.update(args_dict)
-        state_dict.update({'vocab': vocab})
-        # Serialize model and statistics
         checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
-        print('Saving model state to {}'.format(checkpoint_fp))
-        torch.save(state_dict, checkpoint_fp)
+        save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
