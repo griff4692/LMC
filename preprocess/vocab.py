@@ -24,6 +24,7 @@ class Vocab:
             self.i2w.append(token)
             self.support.append(0)
         self.support[self.get_id(token)] += token_support
+        return self.w2i[token]
 
     def neg_sample(self, size=None):
         if self.cached_neg_sample_prob is None:

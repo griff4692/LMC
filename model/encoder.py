@@ -5,20 +5,13 @@ import torch.utils.data
 
 
 class Encoder(nn.Module):
-    def __init__(self, args, vocab_size):
+    def __init__(self, args, vocab_size, doc_vocab_size):
         super(Encoder, self).__init__()
         self.embeddings = nn.Embedding(vocab_size, args.encoder_input_dim, padding_idx=0)
+        self.doc_embeddings = nn.Embedding(doc_vocab_size, args.encoder_input_dim, padding_idx=0)
         self.f = nn.Linear(args.encoder_input_dim * 2, args.encoder_hidden_dim, bias=True)
         self.u = nn.Linear(args.encoder_hidden_dim, args.latent_dim, bias=True)
         self.v = nn.Linear(args.encoder_hidden_dim, 1, bias=True)
-
-    def _compute_mask(self, target_size, num_contexts):
-        mask = torch.ByteTensor(target_size)
-        mask.fill_(0)
-        for batch_idx, num_c in enumerate(num_contexts):
-            if num_c < target_size[1]:
-                mask[batch_idx, num_c:, :] = 1
-        return mask
         
     def forward(self, center_ids, context_ids, mask):
         """

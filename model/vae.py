@@ -7,10 +7,10 @@ from compute_utils import kl_spher, mask_2D
 
 
 class VAE(nn.Module):
-    def __init__(self, args, vocab_size, pretrained_embeddings=None):
+    def __init__(self, args, vocab_size, num_docs=None, pretrained_embeddings=None):
         super(VAE, self).__init__()
 
-        self.encoder = Encoder(args, vocab_size)
+        self.encoder = Encoder(args, vocab_size, doc_vocab_size=num_docs + 1)
 
         self.margin = args.hinge_loss_margin or 1.0
 
@@ -52,6 +52,9 @@ class VAE(nn.Module):
         hinge_loss.masked_fill_(mask, 0)
         return hinge_loss.sum(1)
 
+    def _compute_doc_priors(self, ids):
+        return self.doc_embeddings_mu(ids), self.doc_embeddings_log_sigma(ids).exp()
+
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
@@ -67,6 +70,7 @@ class VAE(nn.Module):
         batch_size, num_context_ids = context_ids.size()
         mask_size = torch.Size([batch_size, num_context_ids])
         mask = mask_2D(mask_size, num_contexts).to(device)
+        mask[:, -1] = 0  # don't mask doc_ids
 
         mu_q, sigma_q = self.encoder(center_ids, context_ids, mask)
 

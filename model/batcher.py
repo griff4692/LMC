@@ -2,8 +2,9 @@ import numpy as np
 
 
 class SkipGramBatchLoader:
-    def __init__(self, N, ignore_idxs, batch_size=32):
+    def __init__(self, N, ignore_idxs, batch_size=32, doc2vec=False):
         self.ignore_idxs = ignore_idxs
+        self.calculate_doc_ids = doc2vec
         self.batch_size = batch_size
         self.N = N
         self.batch_ct, self.batches = 0, None
@@ -22,8 +23,8 @@ class SkipGramBatchLoader:
         left_context = ids[start_idx:center_idx]
         right_context = ids[center_idx + 1:end_idx]
 
-        doc_boundary_left = np.where(left_context == 0)[0]
-        doc_boundary_right = np.where(right_context == 0)[0]
+        doc_boundary_left = np.where(left_context <= 0)[0]
+        doc_boundary_right = np.where(right_context <= 0)[0]
 
         left_trunc_idx = 0 if len(doc_boundary_left) == 0 else doc_boundary_left[-1] + 1
         right_trunc_idx = len(right_context) if len(doc_boundary_right) == 0 else doc_boundary_right[0]
@@ -33,15 +34,18 @@ class SkipGramBatchLoader:
 
         return np.concatenate([left_context_truncated, right_context_truncated])
 
-    def next(self, ids, window_size):
+    def next(self, ids, doc_ids, window_size, add_doc_context=False):
         batch_idxs = self.batches[self.batch_ct]
         center_ids = ids[batch_idxs]
-        context_ids = np.zeros([self.batch_size, window_size * 2], dtype=int)
+        num_pseudo_contexts = 1 if add_doc_context else 0
+        context_ids = np.zeros([self.batch_size, (window_size * 2) + num_pseudo_contexts], dtype=int)
         actual_window_sizes = []
         for batch_idx, center_idx in enumerate(batch_idxs):
             example_context_ids = self.extract_context_ids(ids, center_idx, window_size)
-            actual_window_size = len(example_context_ids)
-            context_ids[batch_idx, :actual_window_size] = example_context_ids
+            actual_window_size = len(example_context_ids) + num_pseudo_contexts
+            if add_doc_context:
+                context_ids[batch_idx, 0] = doc_ids[center_idx]
+            context_ids[batch_idx, num_pseudo_contexts:actual_window_size] = example_context_ids
             actual_window_sizes.append(actual_window_size)
         self.batch_ct += 1
         return center_ids, context_ids, actual_window_sizes
