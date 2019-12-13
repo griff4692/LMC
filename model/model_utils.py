@@ -14,6 +14,11 @@ def tensor_to_np(tens):
         return tens.cpu().numpy()
 
 
+def render_args(args):
+    for arg in vars(args):
+        print('{}={}'.format(arg, getattr(args, arg)))
+
+
 def restore_model(restore_name):
     checkpoint_dir = os.path.join('weights', restore_name)
     checkpoint_fns = os.listdir(checkpoint_dir)

@@ -56,9 +56,6 @@ class VAE(nn.Module):
         hinge_loss.masked_fill_(mask, 0)
         return hinge_loss.sum(1)
 
-    def _compute_doc_priors(self, ids):
-        return self.doc_embeddings_mu(ids), self.doc_embeddings_log_sigma(ids).exp()
-
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
