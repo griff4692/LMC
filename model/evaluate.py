@@ -1,10 +1,15 @@
 from collections import defaultdict
+import re
+import string
 import sys
 
 import argparse
+import numpy as np
+from nltk import word_tokenize
+from nltk.corpus import stopwords
+import pandas as pd
 from scipy.spatial.distance import cosine
 from scipy.stats import spearmanr, pearsonr
-import pandas as pd
 import torch
 
 from compute_utils import compute_kl
@@ -12,6 +17,7 @@ from model_utils import restore_model, tensor_to_np
 from vae import VAE
 
 
+STOPWORDS = set(stopwords.words('english'))
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 
 
@@ -35,6 +41,62 @@ def point_similarity(model, vocab, tokens_a, tokens_b):
 
 
 def evaluate_acronyms(prev_args, model, vocab):
+    data_fp = '../eval_data/minnesota/AnonymizedClinicalAbbreviationsAndAcronymsDataSet.txt'
+    # cols = ['sf', 'target_lf', 'sf_rep', 'start_idx', 'end_idx', 'section', 'context']
+    df = pd.read_csv(data_fp, sep='|')[:100]
+    df.dropna(subset=['sf', 'target_lf', 'context'], inplace=True)
+
+    # Tokenize
+    sf_occurrences = []  # When multiple of SF in context, keep track of which one the label is for
+    tokenized_contexts = []
+    for row_idx, row in df.iterrows():
+        row = row.to_dict()
+        try:
+            sf_idxs = [m.start() for m in re.finditer(row['sf'], row['context'])]
+        except:
+            TypeError
+        target_start_idx = int(row['start_idx'])
+
+        sf_occurrence_ct = np.where(np.array(sf_idxs) == target_start_idx)[0]
+        if len(sf_occurrence_ct) == 0:
+            # print('SF not present in context for row={}'.format(row_idx))
+            sf_occurrences.append(0)
+            tokenized_contexts.append(None)
+        else:
+            assert len(sf_occurrence_ct) == 1
+            sf_occurrences.append(sf_occurrence_ct[0])
+            filtered = re.sub(r'_%#\S+#%_', '', row['context']).lower()
+            filtered = filtered.translate(str.maketrans(string.punctuation, ' '* len(string.punctuation)))
+            filtered = re.sub(r'\b(\d+)\b', ' ', filtered)
+            filtered = re.sub(r'\s+', ' ', filtered)
+            tokens = word_tokenize(filtered)
+            tokens = [t for t in tokens if t not in STOPWORDS]
+            tokenized_contexts.append(tokens)
+
+    context_tokens = []
+    context_ids = []
+    for sf, sf_label_order, tokens in zip(df['sf'].tolist(), sf_occurrences, tokenized_contexts):
+        if tokens is None:
+            context_tokens.append(None)
+            context_ids.append(None)
+        else:
+            sf_idxs = np.where(np.array(tokens) == sf.lower())[0]
+            sf_idx = sf_idxs[sf_label_order]
+            start_idx = max(0, sf_idx - prev_args.window)
+            end_idx = min(sf_idx + prev_args.window + 1, len(tokens))
+            context = tokens[start_idx:sf_idx] + tokens[sf_idx + 1: end_idx]
+            context_tokens.append(context)
+            context_ids.append([
+                vocab.get_id(token) for token in context
+            ])
+
+    # TODO add proper masking
+
+
+
+
+
+def evaluate_mimic_acronyms(prev_args, model, vocab):
     print('Evaluating context-dependent representations via acronym disambiguation...')
     label_df = pd.read_csv('../eval_data/mimic_acronym_expansion_labels.csv')
     expansion_df = pd.read_csv('../eval_data/acronym_expansions.csv')
