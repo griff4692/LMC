@@ -10,7 +10,7 @@ import torch
 from tqdm import tqdm
 
 from batcher import SkipGramBatchLoader
-from model_utils import render_args, restore_model, save_checkpoint
+from model_utils import get_git_revision_hash, render_args, restore_model, save_checkpoint
 from vae import VAE
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from doc_ids import parse_doc_ids
@@ -43,6 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--latent_dim', default=100, type=int, help='z dimension')
 
     args = parser.parse_args()
+    args.git_hash = get_git_revision_hash()
     render_args(args)
 
     # Load Data

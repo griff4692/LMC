@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 import argparse
 import torch
@@ -6,12 +7,8 @@ import torch
 from vae import VAE
 
 
-def tensor_to_np(tens):
-    tens = tens.detach()
-    try:
-        return tens.numpy()
-    except TypeError:
-        return tens.cpu().numpy()
+def get_git_revision_hash():
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip().decode('utf-8')
 
 
 def render_args(args):
@@ -57,3 +54,11 @@ def save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=No
     # Serialize model and statistics
     print('Saving model state to {}'.format(checkpoint_fp))
     torch.save(state_dict, checkpoint_fp)
+
+
+def tensor_to_np(tens):
+    tens = tens.detach()
+    try:
+        return tens.numpy()
+    except TypeError:
+        return tens.cpu().numpy()
