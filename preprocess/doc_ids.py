@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def parse_doc_ids(vocab, ids, doc2vec=False):
+def parse_doc_ids(vocab, ids, doc2vec=True):
     # TODO make this part of preprocessing
     token_vocab_size = vocab.size()
 
@@ -21,7 +21,7 @@ def parse_doc_ids(vocab, ids, doc2vec=False):
         else:
             doc_len = doc_pos_idxs[doc_num + 1] - doc_pos_idx
         doc_ids += [doc_id] * doc_len
-        ids[doc_pos_idx] = -doc_id  # Make doc_ids be negative so we know difference between word and document easily
+        ids[doc_pos_idx] = doc_id  # Make doc_ids be negative so we know difference between word and document easily
     full_vocab_size = vocab.size()
     # Documents are stored at the end of the vocabulary
     doc_id_range = np.arange(token_vocab_size, full_vocab_size)

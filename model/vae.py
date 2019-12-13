@@ -4,10 +4,12 @@ import torch.nn as nn
 
 from encoder import Encoder
 from compute_utils import kl_spher, mask_2D
+from torch.distributions.multivariate_normal import MultivariateNormal
 
+from torch.autograd import Variable
 
 class VAE(nn.Module):
-    def __init__(self, args, vocab_size, pretrained_embeddings=None):
+    def __init__(self, args, vocab_size,numb_docs, pretrained_embeddings=None):
         super(VAE, self).__init__()
 
         self.encoder = Encoder(args, vocab_size)
@@ -23,6 +25,20 @@ class VAE(nn.Module):
         self.embeddings_log_sigma = nn.Embedding(vocab_size, 1, padding_idx=0)
         log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
         self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
+        
+        
+        #Write document priors
+        self.priors_doc_mu = Variable(torch.empty(numb_docs+1, 
+                                                  args.latent_dim).normal_(mean=1,std=0.1), requires_grad=False)
+        self.priors_doc_sigma = Variable(torch.empty(numb_docs+1, 1).normal_(mean=1,std=0.1), requires_grad=False)
+
+        
+        #Write document embeddings     
+        self.embeddings_doc_mu = nn.Embedding(numb_docs+1, args.latent_dim)
+        self.embeddings_doc_log_sigma =  nn.Embedding(numb_docs+1, 1)
+        
+        log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(numb_docs+1, 1))
+        self.embeddings_doc_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
 
     def _max_margin(self, mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p, mask):
         """
@@ -58,7 +74,7 @@ class VAE(nn.Module):
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
-    def forward(self, center_ids, context_ids, neg_context_ids, num_contexts, device):
+    def forward(self, center_ids, context_ids, neg_context_ids, num_contexts, device, selected_doc_ids):
         """
         :param center_ids: batch_size
         :param context_ids: batch_size, 2 * context_window
@@ -66,6 +82,7 @@ class VAE(nn.Module):
         :param num_contexts: batch_size (how many context words for each center id - necessary for masking padding)
         :return: cost components: KL-Divergence (q(z|w,c) || p(z|w)) and max margin (reconstruction error)
         """
+        
         # Mask padded context ids
         batch_size, num_context_ids = context_ids.size()
         mask_size = torch.Size([batch_size, num_context_ids])
@@ -81,4 +98,20 @@ class VAE(nn.Module):
 
         kl = kl_spher(mu_q, sigma_q, mu_p, sigma_p).mean()
         max_margin = self._max_margin(mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p, mask).mean()
-        return kl, max_margin
+        
+        selected_doc_ids = torch.tensor(selected_doc_ids).long().to(device)
+        
+        prior_doc_mu = self.priors_doc_mu[selected_doc_ids].to(device)
+        prior_doc_sigma = torch.diag_embed(self.priors_doc_sigma[selected_doc_ids].repeat(1,mu_p.shape[1])).to(device)
+        prior_doc_dist = MultivariateNormal(prior_doc_mu,prior_doc_sigma)
+        doc_mu =self.embeddings_doc_mu(selected_doc_ids).to(device)
+        regularization = prior_doc_dist.log_prob(doc_mu).sum(0)
+        
+        
+        posterior_doc_mu = self.embeddings_doc_mu(selected_doc_ids).to(device)
+        posterior_doc_sigma =  torch.diag_embed(self.embeddings_doc_log_sigma(selected_doc_ids).exp().repeat(1,mu_p.shape[1])).to(device)
+
+        posterior_doc_dist = MultivariateNormal(posterior_doc_mu,posterior_doc_sigma)
+        p_likelihood = posterior_doc_dist.log_prob(mu_p).sum(0)
+        
+        return kl, max_margin, regularization+p_likelihood

@@ -23,13 +23,13 @@ if __name__ == '__main__':
     # Functional Arguments
     parser.add_argument('-cpu', action='store_true', default=False)
     parser.add_argument('-debug', action='store_true', default=False)
-    parser.add_argument('--data_dir', default='../preprocess/data/')
+    parser.add_argument('--data_dir', default='data/')
     parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
     parser.add_argument('--restore_experiment', default=None, help='Experiment name from which to restore.')
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=256, type=int)
-    parser.add_argument('-doc2vec', default=False, action='store_true')
+    parser.add_argument('-doc2vec', default=True, action='store_true')
     parser.add_argument('--epochs', default=25, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('--encoder_hidden_dim', default=64, type=int, help='hidden dimension for encoder')
     parser.add_argument('--encoder_input_dim', default=64, type=int, help='embedding dimemsions for encoder')
     parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
-    parser.add_argument('--latent_dim', default=200, type=int, help='z dimension')
+    parser.add_argument('--latent_dim', default=50, type=int, help='z dimension')
 
     args = parser.parse_args()
 
@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     # Load Vocabulary
     print('Loading vocabulary...')
-    vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
+    vocab_infile = 'data/vocab{}.pk'.format(debug_str)
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
     token_vocab_size = vocab.size()
@@ -74,14 +74,14 @@ if __name__ == '__main__':
     batcher = SkipGramBatchLoader(len(ids), doc_pos_idxs, batch_size=args.batch_size, doc2vec=args.doc2vec)
 
     # Load pretrained word embeddings if requested
-    pretrained_in_fn = '../preprocess/data/embeddings{}.npy'.format(debug_str)
+    pretrained_in_fn = 'data/embeddings{}.npy'.format(debug_str)
     pretrained_embeddings = None
     if args.use_pretrained:
         with open(pretrained_in_fn, 'rb') as fd:
             pretrained_embeddings = np.load(fd)
             assert vocab.size() == pretrained_embeddings.shape[0]
 
-    vae_model = VAE(args, vocab.size(), pretrained_embeddings=pretrained_embeddings).to(args.device)
+    vae_model = VAE(args, vocab.size(),max(doc_ids), pretrained_embeddings=pretrained_embeddings).to(args.device)
     if args.restore_experiment is not None:
         prev_args, vae_model, vocab, optimizer_state = restore_model(args.restore_experiment)
 
@@ -110,18 +110,17 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            center_ids, context_ids, num_contexts = batcher.next(ids, doc_ids, args.window,
+            center_ids, context_ids, num_contexts,selected_doc_ids = batcher.next(ids, doc_ids, args.window,
                                                                  add_doc_id_as_context=args.doc2vec)
             center_ids_tens = torch.LongTensor(center_ids).to(args.device)
             context_ids_tens = torch.LongTensor(context_ids).to(args.device)
 
             neg_ids = vocab.neg_sample(size=context_ids_tens.shape)
-            if args.doc2vec:
-                neg_ids[:, 0] = np.random.choice(doc_id_range, size=(args.batch_size))
+
             neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
 
-            kl_loss, recon_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts, args.device)
-            joint_loss = kl_loss + recon_loss
+            kl_loss, recon_loss, likelihood = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts, args.device,selected_doc_ids)
+            joint_loss = kl_loss + recon_loss - likelihood
             joint_loss.backward()  # backpropagate loss
 
             epoch_kl_loss += kl_loss.item()

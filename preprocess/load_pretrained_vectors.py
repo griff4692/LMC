@@ -15,7 +15,7 @@ from vocab import Vocab
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('MIMIC (v3) Collect Pretrained Embeddings.')
-    parser.add_argument('--biowordvec_fp', default='~/BioWordVec_PubMed_MIMICIII_d200.vec.bin')
+    parser.add_argument('--biowordvec_fp', default='BioWordVec_PubMed_MIMICIII_d200.vec.bin')
     parser.add_argument('-debug', action='store_true', default=False)
 
     args = parser.parse_args()
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     # Expand home path (~) so that pandas knows where to look
     debug_str = '_mini' if args.debug else ''
     args.biowordvec_fp = os.path.expanduser(args.biowordvec_fp)
-    vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
+    vocab_infile = 'data/vocab{}.pk'.format(debug_str)
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
 

@@ -159,6 +159,7 @@ if __name__ == '__main__':
     print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
 
     categories = df['CATEGORY'].tolist()
+    
     p = Pool(processes=10)
     parsed_docs = tqdm(p.map(preprocess_mimic_doc, df['TEXT'].tolist()))
     p.close()

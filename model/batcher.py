@@ -2,7 +2,7 @@ import numpy as np
 
 
 class SkipGramBatchLoader:
-    def __init__(self, N, ignore_idxs, batch_size=32, doc2vec=False):
+    def __init__(self, N, ignore_idxs, batch_size=1000, doc2vec=False):
         self.ignore_idxs = ignore_idxs
         self.calculate_doc_ids = doc2vec
         self.batch_size = batch_size
@@ -34,21 +34,21 @@ class SkipGramBatchLoader:
 
         return np.concatenate([left_context_truncated, right_context_truncated])
 
-    def next(self, ids, doc_ids, window_size, add_doc_id_as_context=False):
+    def next(self, ids, doc_ids, window_size, add_doc_id_as_context=True):
         batch_idxs = self.batches[self.batch_ct]
         center_ids = ids[batch_idxs]
-        num_pseudo_contexts = 1 if add_doc_id_as_context else 0
-        context_ids = np.zeros([self.batch_size, (window_size * 2) + num_pseudo_contexts], dtype=int)
+        num_pseudo_contexts = 0
+        context_ids = np.zeros([self.batch_size, (window_size * 2)], dtype=int)
         actual_window_sizes = []
+        current_doc_id = np.zeros(self.batch_size)
         for batch_idx, center_idx in enumerate(batch_idxs):
             example_context_ids = self.extract_context_ids(ids, center_idx, window_size)
             actual_window_size = len(example_context_ids) + num_pseudo_contexts
-            if add_doc_id_as_context:
-                context_ids[batch_idx, 0] = doc_ids[center_idx]
+            current_doc_id[batch_idx] = doc_ids[center_idx]
             context_ids[batch_idx, num_pseudo_contexts:actual_window_size] = example_context_ids
             actual_window_sizes.append(actual_window_size)
         self.batch_ct += 1
-        return center_ids, context_ids, actual_window_sizes
+        return center_ids, context_ids, actual_window_sizes, current_doc_id
 
     def reset(self):
         batch_idxs = np.array(list(set(np.arange(self.N)) - set(self.ignore_idxs)))

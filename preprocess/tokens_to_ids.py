@@ -18,7 +18,7 @@ def tokens_to_ids(args, token_infile=None):
         tokens = json.load(fd)
 
     # Load Vocabulary
-    vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
+    vocab_infile = 'data/vocab{}.pk'.format(debug_str)
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
 
@@ -40,7 +40,7 @@ def tokens_to_ids(args, token_infile=None):
 if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC (v3) Note Tokens to Ids.')
 
-    arguments.add_argument('--tokenized_fp', default='~/Desktop/mimic/NOTEEVENTS_tokenized_subsampled')
+    arguments.add_argument('--tokenized_fp', default='/data/mimic/NOTEEVENTS_tokenized_subsampled')
     arguments.add_argument('-debug', default=False, action='store_true')
 
     args = arguments.parse_args()
