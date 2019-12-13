@@ -74,7 +74,7 @@ def evaluate_acronyms(prev_args, model, vocab):
         center_id_tens = torch.LongTensor([center_id]).to(prev_args.device).clamp_min_(0)
         context_id_tens = torch.LongTensor(context_id_seq).unsqueeze(0).to(prev_args.device).clamp_min_(0)
 
-        mask = torch.BoolTensor(torch.Size([1, len(context_id_seq)]))
+        mask = torch.BoolTensor(torch.Size([1, len(context_id_seq)])).to(prev_args.device)
         mask.fill_(0)
 
         p_mu, p_sigma = model._compute_priors(center_id_tens)
