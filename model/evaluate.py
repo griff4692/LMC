@@ -33,20 +33,43 @@ def point_similarity(model, vocab, tokens_a, tokens_b):
 
 
 def evaluate_word_similarity(model, vocab):
-    word_sim_df = pd.read_csv('../eval_data/MayoSRS.csv')
-    human_scores = word_sim_df['Mean'].tolist()
-    known_model_relatedness, known_human_scores = [], []
-    for row_idx, row in word_sim_df.iterrows():
-        row = row.to_dict()
-        t1 = row['TERM1']
-        t2 = row['TERM2']
-        sim = point_similarity(model, vocab, t1, t2)
-        if not sim == 0.0:
-            known_human_scores.append(human_scores[row_idx])
-            known_model_relatedness.append(sim)
-    pear_corr, _ = pearsonr(known_model_relatedness, known_human_scores)
-    spear_corr, _ = spearmanr(known_model_relatedness, known_human_scores)
-    return pear_corr, spear_corr
+    umnrs = {
+        'name': 'UMNRS',
+        'file': '../eval_data/UMNSRS_relatedness.csv',
+        'label': 'Mean',
+        't1': 'Term1',
+        't2': 'Term2',
+    }
+
+    mayo = {
+        'name': 'MayoSRS',
+        'file': '../eval_data/MayoSRS.csv',
+        'label': 'Mean',
+        't1': 'TERM1',
+        't2': 'TERM2',
+    }
+
+    sim_datasets = [umnrs, mayo]
+
+    for didx, sim_dataset in enumerate(sim_datasets):
+        word_sim_df = pd.read_csv(sim_dataset['file'])
+        human_scores = word_sim_df[sim_dataset['label']].tolist()
+        known_model_relatedness, known_human_scores = [], []
+        for row_idx, row in word_sim_df.iterrows():
+            row = row.to_dict()
+            t1 = row[sim_dataset['t1']].lower()
+            t2 = row[sim_dataset['t2']].lower()
+            sim = point_similarity(model, vocab, t1, t2)
+            if not sim == 0.0:  # means both terms are OOV
+                known_human_scores.append(human_scores[row_idx])
+                known_model_relatedness.append(sim)
+        pear_corr, _ = pearsonr(known_model_relatedness, known_human_scores)
+        spear_corr, _ = spearmanr(known_model_relatedness, known_human_scores)
+        sim_datasets[didx]['pearson_correlation'] = pear_corr
+        sim_datasets[didx]['spearman_correlation'] = spear_corr
+        print('{} Evaluation\n\tWord Similarity --> Pearson Corr.={}, Spearman Corr.={}'.format(
+            sim_dataset['name'], pear_corr, spear_corr))
+    return sim_datasets
 
 
 if __name__ == '__main__':
@@ -58,6 +81,7 @@ if __name__ == '__main__':
     parser.add_argument('--experiment', default='debug', help='Save path in weights/ for experiment.')
 
     args = parser.parse_args()
+    args.experiment = 'baseline-v2'
 
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
@@ -70,13 +94,4 @@ if __name__ == '__main__':
     model.eval()  # just sets .requires_grad = False
 
     print('\nEvaluations...')
-    pear_corr, spear_corr = evaluate_word_similarity(model, vocab)
-    print('MayoSRS Evaluation\n\tWord Similarity --> Pearson Corr.={}, Spearman Corr.={}'.format(pear_corr, spear_corr))
-
-    print('lesion', 'nodule', point_similarity(model, vocab, 'lesion', 'nodule'))
-    print('lesion', 'advil', point_similarity(model, vocab, 'lesion', 'advil'))
-    print('pain', 'tolerance', point_similarity(model, vocab, 'pain', 'tolerance'))
-    print('advil', 'tylenol', point_similarity(model, vocab, 'advil', 'tylenol'))
-    print('advil', 'ibruprofen', point_similarity(model, vocab, 'advil', 'ibruprofen'))
-    print('headache', 'migraine', point_similarity(model, vocab, 'headache', 'migraine'))
-    print('tolerance', 'lesion', point_similarity(model, vocab, 'tolerance', 'lesion'))
+    word_sim_results = evaluate_word_similarity(model, vocab)
