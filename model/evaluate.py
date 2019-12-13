@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 import re
 import string
 import sys
@@ -40,60 +41,146 @@ def point_similarity(model, vocab, tokens_a, tokens_b):
     return sim
 
 
-def evaluate_acronyms(prev_args, model, vocab):
-    data_fp = '../eval_data/minnesota/AnonymizedClinicalAbbreviationsAndAcronymsDataSet.txt'
+def tokenize_str(str):
+    filtered = re.sub(r'_%#\S+#%_', '', str).lower()
+    filtered = filtered.translate(str.maketrans(string.punctuation, ' '* len(string.punctuation)))
+    filtered = re.sub(r'\b(\d+)\b', ' ', filtered)
+    filtered = re.sub(r'\s+', ' ', filtered)
+    tokens = word_tokenize(filtered)
+    tokens = [t for t in tokens if t not in STOPWORDS]
+    return tokens
+
+
+def preprocess_minnesota_dataset(window=5):
+    in_fp = '../eval_data/minnesota/AnonymizedClinicalAbbreviationsAndAcronymsDataSet.txt'
+    out_fp = '../eval_data/minnesota/preprocessed_dataset.csv'
     # cols = ['sf', 'target_lf', 'sf_rep', 'start_idx', 'end_idx', 'section', 'context']
-    df = pd.read_csv(data_fp, sep='|')[:100]
+    df = pd.read_csv(in_fp, sep='|')
     df.dropna(subset=['sf', 'target_lf', 'context'], inplace=True)
 
     # Tokenize
     sf_occurrences = []  # When multiple of SF in context, keep track of which one the label is for
     tokenized_contexts = []
+
+    valid_rows = []
     for row_idx, row in df.iterrows():
         row = row.to_dict()
-        try:
-            sf_idxs = [m.start() for m in re.finditer(row['sf'], row['context'])]
-        except:
-            TypeError
+        sf_idxs = [m.start() for m in re.finditer(r'\b({})\b'.format(row['sf']), row['context'])]
         target_start_idx = int(row['start_idx'])
 
         sf_occurrence_ct = np.where(np.array(sf_idxs) == target_start_idx)[0]
         if len(sf_occurrence_ct) == 0:
             # print('SF not present in context for row={}'.format(row_idx))
-            sf_occurrences.append(0)
-            tokenized_contexts.append(None)
+            valid_rows.append(False)
         else:
             assert len(sf_occurrence_ct) == 1
+            valid_rows.append(True)
             sf_occurrences.append(sf_occurrence_ct[0])
-            filtered = re.sub(r'_%#\S+#%_', '', row['context']).lower()
-            filtered = filtered.translate(str.maketrans(string.punctuation, ' '* len(string.punctuation)))
-            filtered = re.sub(r'\b(\d+)\b', ' ', filtered)
-            filtered = re.sub(r'\s+', ' ', filtered)
-            tokens = word_tokenize(filtered)
-            tokens = [t for t in tokens if t not in STOPWORDS]
-            tokenized_contexts.append(tokens)
+            tokenized_contexts.append(tokenize_str(row['context']))
 
-    context_tokens = []
-    context_ids = []
-    for sf, sf_label_order, tokens in zip(df['sf'].tolist(), sf_occurrences, tokenized_contexts):
-        if tokens is None:
-            context_tokens.append(None)
-            context_ids.append(None)
-        else:
-            sf_idxs = np.where(np.array(tokens) == sf.lower())[0]
-            sf_idx = sf_idxs[sf_label_order]
-            start_idx = max(0, sf_idx - prev_args.window)
-            end_idx = min(sf_idx + prev_args.window + 1, len(tokens))
-            context = tokens[start_idx:sf_idx] + tokens[sf_idx + 1: end_idx]
-            context_tokens.append(context)
-            context_ids.append([
-                vocab.get_id(token) for token in context
-            ])
+    df['valid'] = valid_rows
+    prev_n = df.shape[0]
+    df = df[df['valid']]
+    n = df.shape[0]
+    print('Dropping {} rows because we couldn\'t find SF in the context.'.format(n - prev_n))
 
+    trimmed_contexts = []
+    for row_idx, row in df.iterrows():
+        row = row.to_dict()
+        sf_label_order = sf_occurrences[row_idx]
+        tokens = tokenized_contexts[row_idx]
+        sf_idxs = np.where(np.array(tokens) == row['sf'].lower())[0]
+        sf_idx = sf_idxs[sf_label_order]
+
+        start_idx = max(0, sf_idx - window)
+        end_idx = min(sf_idx + window + 1, len(tokens))
+        tc = tokens[start_idx:sf_idx] + tokens[sf_idx + 1: end_idx]
+        trimmed_contexts.append(' '.join(tc))
+
+    df['trimmed_tokens'] = trimmed_contexts
+    df.to_csv(out_fp, index=False)
+
+
+def evaluate_acronyms(prev_args, model, vocab):
+    data_fp = '../eval_data/minnesota/preprocessed_dataset.csv'
+    if not os.path.exists(data_fp):
+        preprocess_minnesota_dataset(prev_args.window)
+
+    df = pd.read_csv(data_fp)
+    N = df.shape[0]
+    context_ids = np.zeros([N, prev_args.window * 2], dtype=int)
+    center_ids = np.zeros([N, ], dtype=int)
+    ct = 0
+    for row_idx, row in df.iterrows():
+        assert row_idx == ct
+        ct += 1
+        row = row.to_dict()
+
+        center_id = vocab.get_id(row['sf'].lower())
+        center_ids[row_idx] = center_id
+        context_id_seq = [vocab.get_id(token.lower()) for token in row['trimmed_tokens'].split()]
+        context_ids[row_idx, :len(context_id_seq)] = context_id_seq
+
+    center_id_tens = torch.LongTensor(center_ids).clamp_min_(0).to(prev_args.device)
+    context_id_tens = torch.LongTensor(context_ids).clamp_min_(0).to(prev_args.device)
     # TODO add proper masking
+    mask = torch.BoolTensor(torch.Size([N, context_id_tens.shape[-1]])).to(prev_args.device)
+    mask.fill_(0)
+    with torch.no_grad():
+        z_mus, z_sigmas = model.encoder(center_id_tens, context_id_tens, mask)
 
+    sense_fp = '../eval_data/minnesota/sense_inventory_ii'
+    sense_df = pd.read_csv(sense_fp, sep='|')
 
+    lfs = sense_df['LF'].unique().tolist()
+    sfs = sense_df['SF'].unique().tolist()
+    lf_sf_map = {}
+    for row_idx, row in sense_df.iterrows():
+        row = row.to_dict()
+        lf_sf_map[row['LF']] = row['SF']
+    tokenized_lfs = list(map(tokenize_str, lfs))
+    tokenized_ids = [list(map(vocab.get_id, tokens)) for tokens in tokenized_lfs]
+    lf_priors = list(map(lambda x: model._compute_priors(torch.LongTensor(x).clamp_min_(0).to(prev_args.device)),
+                         tokenized_ids))
 
+    # for each SF, create matrix of LFs and priors
+    sf_lf_prior_map = {}
+    for lf, priors in zip(lfs, lf_priors):
+        sf = lf_sf_map[lf]
+
+        if sf not in sf_lf_prior_map:
+            sf_lf_prior_map[sf] = {
+                'lf': [],
+                'lf_mu': [],
+                'lf_sigma': []
+            }
+
+        sf_lf_prior_map[sf]['lf'].append(lf)
+        # Representation of phrases is just average of words (...for now)
+        sf_lf_prior_map[sf]['lf_mu'].append(priors[0].mean(axis=0).unsqueeze(0))
+        sf_lf_prior_map[sf]['lf_sigma'].append(priors[1].mean(axis=0).unsqueeze(0))
+
+    for sf in sf_lf_prior_map.keys():
+        sf_lf_prior_map[sf]['lf_mu'] = torch.cat(sf_lf_prior_map[sf]['lf_mu'], axis=0)
+        sf_lf_prior_map[sf]['lf_sigma'] = torch.cat(sf_lf_prior_map[sf]['lf_sigma'], axis=0)
+
+    num_correct = 0
+    for row_idx, row in df.iterrows():
+        sf = row['sf']
+        z_mu, z_sigma = z_mus[row_idx].unsqueeze(0), z_sigmas[row_idx].unsqueeze(0)
+        lf_obj = sf_lf_prior_map[sf]
+        lf_map, prior_mus, prior_sigmas = lf_obj['lf'], lf_obj['lf_mu'], lf_obj['lf_sigma']
+        num_lf = prior_mus.shape[0]
+        divergences = compute_kl(z_mu.repeat(num_lf, 1), z_sigma.repeat(num_lf, 1), prior_mus, prior_sigmas)
+
+        closest_lf_idx = divergences.squeeze(-1).argmin().item()
+        predicted_lf = lf_map[closest_lf_idx]
+        target_lf = row['target_lf']
+
+        if predicted_lf == target_lf:
+            num_correct += 1
+
+    print('Accuracy={}'.format(num_correct / float(N)))
 
 
 def evaluate_mimic_acronyms(prev_args, model, vocab):
@@ -133,8 +220,8 @@ def evaluate_mimic_acronyms(prev_args, model, vocab):
         context_id_seq = context_ids[row_idx]
         center_id = vocab.get_id(sf.lower())
 
-        center_id_tens = torch.LongTensor([center_id]).to(prev_args.device).clamp_min_(0)
-        context_id_tens = torch.LongTensor(context_id_seq).unsqueeze(0).to(prev_args.device).clamp_min_(0)
+        center_id_tens = torch.LongTensor([center_id]).clamp_min_(0).to(prev_args.device)
+        context_id_tens = torch.LongTensor(context_id_seq).unsqueeze(0).clamp_min_(0).to(prev_args.device)
 
         mask = torch.BoolTensor(torch.Size([1, len(context_id_seq)])).to(prev_args.device)
         mask.fill_(0)
@@ -147,7 +234,7 @@ def evaluate_mimic_acronyms(prev_args, model, vocab):
 
         for target_expansion in target_lfs.split('|'):
             lf_ids = [vocab.get_id(token.lower()) for token in target_expansion.split()]
-            lf_tens = torch.LongTensor(lf_ids).to(prev_args.device).clamp_min_(0)
+            lf_tens = torch.LongTensor(lf_ids).clamp_min_(0).to(prev_args.device)
 
             lf_mu, lf_sigma = model._compute_priors(lf_tens)
 
@@ -228,5 +315,6 @@ if __name__ == '__main__':
     model.eval()  # just sets .requires_grad = False
 
     print('\nEvaluations...')
-    evaluate_acronyms(prev_args, model, vocab)
     word_sim_results = evaluate_word_similarity(model, vocab)
+    evaluate_acronyms(prev_args, model, vocab)
+    evaluate_mimic_acronyms(prev_args, model, vocab)
