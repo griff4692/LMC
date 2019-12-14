@@ -42,14 +42,21 @@ def point_similarity(model, vocab, tokens_a, tokens_b):
     return sim
 
 
-def tokenize_str(str):
+UMLS_BLACKLIST = set(['unidentified', 'otherwise', 'specified', 'nos'])  # UMLS concepts annoyingly includes these terms
+TOKEN_BLACKLIST = set(string.punctuation).union(STOPWORDS).union(UMLS_BLACKLIST)
+
+
+def tokenize_str(str, unique_only=False):
     filtered = re.sub(r'_%#\S+#%_', '', str).lower()
     filtered = re.sub(r'\b(\d+)\b', ' ', filtered)
     lead_trail_punc_regex = r'(\s[{}]+)|([{}]+\s)'.format(PUNCTUATION, PUNCTUATION)
     filtered = re.sub(lead_trail_punc_regex, ' ', filtered)
     filtered = re.sub(r'\s+', ' ', filtered)
     tokens = word_tokenize(filtered)
-    tokens = [t for t in tokens if t not in STOPWORDS]
+    tokens = [t for t in tokens if t not in TOKEN_BLACKLIST]
+    tokens = [t.strip(string.punctuation) for t in tokens]
+    if unique_only:
+        tokens = list(set(tokens))
     return tokens
 
 
@@ -163,7 +170,7 @@ def evaluate_acronyms(prev_args, model, vocab, mini=False):
     for row_idx, row in sense_df.iterrows():
         row = row.to_dict()
         lf_sf_map[row['LF']] = row['SF']
-    tokenized_lfs = list(map(tokenize_str, lfs))
+    tokenized_lfs = list(map(lambda t: tokenize_str(t, unique_only=True), lfs))
     tokenized_ids = [list(map(vocab.get_id, tokens)) for tokens in tokenized_lfs]
     lf_priors = list(map(lambda x: model._compute_priors(torch.LongTensor(x).clamp_min_(0).to(prev_args.device)),
                          tokenized_ids))
@@ -345,6 +352,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    args.acronym_mini = True
+
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
     print('Evaluating on {}...'.format(device_str))
@@ -356,6 +365,6 @@ if __name__ == '__main__':
     model.eval()  # just sets .requires_grad = False
 
     print('\nEvaluations...')
-    word_sim_results = evaluate_word_similarity(model, vocab)
+    # word_sim_results = evaluate_word_similarity(model, vocab)
     evaluate_acronyms(prev_args, model, vocab, mini=args.acronym_mini)
     evaluate_mimic_acronyms(prev_args, model, vocab)
