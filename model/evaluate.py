@@ -134,9 +134,8 @@ def evaluate_acronyms(prev_args, model, vocab, mini=False):
     if mini:
         df = df.sample(100, random_state=1992).reset_index(drop=True)
 
-    N = df.shape[0]
-    context_ids = np.zeros([N, prev_args.window * 2], dtype=int)
-    center_ids = np.zeros([N, ], dtype=int)
+    context_ids = np.zeros([df.shape[0], prev_args.window * 2], dtype=int)
+    center_ids = np.zeros([df.shape[0], ], dtype=int)
     ct = 0
     for row_idx, row in df.iterrows():
         assert row_idx == ct
@@ -151,7 +150,7 @@ def evaluate_acronyms(prev_args, model, vocab, mini=False):
     center_id_tens = torch.LongTensor(center_ids).clamp_min_(0).to(prev_args.device)
     context_id_tens = torch.LongTensor(context_ids).clamp_min_(0).to(prev_args.device)
     # TODO add proper masking
-    mask = torch.BoolTensor(torch.Size([N, context_id_tens.shape[-1]])).to(prev_args.device)
+    mask = torch.BoolTensor(torch.Size([center_id_tens.shape[0], context_id_tens.shape[-1]])).to(prev_args.device)
     mask.fill_(0)
     with torch.no_grad():
         z_mus, z_sigmas = model.encoder(center_id_tens, context_id_tens, mask)
@@ -218,8 +217,10 @@ def evaluate_acronyms(prev_args, model, vocab, mini=False):
         if predicted_lf == target_lf:
             num_correct += 1
 
-    print('Minnesota Acronym Accuracy={}.  KLD(SF Posterior||Target LF)={}. Median KLD(SF Posterior || LF_i..n)={}'.
-        format(num_correct / float(N), target_kld / float(N), median_kld / float(N)))
+    N = float(df.shape[0])
+    print('Statistics from {} examples'.format(int(N)))
+    print('Minnesota Acronym Accuracy={}.  KLD(SF Posterior||Target LF)={}. Median KLD(SF Posterior || LF_(i..n)={}'.
+        format(num_correct / N, target_kld / N, median_kld / N))
 
 
 def evaluate_mimic_acronyms(prev_args, model, vocab):
