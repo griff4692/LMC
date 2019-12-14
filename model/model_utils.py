@@ -27,7 +27,10 @@ def restore_model(restore_name):
             latest_checkpoint_idx = cidx
     latest_checkpoint_fn = os.path.join(checkpoint_dir, checkpoint_fns[latest_checkpoint_idx])
     print('Loading model from {}'.format(latest_checkpoint_fn))
-    checkpoint_state = torch.load(latest_checkpoint_fn)
+    if not torch.cuda.is_available():
+        checkpoint_state = torch.load(latest_checkpoint_fn, map_location=lambda storage, loc: storage)
+    else:
+        checkpoint_state = torch.load(latest_checkpoint_fn)
     vocab = checkpoint_state['vocab']
     print('Previous checkpoint at epoch={}...'.format(max_checkpoint_epoch))
     for k, v in checkpoint_state['losses'].items():
