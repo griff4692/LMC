@@ -196,7 +196,8 @@ def evaluate_acronyms(prev_args, model, vocab, mini=False):
         sf_lf_prior_map[sf]['lf_mu'] = torch.cat(sf_lf_prior_map[sf]['lf_mu'], axis=0)
         sf_lf_prior_map[sf]['lf_sigma'] = torch.cat(sf_lf_prior_map[sf]['lf_sigma'], axis=0)
 
-    num_correct, target_kld, median_kld = 0, 0.0, 0.0
+    num_correct, target_kld, median_kld, num_eval = 0, 0.0, 0.0, 0
+    random_expected_acc = 0.0
     for row_idx, row in df.iterrows():
         sf = row['sf']
         z_mu, z_sigma = z_mus[row_idx].unsqueeze(0), z_sigmas[row_idx].unsqueeze(0)
@@ -217,17 +218,21 @@ def evaluate_acronyms(prev_args, model, vocab, mini=False):
                 for lf_chunk in lf.split(';'):
                     if target_lf == lf_chunk:
                         target_lf_idx = idx
+                        target_lf = lf_map[target_lf_idx]
                         break
-        target_kld += divergences[target_lf_idx].item()
-        median_kld += divergences.median().item()
+        if target_lf in lf_map:
+            num_eval += 1
+            random_expected_acc += 1 / float(len(lf_map))
+            target_kld += divergences[target_lf_idx].item()
+            median_kld += divergences.median().item()
+            if predicted_lf == target_lf:
+                num_correct += 1
 
-        if predicted_lf == target_lf:
-            num_correct += 1
-
-    N = float(df.shape[0])
+    N = float(num_eval)
     print('Statistics from {} examples'.format(int(N)))
     print('Minnesota Acronym Accuracy={}.  KLD(SF Posterior||Target LF)={}. Median KLD(SF Posterior || LF_(i..n)={}'.
         format(num_correct / N, target_kld / N, median_kld / N))
+    print('Random Accuracy={}'.format(random_expected_acc / N))
 
 
 def evaluate_mimic_acronyms(prev_args, model, vocab):
