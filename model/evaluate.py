@@ -133,7 +133,6 @@ def evaluate_acronyms(prev_args, model, vocab):
     sense_df = pd.read_csv(sense_fp, sep='|')
 
     lfs = sense_df['LF'].unique().tolist()
-    sfs = sense_df['SF'].unique().tolist()
     lf_sf_map = {}
     for row_idx, row in sense_df.iterrows():
         row = row.to_dict()
@@ -164,7 +163,7 @@ def evaluate_acronyms(prev_args, model, vocab):
         sf_lf_prior_map[sf]['lf_mu'] = torch.cat(sf_lf_prior_map[sf]['lf_mu'], axis=0)
         sf_lf_prior_map[sf]['lf_sigma'] = torch.cat(sf_lf_prior_map[sf]['lf_sigma'], axis=0)
 
-    num_correct = 0
+    num_correct, target_kld, all_kld = 0, 0.0, 0.0
     for row_idx, row in df.iterrows():
         sf = row['sf']
         z_mu, z_sigma = z_mus[row_idx].unsqueeze(0), z_sigmas[row_idx].unsqueeze(0)
@@ -176,11 +175,15 @@ def evaluate_acronyms(prev_args, model, vocab):
         closest_lf_idx = divergences.squeeze(-1).argmin().item()
         predicted_lf = lf_map[closest_lf_idx]
         target_lf = row['target_lf']
+        target_lf_idx = lf_map.index(target_lf)
+        target_kld += divergences[target_lf_idx].item()
+        all_kld += divergences.mean().item()
 
         if predicted_lf == target_lf:
             num_correct += 1
 
-    print('Accuracy={}'.format(num_correct / float(N)))
+    print('Minnesota Acronym Accuracy={}.  KLD(SF Posterior||Target LF)={}. Avg KLD(SF Posterior || LF_i..n)'.format(
+        num_correct / float(N), target_kld / float(N), all_kld / float(N)))
 
 
 def evaluate_mimic_acronyms(prev_args, model, vocab):
