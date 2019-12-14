@@ -62,7 +62,7 @@ def tokenize_str(str, unique_only=False):
 
 def preprocess_minnesota_dataset(window=5):
     in_fp = '../eval_data/minnesota/AnonymizedClinicalAbbreviationsAndAcronymsDataSet.txt'
-    out_fp = '../eval_data/minnesota/preprocessed_dataset.csv'
+    out_fp = '../eval_data/minnesota/preprocessed_dataset_window_{}.csv'.format(window)
     # cols = ['sf', 'target_lf', 'sf_rep', 'start_idx', 'end_idx', 'section', 'context']
     df = pd.read_csv(in_fp, sep='|')
     df.dropna(subset=['sf', 'target_lf', 'context'], inplace=True)
@@ -131,7 +131,7 @@ def preprocess_minnesota_dataset(window=5):
 
 
 def evaluate_acronyms(prev_args, model, vocab, mini=False):
-    data_fp = '../eval_data/minnesota/preprocessed_dataset.csv'
+    data_fp = '../eval_data/minnesota/preprocessed_dataset_window_{}.csv'.format(prev_args.window)
     if not os.path.exists(data_fp):
         print('Preprocessing Dataset...')
         preprocess_minnesota_dataset(prev_args.window)
@@ -352,8 +352,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    args.acronym_mini = True
-
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
     print('Evaluating on {}...'.format(device_str))
@@ -365,6 +363,6 @@ if __name__ == '__main__':
     model.eval()  # just sets .requires_grad = False
 
     print('\nEvaluations...')
-    # word_sim_results = evaluate_word_similarity(model, vocab)
+    word_sim_results = evaluate_word_similarity(model, vocab)
     evaluate_acronyms(prev_args, model, vocab, mini=args.acronym_mini)
     evaluate_mimic_acronyms(prev_args, model, vocab)
