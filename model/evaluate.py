@@ -18,6 +18,7 @@ from model_utils import restore_model, tensor_to_np
 from vae import VAE
 
 
+PUNCTUATION = '-' + string.punctuation.replace( '-', '')
 STOPWORDS = set(stopwords.words('english'))
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 
@@ -43,8 +44,9 @@ def point_similarity(model, vocab, tokens_a, tokens_b):
 
 def tokenize_str(str):
     filtered = re.sub(r'_%#\S+#%_', '', str).lower()
-    filtered = filtered.translate(str.maketrans(string.punctuation, ' '* len(string.punctuation)))
     filtered = re.sub(r'\b(\d+)\b', ' ', filtered)
+    lead_trail_punc_regex = r'(\s[{}]+)|([{}]+\s)'.format(PUNCTUATION, PUNCTUATION)
+    filtered = re.sub(lead_trail_punc_regex, ' ', filtered)
     filtered = re.sub(r'\s+', ' ', filtered)
     tokens = word_tokenize(filtered)
     tokens = [t for t in tokens if t not in STOPWORDS]
@@ -63,50 +65,75 @@ def preprocess_minnesota_dataset(window=5):
     tokenized_contexts = []
 
     valid_rows = []
+    print('Filtering out invalid rows...')
     for row_idx, row in df.iterrows():
         row = row.to_dict()
         sf_idxs = [m.start() for m in re.finditer(r'\b({})\b'.format(row['sf']), row['context'])]
         target_start_idx = int(row['start_idx'])
 
+        valid = ' ' in row['context'][target_start_idx + len(row['sf']): target_start_idx + len(row['sf']) + 2]
+
         sf_occurrence_ct = np.where(np.array(sf_idxs) == target_start_idx)[0]
-        if len(sf_occurrence_ct) == 0:
+        if not valid or len(sf_occurrence_ct) == 0:
             # print('SF not present in context for row={}'.format(row_idx))
             valid_rows.append(False)
+            tokenized_contexts.append(None)
+            sf_occurrences.append(None)
         else:
             assert len(sf_occurrence_ct) == 1
             valid_rows.append(True)
             sf_occurrences.append(sf_occurrence_ct[0])
-            tokenized_contexts.append(tokenize_str(row['context']))
+            tokenized_contexts.append(' '.join(tokenize_str(row['context'])))
 
     df['valid'] = valid_rows
+    df['tokenized_context'] = tokenized_contexts
+    df['sf_occurrences'] = sf_occurrences
     prev_n = df.shape[0]
     df = df[df['valid']]
     n = df.shape[0]
-    print('Dropping {} rows because we couldn\'t find SF in the context.'.format(n - prev_n))
+    print('Dropping {} rows because we couldn\'t find SF in the context.'.format(prev_n - n))
 
     trimmed_contexts = []
+    print('Tokenizing and extracting context windows...')
+    valid = []
     for row_idx, row in df.iterrows():
         row = row.to_dict()
-        sf_label_order = sf_occurrences[row_idx]
-        tokens = tokenized_contexts[row_idx]
+        sf_label_order = int(row['sf_occurrences'])
+        tokens = row['tokenized_context'].split()
         sf_idxs = np.where(np.array(tokens) == row['sf'].lower())[0]
-        sf_idx = sf_idxs[sf_label_order]
 
-        start_idx = max(0, sf_idx - window)
-        end_idx = min(sf_idx + window + 1, len(tokens))
-        tc = tokens[start_idx:sf_idx] + tokens[sf_idx + 1: end_idx]
-        trimmed_contexts.append(' '.join(tc))
+        if len(sf_idxs) == 0 or sf_label_order >= len(sf_idxs):
+            valid.append(False)
+            trimmed_contexts.append(None)
+        else:
+            valid.append(True)
+            sf_idx = sf_idxs[sf_label_order]
+            start_idx = max(0, sf_idx - window)
+            end_idx = min(sf_idx + window + 1, len(tokens))
+            tc = tokens[start_idx:sf_idx] + tokens[sf_idx + 1: end_idx]
+            trimmed_contexts.append(' '.join(tc))
 
     df['trimmed_tokens'] = trimmed_contexts
+    df['valid'] = valid
+    prev_n = df.shape[0]
+    df = df[df['valid']]
+    df.drop(columns='valid', inplace=True)
+    print('Issues parsing into tokens for {} out of {} remaining examples'.format(prev_n - df.shape[0], prev_n))
+    print('Finished preprocessing dataset.  Now saving it to {}'.format(out_fp))
     df.to_csv(out_fp, index=False)
 
 
-def evaluate_acronyms(prev_args, model, vocab):
+def evaluate_acronyms(prev_args, model, vocab, mini=False):
     data_fp = '../eval_data/minnesota/preprocessed_dataset.csv'
     if not os.path.exists(data_fp):
+        print('Preprocessing Dataset...')
         preprocess_minnesota_dataset(prev_args.window)
 
     df = pd.read_csv(data_fp)
+
+    if mini:
+        df = df.sample(100, random_state=1992).reset_index(drop=True)
+
     N = df.shape[0]
     context_ids = np.zeros([N, prev_args.window * 2], dtype=int)
     center_ids = np.zeros([N, ], dtype=int)
@@ -163,7 +190,7 @@ def evaluate_acronyms(prev_args, model, vocab):
         sf_lf_prior_map[sf]['lf_mu'] = torch.cat(sf_lf_prior_map[sf]['lf_mu'], axis=0)
         sf_lf_prior_map[sf]['lf_sigma'] = torch.cat(sf_lf_prior_map[sf]['lf_sigma'], axis=0)
 
-    num_correct, target_kld, all_kld = 0, 0.0, 0.0
+    num_correct, target_kld, median_kld = 0, 0.0, 0.0
     for row_idx, row in df.iterrows():
         sf = row['sf']
         z_mu, z_sigma = z_mus[row_idx].unsqueeze(0), z_sigmas[row_idx].unsqueeze(0)
@@ -175,15 +202,24 @@ def evaluate_acronyms(prev_args, model, vocab):
         closest_lf_idx = divergences.squeeze(-1).argmin().item()
         predicted_lf = lf_map[closest_lf_idx]
         target_lf = row['target_lf']
-        target_lf_idx = lf_map.index(target_lf)
+
+        try:
+            target_lf_idx = lf_map.index(target_lf)
+        except ValueError:
+            target_lf_idx = -1
+            for idx, lf in enumerate(lf_map):
+                for lf_chunk in lf.split(';'):
+                    if target_lf == lf_chunk:
+                        target_lf_idx = idx
+                        break
         target_kld += divergences[target_lf_idx].item()
-        all_kld += divergences.mean().item()
+        median_kld += divergences.median().item()
 
         if predicted_lf == target_lf:
             num_correct += 1
 
-    print('Minnesota Acronym Accuracy={}.  KLD(SF Posterior||Target LF)={}. Avg KLD(SF Posterior || LF_i..n)'.format(
-        num_correct / float(N), target_kld / float(N), all_kld / float(N)))
+    print('Minnesota Acronym Accuracy={}.  KLD(SF Posterior||Target LF)={}. Median KLD(SF Posterior || LF_i..n)={}'.
+        format(num_correct / float(N), target_kld / float(N), median_kld / float(N)))
 
 
 def evaluate_mimic_acronyms(prev_args, model, vocab):
@@ -304,6 +340,7 @@ if __name__ == '__main__':
     parser.add_argument('-cpu', action='store_true', default=False)
     parser.add_argument('--eval_fp', default='../preprocess/data/')
     parser.add_argument('--experiment', default='debug', help='Save path in weights/ for experiment.')
+    parser.add_argument('-acronym_mini', default=False, action='store_true')
 
     args = parser.parse_args()
 
@@ -319,5 +356,5 @@ if __name__ == '__main__':
 
     print('\nEvaluations...')
     word_sim_results = evaluate_word_similarity(model, vocab)
-    evaluate_acronyms(prev_args, model, vocab)
+    evaluate_acronyms(prev_args, model, vocab, mini=args.acronym_mini)
     evaluate_mimic_acronyms(prev_args, model, vocab)

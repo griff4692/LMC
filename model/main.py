@@ -28,9 +28,9 @@ if __name__ == '__main__':
     parser.add_argument('--restore_experiment', default=None, help='Experiment name from which to restore.')
 
     # Training Hyperparameters
-    parser.add_argument('--batch_size', default=256, type=int)
+    parser.add_argument('--batch_size', default=1024, type=int)
     parser.add_argument('-doc2vec', default=False, action='store_true')
-    parser.add_argument('--epochs', default=25, type=int)
+    parser.add_argument('--epochs', default=5, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
     parser.add_argument('-use_pretrained', default=False, action='store_true')
