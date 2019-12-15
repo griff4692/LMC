@@ -10,7 +10,6 @@ import argparse
 from nltk import word_tokenize
 from nltk.corpus import stopwords
 import pandas as pd
-from tqdm import tqdm
 
 from chunker import chunk
 
@@ -107,7 +106,7 @@ if __name__ == '__main__':
             token_cts[token] += 1
             token_cts['__ALL__'] += 1
     debug_str = '_mini' if args.debug else ''
-    chunks_str = '_chunk' if args.chunk else ''
+    chunks_str = '_chunk' if CHUNK else ''
     with open(args.mimic_fp + '_tokenized{}{}.json'.format(debug_str, chunks_str), 'w') as fd:
         json.dump(list(zip(categories, parsed_docs)), fd)
     with open(args.mimic_fp + '_token_counts{}.json'.format(debug_str, chunks_str), 'w') as fd:

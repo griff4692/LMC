@@ -7,3 +7,4 @@ BSG/*.pyc
 model/weights/
 screenlog.*
 eval_data/
+*.iml
