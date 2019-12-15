@@ -4,15 +4,20 @@ from multiprocessing import Pool
 import os
 import re
 import string
+from time import time
 
 import argparse
 from nltk import word_tokenize
+from nltk.corpus import stopwords
 import pandas as pd
 from tqdm import tqdm
 
-from nltk.corpus import stopwords
-OTHER_NO = set(['\'s'])
-STOPWORDS = set(stopwords.words('english')).union(set(string.punctuation)).union(OTHER_NO) - set(['%', '+', '-', '>', '<', '='])
+from chunker import chunk
+
+CHUNK = True
+OTHER_NO = set(['\'s', '`'])
+STOPWORDS = set(stopwords.words('english')).union(
+    set(string.punctuation)).union(OTHER_NO) - set(['%', '+', '-', '>', '<', '='])
 
 
 section_df = pd.read_csv('data/mimic/sections.csv').dropna()
@@ -28,8 +33,8 @@ def pattern_repl(matchobj):
 
 
 def create_section_token(section):
-    section = re.sub(':', '', section)
-    return '<header={}>'.format(section)
+    section = re.sub('[:\s]+', '', section)
+    return '||header{}||'.format(section)
 
 
 def clean_text(text):
@@ -40,6 +45,7 @@ def clean_text(text):
     text = re.sub(r'\[\*\*.*?\*\*\]', pattern_repl, text)
     # Replace `_` with spaces.
     text = re.sub(r'[_*?]+', ' ', text)
+    text = re.sub(r'\b(-)?[\d.]+(-)?\b', ' DIGITPARSED ', text)
     text = re.sub(r'\s+', ' ', text)
     return text
 
@@ -62,21 +68,14 @@ def preprocess_mimic(text):
             if tok_idx + 1 == len(sectioned_text) or not sectioned_text[tok_idx + 1] in SECTION_NAMES:
                 tokenized_text += [create_section_token(toks)]
         else:
-            toks = re.sub(r'\b[\d.]+\b', 'DIGIT-PARSED', toks)
-            tokens = word_tokenize(toks.lower().strip())
+            tokens = [x.strip(string.punctuation) for x in word_tokenize(toks.lower().strip())]
             tokens = filter(lambda x: x not in STOPWORDS, tokens)
             tokenized_text += list(tokens)
-    return ' '.join(tokenized_text)
-
-
-def test_preprocess_mimic():
-    text = """ABDOMEN: section about .
-
-    """
-    sents = [sen for sen in preprocess_mimic(text)]
-    assert sents[0] == 'normal sinus rhythm .'
-    assert sents[1] == 'right bundle-branch block with secondary st-t wave abnormalities .'
-    assert sents[2] == 'compared to the previous tracing of no diagnostic interim change .'
+    doc_boundary = [create_section_token('DOCUMENT')]
+    unigram_text = ' '.join(doc_boundary + tokenized_text)
+    if CHUNK:
+        return chunk(unigram_text)
+    return unigram_text
 
 
 if __name__ == '__main__':
@@ -94,17 +93,22 @@ if __name__ == '__main__':
 
     print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
     categories = df['CATEGORY'].tolist()
-    p = Pool(processes=10)
+    start_time = time()
+    p = Pool()
     parsed_docs = p.map(preprocess_mimic, df['TEXT'].tolist())
     p.close()
 
+    end_time = time()
+    print('Took {} seconds'.format(end_time - start_time))
+
     token_cts = defaultdict(int)
-    for doc in parsed_docs:
+    for doc_idx, doc in enumerate(parsed_docs):
         for token in doc.split():
             token_cts[token] += 1
             token_cts['__ALL__'] += 1
     debug_str = '_mini' if args.debug else ''
-    with open(args.mimic_fp + '_tokenized{}.json'.format(debug_str), 'w') as fd:
+    chunks_str = '_chunk' if args.chunk else ''
+    with open(args.mimic_fp + '_tokenized{}{}.json'.format(debug_str, chunks_str), 'w') as fd:
         json.dump(list(zip(categories, parsed_docs)), fd)
-    with open(args.mimic_fp + '_token_counts{}.json'.format(debug_str), 'w') as fd:
+    with open(args.mimic_fp + '_token_counts{}.json'.format(debug_str, chunks_str), 'w') as fd:
         json.dump(token_cts, fd)
