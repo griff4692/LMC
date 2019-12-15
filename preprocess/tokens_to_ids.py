@@ -27,6 +27,7 @@ def tokens_to_ids(args, token_infile=None):
     for doc_idx in tqdm(range(N)):
         doc_tokens = tokens[doc_idx][1].split()
         doc_ids = vocab.get_ids(doc_tokens)
+        doc_ids = [-d if d >= vocab.separator_start_vocab_id else d for d in doc_ids]
         ids += doc_ids
         ids += [0]  # Treating this as document boundary
 

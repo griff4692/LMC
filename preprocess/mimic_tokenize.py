@@ -3,37 +3,21 @@ import json
 from multiprocessing import Pool
 import os
 import re
+import string
 
 import argparse
 from nltk import word_tokenize
 import pandas as pd
 from tqdm import tqdm
 
+from nltk.corpus import stopwords
+OTHER_NO = set(['\'s'])
+STOPWORDS = set(stopwords.words('english')).union(set(string.punctuation)).union(OTHER_NO) - set(['%', '+', '-', '>', '<', '='])
 
-"""
-Preprocess MIMIC-III reports
-"""
 
-MIMIC_BOILERPLATE = {
-    'addendum :',
-    'admission date :',
-    'discharge date :',
-    'date of birth :',
-    'sex : m',
-    'sex : f',
-    'service :',
-}
-
-BOILERPLATE_REGEX = re.compile('|'.join(MIMIC_BOILERPLATE))
-
-SECTION_TITLES = re.compile(
-    r'('
-    r'ABDOMEN AND PELVIS|CLINICAL HISTORY|CLINICAL INDICATION|COMPARISON|COMPARISON STUDY DATE'
-    r'|EXAM|EXAMINATION|FINDINGS|HISTORY|IMPRESSION|INDICATION'
-    r'|MEDICAL CONDITION|PROCEDURE|REASON FOR EXAM|REASON FOR STUDY|REASON FOR THIS EXAMINATION'
-    r'|TECHNIQUE'
-    r'):|FINAL REPORT',
-    re.I | re.M)
+section_df = pd.read_csv('data/mimic/sections.csv').dropna()
+SECTION_NAMES = list(sorted(section_df.nlargest(1000, columns=['count'])['section'].tolist()))
+SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES))
 
 
 def pattern_repl(matchobj):
@@ -43,73 +27,21 @@ def pattern_repl(matchobj):
     return ' '.rjust(len(matchobj.group(0)))
 
 
-def find_end(text):
-    """Find the end of the report."""
-    ends = [len(text)]
-    patterns = [
-        re.compile(r'BY ELECTRONICALLY SIGNING THIS REPORT', re.I),
-        re.compile(r'\n {3,}DR.', re.I),
-        re.compile(r'[ ]{1,}RADLINE ', re.I),
-        re.compile(r'.*electronically signed on', re.I),
-        re.compile(r'M\[0KM\[0KM')
-    ]
-    for pattern in patterns:
-        matchobj = pattern.search(text)
-        if matchobj:
-            ends.append(matchobj.start())
-    return min(ends)
-
-
-def split_heading(text):
-    """Split the report into sections"""
-    start = 0
-    for matcher in SECTION_TITLES.finditer(text):
-        # add last
-        end = matcher.start()
-        if end != start:
-            section = text[start:end].strip()
-            if section:
-                yield section
-
-        # add title
-        start = end
-        end = matcher.end()
-        if end != start:
-            section = text[start:end].strip()
-            if section:
-                yield section
-
-        start = end
-
-    # add last piece
-    end = len(text)
-    if start < end:
-        section = text[start:end].strip()
-        if section:
-            yield section
+def create_section_token(section):
+    section = re.sub(':', '', section)
+    return '<header={}>'.format(section)
 
 
 def clean_text(text):
     """
     Clean text
     """
-
     # Replace [**Patterns**] with spaces.
     text = re.sub(r'\[\*\*.*?\*\*\]', pattern_repl, text)
     # Replace `_` with spaces.
-    text = re.sub(r'_', ' ', text)
-
-    start = 0
-    end = find_end(text)
-    new_text = ''
-    if start > 0:
-        new_text += ' ' * start
-    new_text = text[start:end]
-
-    # make sure the new text has the same length of old text.
-    if len(text) - end > 0:
-        new_text += ' ' * (len(text) - end)
-    return new_text
+    text = re.sub(r'[_*?]+', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text
 
 
 def preprocess_mimic(text):
@@ -120,27 +52,31 @@ def preprocess_mimic(text):
     3. tokenize words
     4. lowercase
     """
-    for sec in split_heading(clean_text(text)):
-        yield ' '.join(word_tokenize(sec)).lower()
+    cleaned_text = clean_text(text)
+    tokenized_text = []
+    sectioned_text = list(filter(lambda x: len(x) > 0 and not x == ' ', re.split(SECTION_REGEX, cleaned_text)))
+    for tok_idx, toks in enumerate(sectioned_text):
+        if len(toks) == 0:
+            continue
+        elif toks in SECTION_NAMES:
+            if tok_idx + 1 == len(sectioned_text) or not sectioned_text[tok_idx + 1] in SECTION_NAMES:
+                tokenized_text += [create_section_token(toks)]
+        else:
+            toks = re.sub(r'\b[\d.]+\b', 'DIGIT-PARSED', toks)
+            tokens = word_tokenize(toks.lower().strip())
+            tokens = filter(lambda x: x not in STOPWORDS, tokens)
+            tokenized_text += list(tokens)
+    return ' '.join(tokenized_text)
 
 
 def test_preprocess_mimic():
-    text = """Normal sinus rhythm. Right bundle-branch block with secondary ST-T wave
-    abnormalities. Compared to the previous tracing of [**2198-5-26**] no diagnostic
-    interim change.
+    text = """ABDOMEN: section about .
 
     """
     sents = [sen for sen in preprocess_mimic(text)]
     assert sents[0] == 'normal sinus rhythm .'
     assert sents[1] == 'right bundle-branch block with secondary st-t wave abnormalities .'
     assert sents[2] == 'compared to the previous tracing of no diagnostic interim change .'
-
-
-def preprocess_mimic_doc(text):
-    tokenized_doc = ' '.join(list(preprocess_mimic(text)))
-    tokenized_cleaned_doc = re.sub(BOILERPLATE_REGEX, '', tokenized_doc).strip()
-    tokenized_cleaned_doc = re.sub('\s+', ' ', tokenized_cleaned_doc)
-    return tokenized_cleaned_doc
 
 
 if __name__ == '__main__':
@@ -157,13 +93,10 @@ if __name__ == '__main__':
     df = pd.read_csv('{}{}.csv'.format(args.mimic_fp, debug_str))
 
     print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
-
     categories = df['CATEGORY'].tolist()
     p = Pool(processes=10)
-    parsed_docs = tqdm(p.map(preprocess_mimic_doc, df['TEXT'].tolist()))
+    parsed_docs = p.map(preprocess_mimic, df['TEXT'].tolist())
     p.close()
-
-    print('Finished tokenization.  Now collecting word counts.')
 
     token_cts = defaultdict(int)
     for doc in parsed_docs:

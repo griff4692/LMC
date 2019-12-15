@@ -10,13 +10,14 @@ class Vocab:
         self.support = []
         self.add_token(Vocab.PAD_TOKEN)
         self.cached_neg_sample_prob = None
+        self.separator_start_vocab_id = None
 
     def pad_id(self):
         return self.get_id(Vocab.PAD_TOKEN)
 
-    def add_tokens(self, tokens):
+    def add_tokens(self, tokens, token_support=1):
         for tidx, token in enumerate(tokens):
-            self.add_token(token)
+            self.add_token(token, token_support=token_support)
 
     def add_token(self, token, token_support=1):
         if token not in self.w2i:

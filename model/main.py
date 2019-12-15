@@ -13,7 +13,6 @@ from batcher import SkipGramBatchLoader
 from model_utils import get_git_revision_hash, render_args, restore_model, save_checkpoint
 from vae import VAE
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-from doc_ids import parse_doc_ids
 from vocab import Vocab
 
 
@@ -29,8 +28,8 @@ if __name__ == '__main__':
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=1024, type=int)
-    parser.add_argument('-doc2vec', default=False, action='store_true')
-    parser.add_argument('--epochs', default=5, type=int)
+    parser.add_argument('-section2vec', default=False, action='store_true')
+    parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
     parser.add_argument('-use_pretrained', default=False, action='store_true')
@@ -53,30 +52,25 @@ if __name__ == '__main__':
     print('Loading data...')
     with open(ids_infile, 'rb') as fd:
         ids = np.load(fd)
-        if not ids[0] == 0:
-            ids = np.insert(ids, [0], 0)
 
     # Load Vocabulary
     print('Loading vocabulary...')
     vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
-    token_vocab_size = vocab.size()
-    print('Loaded vocabulary of size={}...'.format(token_vocab_size))
+    print('Loaded vocabulary of size={}...'.format(vocab.separator_start_vocab_id))
 
     print('Collecting document information...')
-    doc_pos_idxs, doc_ids, doc_id_range = parse_doc_ids(vocab, ids, doc2vec=args.doc2vec)
-    if not vocab.size() == token_vocab_size:
-        assert args.doc2vec
-        print('We have added {} doc_ids as pseudo documents'.format(vocab.size() - token_vocab_size))
+    section_pos_idxs = np.where(ids <= 0)[0]
+    section_id_range = np.arange(vocab.separator_start_vocab_id, vocab.size() + 1)
 
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
     print('Training on {}...'.format(device_str))
 
-    batcher = SkipGramBatchLoader(len(ids), doc_pos_idxs, batch_size=args.batch_size, doc2vec=args.doc2vec)
+    batcher = SkipGramBatchLoader(len(ids), section_pos_idxs, batch_size=args.batch_size)
 
-    # Load pretrained word embeddings if requested
+    # # Load pretrained word embeddings if requested
     pretrained_in_fn = '../preprocess/data/embeddings{}.npy'.format(debug_str)
     pretrained_embeddings = None
     if args.use_pretrained:
@@ -114,14 +108,14 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            center_ids, context_ids, num_contexts = batcher.next(ids, doc_ids, args.window,
-                                                                 add_doc_id_as_context=args.doc2vec)
+            center_ids, context_ids, num_contexts = batcher.next(ids, args.window,
+                                                                 add_section_as_context=args.section2vec)
             center_ids_tens = torch.LongTensor(center_ids).to(args.device)
             context_ids_tens = torch.LongTensor(context_ids).to(args.device)
 
             neg_ids = vocab.neg_sample(size=context_ids_tens.shape)
-            if args.doc2vec:
-                neg_ids[:, 0] = np.random.choice(doc_id_range, size=(args.batch_size))
+            if args.section2vec:
+                neg_ids[:, 0] = np.random.choice(section_id_range, size=(args.batch_size))
             neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
 
             kl_loss, recon_loss = model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts)

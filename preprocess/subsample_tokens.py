@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import re
 
 import argparse
 import numpy as np
@@ -16,7 +17,7 @@ if __name__ == '__main__':
     arguments.add_argument('--token_counts_fp', default='data/mimic/NOTEEVENTS_token_counts')
 
     arguments.add_argument('-debug', default=False, action='store_true')
-    arguments.add_argument('--min_token_count', default=5, type=int)
+    arguments.add_argument('--min_token_count', default=10, type=int)
     arguments.add_argument('--subsample_param', default=0.001, type=float)
 
     args = arguments.parse_args()
@@ -33,29 +34,41 @@ if __name__ == '__main__':
     with open(token_counts_fn, 'r') as fd:
         token_counts = json.load(fd)
     N = float(token_counts['__ALL__'])
+    print('Subsampling {} tokens'.format(N))
 
     # Store subsampled data
     tokenized_subsampled_data = []
     # And vocabulary with word counts
     vocab = Vocab()
     num_docs = len(tokenized_data)
+    sections = set()
     for doc_idx in tqdm(range(num_docs)):
         category, tokenized_doc_str = tokenized_data[doc_idx]
         subsampled_doc = []
         for token in tokenized_doc_str.split():
             wc = token_counts[token]
-            too_sparse = wc <= args.min_token_count
-            if too_sparse:
-                continue
-            frac = wc / N
-            keep_prob = min((np.sqrt(frac / args.subsample_param) + 1) * (args.subsample_param / frac), 1.0)
-            should_keep = np.random.binomial(1, keep_prob) == 1
-            if should_keep:
+            is_section_header = re.match(r'<header=\S+>', token)
+            if is_section_header:
                 subsampled_doc.append(token)
-                vocab.add_token(token, token_support=1)
+                sections.add(token)
+            else:
+                too_sparse = wc <= args.min_token_count
+                if too_sparse:
+                    continue
+                frac = wc / N
+                keep_prob = min((np.sqrt(frac / args.subsample_param) + 1) * (args.subsample_param / frac), 1.0)
+                should_keep = np.random.binomial(1, keep_prob) == 1
+                if should_keep:
+                    subsampled_doc.append(token)
+                    vocab.add_token(token, token_support=1)
         tokenized_subsampled_data.append((category, ' '.join(subsampled_doc)))
 
     print('Reduced tokens from {} to {}'.format(int(N), sum(vocab.support)))
+
+    separator_start_vocab_id = vocab.size()
+    vocab.separator_start_vocab_id = separator_start_vocab_id
+    vocab.add_tokens(sections, token_support=0)
+
     print('Saving vocabulary of size {}'.format(vocab.size()))
     subsampled_out_fn = args.tokenized_fp + ('_subsampled_mini.json' if args.debug else '_subsampled.json')
     with open(subsampled_out_fn, 'w') as fd:
