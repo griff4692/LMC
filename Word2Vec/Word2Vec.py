@@ -76,11 +76,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Main Script to train Word2Vec')
     parser.add_argument('-partition_data', default=False)
     args = parser.parse_args()
+    
     path = sys.path[0]
+    dump_path = "".join([path,"\data"])
+    ids_infile = "".join([dump_path,"\ids.npy"])
     
     if args.partition_data:
-        dump_path = "".join([path,"\data"])
-        ids_infile = "".join([dump_path,"\ids.npy"])
         ids = read_ids(ids_infile)
         
         
