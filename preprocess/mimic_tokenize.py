@@ -7,7 +7,6 @@ import string
 from time import time
 
 import argparse
-from nltk import word_tokenize
 from nltk.corpus import stopwords
 import pandas as pd
 import spacy
