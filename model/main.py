@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
     print('Collecting document information...')
     section_pos_idxs = np.where(ids <= 0)[0]
-    section_id_range = np.arange(vocab.separator_start_vocab_id, vocab.size() + 1)
+    section_id_range = np.arange(vocab.separator_start_vocab_id, vocab.size())
 
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)

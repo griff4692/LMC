@@ -46,7 +46,7 @@ class SkipGramBatchLoader:
                 section_idx = center_idx - 1
                 while ids[section_idx] > 0:
                     section_idx -= 1
-                section_id = section_idx[section_idx]
+                section_id = ids[section_idx]
                 assert section_id < 0
                 context_ids[batch_idx, 0] = - section_id
             context_ids[batch_idx, num_pseudo_contexts:actual_window_size] = example_context_ids
