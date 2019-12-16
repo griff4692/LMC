@@ -8,3 +8,4 @@ model/weights/
 screenlog.*
 eval_data/
 *.iml
+*.model
