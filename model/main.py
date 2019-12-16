@@ -64,6 +64,15 @@ if __name__ == '__main__':
     section_pos_idxs = np.where(ids <= 0)[0]
     section_id_range = np.arange(vocab.separator_start_vocab_id, vocab.size())
 
+    section_ids = []
+    for section_num, section_pos_idx in enumerate(section_pos_idxs):
+        section_id = -ids[section_pos_idx]
+        if section_num + 1 == len(section_pos_idxs):
+            section_len = len(ids) - section_pos_idx
+        else:
+            section_len = section_pos_idxs[section_num + 1] - section_pos_idx
+        section_ids += [section_id] * section_len
+
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
     print('Training on {}...'.format(device_str))
@@ -108,7 +117,7 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            center_ids, context_ids, num_contexts = batcher.next(ids, args.window,
+            center_ids, context_ids, num_contexts = batcher.next(ids, section_ids, args.window,
                                                                  add_section_as_context=args.section2vec)
             center_ids_tens = torch.LongTensor(center_ids).to(args.device)
             context_ids_tens = torch.LongTensor(context_ids).to(args.device)

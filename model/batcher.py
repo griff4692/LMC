@@ -33,7 +33,7 @@ class SkipGramBatchLoader:
 
         return np.concatenate([left_context_truncated, right_context_truncated])
 
-    def next(self, ids, window_size, add_section_as_context=False):
+    def next(self, ids, section_ids, window_size, add_section_as_context=False):
         batch_idxs = self.batches[self.batch_ct]
         center_ids = ids[batch_idxs]
         num_pseudo_contexts = 1 if add_section_as_context else 0
@@ -43,12 +43,7 @@ class SkipGramBatchLoader:
             example_context_ids = self.extract_context_ids(ids, center_idx, window_size)
             actual_window_size = len(example_context_ids) + num_pseudo_contexts
             if add_section_as_context:
-                section_idx = center_idx - 1
-                while ids[section_idx] > 0:
-                    section_idx -= 1
-                section_id = ids[section_idx]
-                assert section_id <= 0
-                context_ids[batch_idx, 0] = - section_id
+                context_ids[batch_idx, 0] = section_ids[center_idx]
             context_ids[batch_idx, num_pseudo_contexts:actual_window_size] = example_context_ids
             actual_window_sizes.append(actual_window_size)
         self.batch_ct += 1
