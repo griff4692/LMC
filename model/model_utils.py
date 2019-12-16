@@ -16,8 +16,8 @@ def render_args(args):
         print('{}={}'.format(arg, getattr(args, arg)))
 
 
-def restore_model(restore_name):
-    checkpoint_dir = os.path.join('weights', restore_name)
+def restore_model(restore_name, weights_path='weights'):
+    checkpoint_dir = os.path.join(weights_path, restore_name)
     checkpoint_fns = os.listdir(checkpoint_dir)
     max_checkpoint_epoch, latest_checkpoint_idx = -1, -1
     for cidx, checkpoint_fn in enumerate(checkpoint_fns):
@@ -40,7 +40,10 @@ def restore_model(restore_name):
         print('{}={}'.format(k, v))
         setattr(args, k, v)
 
-    vae_model = VAE(args, vocab.size())
+    full_variance = False
+    if hasattr(args, 'full_variance'):
+        full_variance = args.full_variance
+    vae_model = VAE(args, vocab.size(), full_variance=full_variance)
     vae_model.load_state_dict(checkpoint_state['model_state_dict'])
     optimizer_state = checkpoint_state['optimizer_state_dict']
     return args, vae_model, vocab, optimizer_state

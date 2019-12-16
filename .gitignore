@@ -4,7 +4,7 @@ __pycache__
 preprocess/*.pyc
 preprocess/data/
 BSG/*.pyc
-model/weights/
+weights/
 screenlog.*
 eval_data/
 *.iml
