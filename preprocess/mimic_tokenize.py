@@ -69,11 +69,12 @@ def preprocess_mimic(text):
             if tok_idx + 1 == len(sectioned_text) or not sectioned_text[tok_idx + 1] in SECTION_NAMES:
                 tokenized_text += [create_section_token(toks)]
         else:
-            tokens = [x.strip(string.punctuation) for x in word_tokenize(toks.lower().strip())]
+            tokens = toks.lower().strip().split()
+            tokens = list(map(lambda x: x.strip(string.punctuation), tokens))
             tokens = list(filter(lambda x: not x == ' ' and x not in STOPWORDS, tokens))
             tokens = ' '.join(tokens)
             for chunk in nlp(tokens).ents:
-                chunk = str(chunk)
+                chunk = str(chunk).strip()
                 chunk_toks = chunk.split()
                 if len(chunk_toks) > 1:
                     tokens = tokens.replace(chunk, '_'.join(chunk_toks))
