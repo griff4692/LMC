@@ -4,7 +4,7 @@ import re
 import numpy as np
 from quickumls import QuickUMLS
 
-QUICKUMLS_FP = os.path.expanduser('~/Desktop/quickumls_data/')
+QUICKUMLS_FP = os.path.expanduser('~/quickumls_data/')
 matcher = QuickUMLS(QUICKUMLS_FP, threshold=0.7, similarity_name='jaccard', window=5)
 
 
