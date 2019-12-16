@@ -10,10 +10,12 @@ import argparse
 from nltk import word_tokenize
 from nltk.corpus import stopwords
 import pandas as pd
+import spacy
 
-from chunker import chunk
+nlp = spacy.load('en_core_sci_sm')
 
-CHUNK = True
+# from chunker import chunk
+
 OTHER_NO = set(['\'s', '`'])
 STOPWORDS = set(stopwords.words('english')).union(
     set(string.punctuation)).union(OTHER_NO) - set(['%', '+', '-', '>', '<', '='])
@@ -68,13 +70,16 @@ def preprocess_mimic(text):
                 tokenized_text += [create_section_token(toks)]
         else:
             tokens = [x.strip(string.punctuation) for x in word_tokenize(toks.lower().strip())]
-            tokens = filter(lambda x: x not in STOPWORDS, tokens)
-            tokenized_text += list(tokens)
+            tokens = list(filter(lambda x: not x == ' ' and x not in STOPWORDS, tokens))
+            tokens = ' '.join(tokens)
+            for chunk in nlp(tokens).ents:
+                chunk = str(chunk)
+                chunk_toks = chunk.split()
+                if len(chunk_toks) > 1:
+                    tokens = tokens.replace(chunk, '_'.join(chunk_toks))
+            tokenized_text += tokens.split()
     doc_boundary = [create_section_token('DOCUMENT')]
-    unigram_text = ' '.join(doc_boundary + tokenized_text)
-    if CHUNK:
-        return chunk(unigram_text)
-    return unigram_text
+    return ' '.join(doc_boundary + tokenized_text)
 
 
 if __name__ == '__main__':
@@ -106,8 +111,7 @@ if __name__ == '__main__':
             token_cts[token] += 1
             token_cts['__ALL__'] += 1
     debug_str = '_mini' if args.debug else ''
-    chunks_str = '_chunk' if CHUNK else ''
-    with open(args.mimic_fp + '_tokenized{}{}.json'.format(debug_str, chunks_str), 'w') as fd:
+    with open(args.mimic_fp + '_tokenized{}_chunk.json'.format(debug_str), 'w') as fd:
         json.dump(list(zip(categories, parsed_docs)), fd)
-    with open(args.mimic_fp + '_token_counts{}.json'.format(debug_str, chunks_str), 'w') as fd:
+    with open(args.mimic_fp + '_token_counts{}_chunk.json'.format(debug_str), 'w') as fd:
         json.dump(token_cts, fd)
