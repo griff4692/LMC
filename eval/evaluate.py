@@ -16,7 +16,7 @@ if __name__ == '__main__':
     # Functional Arguments
     parser.add_argument('-cpu', action='store_true', default=False)
     parser.add_argument('--eval_fp', default='../preprocess/data/')
-    parser.add_argument('--experiment', default='debug', help='Save path in weights/ for experiment.')
+    parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
     parser.add_argument('-acronym_mini', default=False, action='store_true')
 
     args = parser.parse_args()
@@ -32,5 +32,6 @@ if __name__ == '__main__':
     model.eval()  # just sets .requires_grad = False
 
     print('\nEvaluations...')
-    word_sim_results = evaluate_word_similarity(model, vocab)
-    evaluate_minnesota_acronyms(prev_args, model, vocab, mini=args.acronym_mini)
+    word_sim_results = evaluate_word_similarity(model, vocab, combine_phrases=prev_args.combine_phrases)
+    evaluate_minnesota_acronyms(
+        prev_args, model, vocab, mini=args.acronym_mini, combine_phrases=prev_args.combine_phrases)

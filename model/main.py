@@ -9,11 +9,11 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from batcher import SkipGramBatchLoader
+from compute_sections import enumerate_section_ids
 from model_utils import get_git_revision_hash, render_args, restore_model, save_checkpoint
 from vae import VAE
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-from vocab import Vocab
 
 
 if __name__ == '__main__':
@@ -65,15 +65,7 @@ if __name__ == '__main__':
     print('Collecting document information...')
     section_pos_idxs = np.where(ids <= 0)[0]
     section_id_range = np.arange(vocab.separator_start_vocab_id, vocab.size())
-
-    section_ids = []
-    for section_num, section_pos_idx in enumerate(section_pos_idxs):
-        section_id = -ids[section_pos_idx]
-        if section_num + 1 == len(section_pos_idxs):
-            section_len = len(ids) - section_pos_idx
-        else:
-            section_len = section_pos_idxs[section_num + 1] - section_pos_idx
-        section_ids += [section_id] * section_len
+    section_ids = enumerate_section_ids(ids, section_pos_idxs)
 
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
@@ -126,7 +118,7 @@ if __name__ == '__main__':
             neg_id_shape = (context_ids.shape[0], context_ids.shape[1], args.ns)
             neg_ids = vocab.neg_sample(size=neg_id_shape)
             if args.section2vec:
-                neg_ids[:, 0] = np.random.choice(section_id_range, size=(args.batch_size))
+                neg_ids[:, 0] = np.random.choice(section_id_range, size=args.batch_size)
             neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
 
             kl_loss, recon_loss = model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts)

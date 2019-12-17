@@ -7,6 +7,25 @@ import pandas as pd
 from tqdm import tqdm
 
 
+def enumerate_section_ids(ids, section_pos_idxs):
+    """
+    :param ids: List of token ids where negative numbers are section ids and 0 are document boundaries.
+    Regular tokens are represented by positive ids
+    :param section_pos_idxs: Positional indices where ids <= 0 indicating either section or document boundaries
+    :return: List of len(ids) representing the section each token in ids lies within (for efficient access by batcher)
+    """
+    section_ids = []
+    for section_num, section_pos_idx in enumerate(section_pos_idxs):
+        section_id = -ids[section_pos_idx]
+        assert section_id >= 0
+        if section_num + 1 == len(section_pos_idxs):
+            section_len = len(ids) - section_pos_idx
+        else:
+            section_len = section_pos_idxs[section_num + 1] - section_pos_idx
+        section_ids += [section_id] * section_len
+    return section_ids
+
+
 if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC (v3) Note Tokenization.')
     arguments.add_argument('--mimic_fp', default='data/mimic/NOTEEVENTS')

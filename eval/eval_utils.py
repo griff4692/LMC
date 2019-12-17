@@ -3,21 +3,21 @@ import string
 import sys
 
 import numpy as np
-from nltk import word_tokenize
 from nltk.corpus import stopwords
 import pandas as pd
 from scipy.spatial.distance import cosine
 
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+from mimic_tokenize import tokenize_str
 from model_utils import tensor_to_np
 
 
 PUNCTUATION = '-' + string.punctuation.replace( '-', '')
 STOPWORDS = set(stopwords.words('english'))
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 
 
 def get_known_ids(vocab, tokens):
-    return list(filter(lambda id: id > -1, list(map(lambda tok: vocab.get_id(tok), tokens.split(' ')))))
+    return list(filter(lambda id: id > -1, list(map(lambda tok: vocab.get_id(tok), tokens))))
 
 
 def point_similarity(model, vocab, tokens_a, tokens_b):
@@ -39,23 +39,20 @@ UMLS_BLACKLIST = set(['unidentified', 'otherwise', 'specified', 'nos'])  # UMLS 
 TOKEN_BLACKLIST = set(string.punctuation).union(STOPWORDS).union(UMLS_BLACKLIST)
 
 
-def tokenize_str(str, unique_only=False):
-    filtered = re.sub(r'_%#\S+#%_', '', str).lower()
-    filtered = re.sub(r'\b(\d+)\b', ' ', filtered)
-    lead_trail_punc_regex = r'(\s[{}]+)|([{}]+\s)'.format(PUNCTUATION, PUNCTUATION)
-    filtered = re.sub(lead_trail_punc_regex, ' ', filtered)
-    filtered = re.sub(r'\s+', ' ', filtered)
-    tokens = word_tokenize(filtered)
-    tokens = [t for t in tokens if t not in TOKEN_BLACKLIST]
-    tokens = [t.strip(string.punctuation) for t in tokens]
+def eval_tokenize(str, unique_only=False, chunker=None, combine_phrases=False):
+    str = re.sub(r'_%#\S+#%_', '', str)
+    tokens = tokenize_str(str, combine_phrases=combine_phrases, chunker=chunker)
+    tokens = list(filter(lambda t: t not in TOKEN_BLACKLIST, tokens))
+
     if unique_only:
         tokens = list(set(tokens))
     return tokens
 
 
-def preprocess_minnesota_dataset(window=5):
+def preprocess_minnesota_dataset(window=5, chunker=None, combine_phrases=False):
     in_fp = 'eval_data/minnesota/AnonymizedClinicalAbbreviationsAndAcronymsDataSet.txt'
-    out_fp = 'eval_data/minnesota/preprocessed_dataset_window_{}.csv'.format(window)
+    phrase_str = '_phrase' if combine_phrases else ''
+    out_fp = 'eval_data/minnesota/preprocessed_dataset_window_{}{}.csv'.format(window, phrase_str)
     # cols = ['sf', 'target_lf', 'sf_rep', 'start_idx', 'end_idx', 'section', 'context']
     df = pd.read_csv(in_fp, sep='|')
     df.dropna(subset=['sf', 'target_lf', 'context'], inplace=True)
@@ -83,7 +80,8 @@ def preprocess_minnesota_dataset(window=5):
             assert len(sf_occurrence_ct) == 1
             valid_rows.append(True)
             sf_occurrences.append(sf_occurrence_ct[0])
-            tokenized_contexts.append(' '.join(tokenize_str(row['context'])))
+            tokens = tokenize_str(row['context'], combine_phrases=combine_phrases, chunker=chunker)
+            tokenized_contexts.append(' '.join(tokens))
 
     df['valid'] = valid_rows
     df['tokenized_context'] = tokenized_contexts

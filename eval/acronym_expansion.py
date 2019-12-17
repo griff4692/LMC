@@ -3,17 +3,22 @@ import os
 
 import numpy as np
 import pandas as pd
+import spacy
 import torch
 
 from compute_utils import compute_kl
-from eval_utils import preprocess_minnesota_dataset, tokenize_str
+from eval_utils import eval_tokenize, preprocess_minnesota_dataset
 
 
-def evaluate_minnesota_acronyms(prev_args, model, vocab, mini=False):
-    data_fp = 'eval_data/minnesota/preprocessed_dataset_window_{}.csv'.format(prev_args.window)
+def evaluate_minnesota_acronyms(prev_args, model, vocab, mini=False, combine_phrases=False):
+    chunker = None
+    if combine_phrases:
+        chunker = spacy.load('en_core_sci_sm')
+    phrase_str = '_phrase' if combine_phrases else ''
+    data_fp = 'eval_data/minnesota/preprocessed_dataset_window_{}{}.csv'.format(prev_args.window, phrase_str)
     if not os.path.exists(data_fp):
         print('Preprocessing Dataset...')
-        preprocess_minnesota_dataset(prev_args.window)
+        preprocess_minnesota_dataset(prev_args.window, chunker=chunker, combine_phrases=combine_phrases)
 
     df = pd.read_csv(data_fp)
 
@@ -49,7 +54,8 @@ def evaluate_minnesota_acronyms(prev_args, model, vocab, mini=False):
     for row_idx, row in sense_df.iterrows():
         row = row.to_dict()
         lf_sf_map[row['LF']] = row['SF']
-    tokenized_lfs = list(map(lambda t: tokenize_str(t, unique_only=True), lfs))
+    tokenized_lfs = list(map(
+        lambda t: eval_tokenize(t, unique_only=True, chunker=chunker, combine_phrases=combine_phrases), lfs))
     tokenized_ids = [list(map(vocab.get_id, tokens)) for tokens in tokenized_lfs]
     lf_priors = list(map(lambda x: model._compute_priors(torch.LongTensor(x).clamp_min_(0).to(prev_args.device)),
                          tokenized_ids))

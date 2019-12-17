@@ -11,16 +11,12 @@ from nltk.corpus import stopwords
 import pandas as pd
 import spacy
 
-nlp = spacy.load('en_core_sci_sm')
+nlp = None
 
 OTHER_NO = set(['\'s', '`'])
 USE_PHRASES = False
 STOPWORDS = set(stopwords.words('english')).union(
     set(string.punctuation)).union(OTHER_NO) - set(['%', '+', '-', '>', '<', '='])
-
-section_df = pd.read_csv('data/mimic/sections.csv').dropna()
-SECTION_NAMES = list(sorted(section_df.nlargest(1000, columns=['count'])['section'].tolist()))
-SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES))
 
 
 def pattern_repl(matchobj):
@@ -48,14 +44,24 @@ def clean_text(text):
     return text
 
 
-def chunk(tokens):
+def chunk(tokens, chunker=None):
+    chunker = chunker or nlp
     token_str = ' '.join(tokens)
-    for chunk in nlp(token_str).ents:
+    for chunk in chunker(token_str).ents:
         chunk = str(chunk)
         chunk_toks = chunk.strip().split()
         if len(chunk_toks) > 1:
             token_str = token_str.replace(chunk, '_'.join(chunk_toks))
     return token_str.split()
+
+
+def tokenize_str(token_str, combine_phrases=None, chunker=None):
+    tokens = token_str.lower().strip().split()
+    tokens = list(map(lambda x: x.strip(string.punctuation), tokens))
+    combine_phrases = USE_PHRASES if combine_phrases is None else combine_phrases
+    if combine_phrases:
+        tokens = chunk(tokens, chunker=chunker)
+    return list(filter(lambda x: not x == ' ' and x not in STOPWORDS, tokens))
 
 
 def preprocess_mimic(text):
@@ -76,12 +82,7 @@ def preprocess_mimic(text):
             if tok_idx + 1 == len(sectioned_text) or not sectioned_text[tok_idx + 1] in SECTION_NAMES:
                 tokenized_text += [create_section_token(toks)]
         else:
-            tokens = toks.lower().strip().split()
-            tokens = list(map(lambda x: x.strip(string.punctuation), tokens))
-            tokens = list(filter(lambda x: not x == ' ' and x not in STOPWORDS, tokens))
-            if USE_PHRASES:
-                tokens = chunk(tokens)
-            tokenized_text += tokens
+            tokenized_text += tokenize_str(toks)
     doc_boundary = [create_section_token('DOCUMENT')]
     return ' '.join(doc_boundary + tokenized_text)
 
@@ -96,6 +97,12 @@ if __name__ == '__main__':
     USE_PHRASES = args.combine_phrases
     if USE_PHRASES:
         print('Combining ngrams into phrases')
+
+    section_df = pd.read_csv('data/mimic/sections.csv').dropna()
+    SECTION_NAMES = list(sorted(section_df.nlargest(1000, columns=['count'])['section'].tolist()))
+    SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES))
+
+    nlp = spacy.load('en_core_sci_sm')
 
     # Expand home path (~) so that pandas knows where to look
     print('Loading data...')
