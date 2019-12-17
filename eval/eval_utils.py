@@ -80,7 +80,7 @@ def preprocess_minnesota_dataset(window=5, chunker=None, combine_phrases=False):
             assert len(sf_occurrence_ct) == 1
             valid_rows.append(True)
             sf_occurrences.append(sf_occurrence_ct[0])
-            tokens = tokenize_str(row['context'], combine_phrases=combine_phrases, chunker=chunker)
+            tokens = eval_tokenize(row['context'], combine_phrases=combine_phrases, chunker=chunker)
             tokenized_contexts.append(' '.join(tokens))
 
     df['valid'] = valid_rows
