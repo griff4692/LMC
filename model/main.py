@@ -12,7 +12,7 @@ from tqdm import tqdm
 from batcher import SkipGramBatchLoader
 from model_utils import restore_model
 from vae import VAE
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+sys.path.insert(0, 'D:\\Github\\BWord2Vec\\ClinicalBayesianSkipGram\\preprocess\\')
 from doc_ids import parse_doc_ids
 from vocab import Vocab
 
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('--restore_experiment', default=None, help='Experiment name from which to restore.')
 
     # Training Hyperparameters
-    parser.add_argument('--batch_size', default=256, type=int)
+    parser.add_argument('--batch_size', default=2500, type=int)
     parser.add_argument('-doc2vec', default=True, action='store_true')
     parser.add_argument('--epochs', default=25, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
@@ -36,10 +36,10 @@ if __name__ == '__main__':
     parser.add_argument('-use_pretrained', default=False, action='store_true')
 
     # Model Hyperparameters
-    parser.add_argument('--encoder_hidden_dim', default=64, type=int, help='hidden dimension for encoder')
-    parser.add_argument('--encoder_input_dim', default=64, type=int, help='embedding dimemsions for encoder')
+    parser.add_argument('--encoder_hidden_dim', default=30, type=int, help='hidden dimension for encoder')
+    parser.add_argument('--encoder_input_dim', default=24, type=int, help='embedding dimemsions for encoder')
     parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
-    parser.add_argument('--latent_dim', default=50, type=int, help='z dimension')
+    parser.add_argument('--latent_dim', default=20, type=int, help='z dimension')
 
     args = parser.parse_args()
 
@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, vae_model.parameters())
-    optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
+    optimizer = torch.optim.Adam(trainable_params, lr=args.lr,weight_decay=1e-5)
     if args.restore_experiment is not None:
         optimizer.load_state_dict(optimizer_state)
 
@@ -114,18 +114,18 @@ if __name__ == '__main__':
                                                                  add_doc_id_as_context=args.doc2vec)
             center_ids_tens = torch.LongTensor(center_ids).to(args.device)
             context_ids_tens = torch.LongTensor(context_ids).to(args.device)
+            selected_doc_ids = torch.LongTensor(selected_doc_ids).to(args.device)
 
             neg_ids = vocab.neg_sample(size=context_ids_tens.shape)
 
             neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
 
-            kl_loss, recon_loss, likelihood = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts, args.device,selected_doc_ids)
-            joint_loss = kl_loss + recon_loss - likelihood
-            joint_loss.backward()  # backpropagate loss
+            kl_loss = vae_model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts, args.device,selected_doc_ids)
+
+            kl_loss.backward()  # backpropagate loss
 
             epoch_kl_loss += kl_loss.item()
-            epoch_recon_loss += recon_loss.item()
-            epoch_joint_loss += joint_loss.item()
+
             optimizer.step()
         epoch_joint_loss /= float(batcher.num_batches())
         epoch_kl_loss /= float(batcher.num_batches())
@@ -143,6 +143,7 @@ if __name__ == '__main__':
         args_dict = {'args': {arg: getattr(args, arg) for arg in vars(args)}}
         state_dict.update(args_dict)
         state_dict.update({'vocab': vocab})
+        state_dict.update({'doc':doc_ids})
         # Serialize model and statistics
         checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
         print('Saving model state to {}'.format(checkpoint_fp))

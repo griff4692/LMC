@@ -10,7 +10,7 @@ from model_utils import restore_model, tensor_to_np
 from vae import VAE
 
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+sys.path.insert(0, 'D:\\Github\\BWord2Vec\\ClinicalBayesianSkipGram\\preprocess\\')
 
 
 def get_known_ids(vocab, tokens):
@@ -24,7 +24,7 @@ def point_similarity(model, vocab, tokens_a, tokens_b):
     if len(ids_a) == 0 or len(ids_b) == 0:
         return 0.0
 
-    embeddings = tensor_to_np(model.embeddings_mu.weight)
+    embeddings = tensor_to_np(model.encoder.vocab_embeddings.weight)
 
     rep_a = embeddings[ids_a, :].mean(0)
     rep_b = embeddings[ids_b, :].mean(0)

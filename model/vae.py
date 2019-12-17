@@ -9,70 +9,11 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.autograd import Variable
 
 class VAE(nn.Module):
-    def __init__(self, args, vocab_size,numb_docs, pretrained_embeddings=None):
+    def __init__(self, args, vocab_size,doc_size, pretrained_embeddings=None):
         super(VAE, self).__init__()
 
-        self.encoder = Encoder(args, vocab_size)
-
+        self.encoder = Encoder(args, vocab_size,doc_size)
         self.margin = args.hinge_loss_margin or 1.0
-
-        # The output representations of words(used in KL regularization and max_margin).
-        self.embeddings_mu = nn.Embedding(vocab_size, args.latent_dim, padding_idx=0)
-        if pretrained_embeddings is not None:
-            print('Loading pretrained embeddings...')
-            self.embeddings_mu.load_state_dict({'weight': torch.from_numpy(pretrained_embeddings)})
-
-        self.embeddings_log_sigma = nn.Embedding(vocab_size, 1, padding_idx=0)
-        log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
-        self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
-        
-        
-        #Write document priors
-        self.priors_doc_mu = Variable(torch.empty(numb_docs+1, 
-                                                  args.latent_dim).normal_(mean=1,std=0.1), requires_grad=False)
-        self.priors_doc_sigma = Variable(torch.empty(numb_docs+1, 1).normal_(mean=1,std=0.1), requires_grad=False)
-
-        
-        #Write document embeddings     
-        self.embeddings_doc_mu = nn.Embedding(numb_docs+1, args.latent_dim)
-        self.embeddings_doc_log_sigma =  nn.Embedding(numb_docs+1, 1)
-        
-        log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(numb_docs+1, 1))
-        self.embeddings_doc_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
-
-    def _max_margin(self, mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p, mask):
-        """
-        Computes a sum over context words margin(hinge loss).
-        :param pos_context_words:  a tensor with true context words ids [batch_size x window_size]
-        :param neg_context_words: a tensor with negative context words ids [batch_size x window_size]
-        :param num_contexts: batch_size (how many context words for each center id - necessary for masking padding)
-        :return: tensor [batch_size x 1]
-        """
-        batch_size, num_context_ids, embed_dim = pos_mu_p.size()
-
-        mu_q_tiled = mu_q.unsqueeze(1).repeat(1, num_context_ids, 1)
-        sigma_q_tiled = sigma_q.unsqueeze(1).repeat(1, num_context_ids, 1)
-
-        mu_q_flat = mu_q_tiled.view(batch_size * num_context_ids, -1)
-        sigma_q_flat = sigma_q_tiled.view(batch_size * num_context_ids, -1)
-
-        pos_mu_p_flat = pos_mu_p.view(batch_size * num_context_ids, -1)
-        pos_sigma_p_flat = pos_sigma_p.view(batch_size * num_context_ids, -1)
-        neg_mu_p_flat = neg_mu_p.view(batch_size * num_context_ids, -1)
-        neg_sigma_p_flat = neg_sigma_p.view(batch_size * num_context_ids, -1)
-
-        kl_pos = kl_spher(mu_q_flat, sigma_q_flat, pos_mu_p_flat, pos_sigma_p_flat).view(batch_size, -1)
-        kl_neg = kl_spher(mu_q_flat, sigma_q_flat, neg_mu_p_flat, neg_sigma_p_flat).view(batch_size, -1)
-
-        hinge_loss = (kl_pos - kl_neg + self.margin).clamp_min_(0)
-        hinge_loss.masked_fill_(mask, 0)
-        return hinge_loss.sum(1)
-
-    def _compute_doc_priors(self, ids):
-        return self.doc_embeddings_mu(ids), self.doc_embeddings_log_sigma(ids).exp()
-
-    def _compute_priors(self, ids):
-        return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
     def forward(self, center_ids, context_ids, neg_context_ids, num_contexts, device, selected_doc_ids):
         """
@@ -84,34 +25,20 @@ class VAE(nn.Module):
         """
         
         # Mask padded context ids
-        batch_size, num_context_ids = context_ids.size()
-        mask_size = torch.Size([batch_size, num_context_ids])
-        mask = mask_2D(mask_size, num_contexts).to(device)
-        mask[:, -1] = 0  # don't mask doc_ids
-
-        mu_q, sigma_q = self.encoder(center_ids, context_ids, mask)
-
-        mu_p, sigma_p = self._compute_priors(center_ids)
-
-        pos_mu_p, pos_sigma_p = self._compute_priors(context_ids)
-        neg_mu_p, neg_sigma_p = self._compute_priors(neg_context_ids)
-
-        kl = kl_spher(mu_q, sigma_q, mu_p, sigma_p).mean()
-        max_margin = self._max_margin(mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p, mask).mean()
+        loss = 0
+        batch_size = center_ids.size()[0]
+        mu_center, sigma_center = self.encoder(center_ids, selected_doc_ids)
         
-        selected_doc_ids = torch.tensor(selected_doc_ids).long().to(device)
-        
-        prior_doc_mu = self.priors_doc_mu[selected_doc_ids].to(device)
-        prior_doc_sigma = torch.diag_embed(self.priors_doc_sigma[selected_doc_ids].repeat(1,mu_p.shape[1])).to(device)
-        prior_doc_dist = MultivariateNormal(prior_doc_mu,prior_doc_sigma)
-        doc_mu =self.embeddings_doc_mu(selected_doc_ids).to(device)
-        regularization = prior_doc_dist.log_prob(doc_mu).sum(0)
-        
-        
-        posterior_doc_mu = self.embeddings_doc_mu(selected_doc_ids).to(device)
-        posterior_doc_sigma =  torch.diag_embed(self.embeddings_doc_log_sigma(selected_doc_ids).exp().repeat(1,mu_p.shape[1])).to(device)
-
-        posterior_doc_dist = MultivariateNormal(posterior_doc_mu,posterior_doc_sigma)
-        p_likelihood = posterior_doc_dist.log_prob(mu_p).sum(0)
-        
-        return kl, max_margin, regularization+p_likelihood
+        for i in range(context_ids.shape[1]):
+            
+            mu_pos_context, sigma_pos_context =self.encoder(context_ids[:,i], selected_doc_ids[i].repeat(batch_size))
+            mu_neg_context, sigma_neg_context =self.encoder(neg_context_ids[:,i], selected_doc_ids[i].repeat(batch_size))
+            
+            kl_pos =  kl_spher(mu_center, sigma_center, mu_pos_context, sigma_pos_context)
+            kl_neg =  kl_spher(mu_center, sigma_center, mu_neg_context, sigma_neg_context)
+            kl = kl_pos - kl_neg
+                        
+            hinge_loss = (kl + self.margin).clamp_min_(0)
+            loss += hinge_loss
+            
+        return loss.sum()

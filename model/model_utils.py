@@ -27,6 +27,7 @@ def restore_model(restore_name):
     print('Loading model from {}'.format(latest_checkpoint_fn))
     checkpoint_state = torch.load(latest_checkpoint_fn)
     vocab = checkpoint_state['vocab']
+    doc = checkpoint_state['doc']
     print('Previous checkpoint at epoch={}...'.format(max_checkpoint_epoch))
     for k, v in checkpoint_state['losses'].items():
         print('{}={}'.format(k, v))
@@ -35,7 +36,7 @@ def restore_model(restore_name):
         print('{}={}'.format(k, v))
         setattr(args, k, v)
 
-    vae_model = VAE(args, vocab.size())
+    vae_model = VAE(args, vocab.size(),max(doc))
     vae_model.load_state_dict(checkpoint_state['model_state_dict'])
     optimizer_state = checkpoint_state['optimizer_state_dict']
     return args, vae_model, vocab, optimizer_state
