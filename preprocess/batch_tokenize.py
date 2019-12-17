@@ -21,6 +21,7 @@ def split(dfm, chunk_size):
     indices = index_marks(dfm.shape[0], chunk_size)
     return np.split(dfm, indices)
 
+
 def collect_chunks(args):
     chunk_range = np.arange(args.chunksize)
     debug_str = '_mini' if args.debug else ''
@@ -30,8 +31,8 @@ def collect_chunks(args):
 
     for chunk in chunk_range:
         print('Adding chunk {}'.format(chunk))
-        token_fp = '{}_tokenized{}_chunk_{}.csv'.format(args.mimic_fp, debug_str, chunk)
-        counts_fp = '{}_token_counts{}_chunk_{}.csv'.format(args.mimic_fp, debug_str, chunk)
+        token_fp = '{}_tokenized{}_chunk_{}.json'.format(args.mimic_fp, debug_str, chunk)
+        counts_fp = '{}_token_counts{}_chunk_{}.json'.format(args.mimic_fp, debug_str, chunk)
         with open(token_fp, 'r') as fd:
             full_token_data += json.load(fd)
         with open(counts_fp, 'r') as fd:
@@ -41,11 +42,12 @@ def collect_chunks(args):
                     full_counts_data[k] = 0
                 full_counts_data[k] += counts[k]
 
-    token_fp = '{}_tokenized{}_tmp.csv'.format(args.mimic_fp, debug_str)
-    counts_fp = '{}_token_counts{}_tmp.csv'.format(args.mimic_fp, debug_str)
-    with open(token_fp, 'w') as fd:
+    token_out_fp = '{}_tokenized{}_tmp.json'.format(args.mimic_fp, debug_str)
+    counts_out_fp = '{}_token_counts{}_tmp.json'.format(args.mimic_fp, debug_str)
+    print('Saving data to {} and {}'.format(token_out_fp, counts_out_fp))
+    with open(token_out_fp, 'w') as fd:
         json.dump(full_token_data, fd)
-    with open(counts_fp, 'w') as fd:
+    with open(counts_out_fp, 'w') as fd:
         json.dump(full_counts_data, fd)
 
 

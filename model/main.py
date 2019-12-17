@@ -28,12 +28,12 @@ if __name__ == '__main__':
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=1024, type=int)
+    parser.add_argument('-combine_phrases', default=False, action='store_true')
     parser.add_argument('-section2vec', default=False, action='store_true')
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
     parser.add_argument('-use_pretrained', default=False, action='store_true')
-    parser.add_argument('-full_variance', default=False, action='store_true')
 
     # Model Hyperparameters
     parser.add_argument('--encoder_hidden_dim', default=64, type=int, help='hidden dimension for encoder')
@@ -47,15 +47,16 @@ if __name__ == '__main__':
 
     # Load Data
     debug_str = '_mini' if args.debug else ''
+    phrase_str = '_phrase' if args.combine_phrases else ''
 
-    ids_infile = os.path.join(args.data_dir, 'ids{}.npy'.format(debug_str))
-    print('Loading data...')
+    ids_infile = os.path.join(args.data_dir, 'ids{}{}.npy'.format(debug_str, phrase_str))
+    print('Loading data from {}...'.format(ids_infile))
     with open(ids_infile, 'rb') as fd:
         ids = np.load(fd)
 
     # Load Vocabulary
-    print('Loading vocabulary...')
-    vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
+    vocab_infile = '../preprocess/data/vocab{}{}.pk'.format(debug_str, phrase_str)
+    print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
     print('Loaded vocabulary of size={}...'.format(vocab.separator_start_vocab_id))
@@ -87,8 +88,7 @@ if __name__ == '__main__':
             pretrained_embeddings = np.load(fd)
             assert vocab.size() == pretrained_embeddings.shape[0]
 
-    model = (VAE(args, vocab.size(), pretrained_embeddings=pretrained_embeddings, full_variance=args.full_variance)
-                 .to(args.device))
+    model = VAE(args, vocab.size(), pretrained_embeddings=pretrained_embeddings).to(args.device)
     if args.restore_experiment is not None:
         prev_args, model, vocab, optimizer_state = restore_model(args.restore_experiment)
 

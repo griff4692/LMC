@@ -39,11 +39,7 @@ def restore_model(restore_name, weights_path='weights'):
     for k, v in checkpoint_state['args'].items():
         print('{}={}'.format(k, v))
         setattr(args, k, v)
-
-    full_variance = False
-    if hasattr(args, 'full_variance'):
-        full_variance = args.full_variance
-    vae_model = VAE(args, vocab.size(), full_variance=full_variance)
+    vae_model = VAE(args, vocab.size())
     vae_model.load_state_dict(checkpoint_state['model_state_dict'])
     optimizer_state = checkpoint_state['optimizer_state_dict']
     return args, vae_model, vocab, optimizer_state

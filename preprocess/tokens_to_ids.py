@@ -11,14 +11,15 @@ from vocab import Vocab
 
 def tokens_to_ids(args, token_infile=None):
     debug_str = '_mini' if args.debug else ''
+    phrase_str = '_phrase' if args.combine_phrases else ''
 
     if token_infile is None:
-        token_infile = '{}{}.json'.format(args.tokenized_fp, debug_str)
+        token_infile = '{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str)
     with open(token_infile, 'r') as fd:
         tokens = json.load(fd)
 
     # Load Vocabulary
-    vocab_infile = '../preprocess/data/vocab{}.pk'.format(debug_str)
+    vocab_infile = 'data/vocab{}{}.pk'.format(debug_str, phrase_str)
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
 
@@ -33,7 +34,7 @@ def tokens_to_ids(args, token_infile=None):
 
     ids = ids[:-1]
     print('Saving {} tokens to disc'.format(len(ids)))
-    out_fn = 'data/ids{}.npy'.format(debug_str)
+    out_fn = 'data/ids{}{}.npy'.format(debug_str, phrase_str)
     with open(out_fn, 'wb') as fd:
         np.save(fd, np.array(ids, dtype=int))
 

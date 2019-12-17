@@ -13,12 +13,10 @@ import spacy
 
 nlp = spacy.load('en_core_sci_sm')
 
-# from chunker import chunk
-
 OTHER_NO = set(['\'s', '`'])
+USE_PHRASES = False
 STOPWORDS = set(stopwords.words('english')).union(
     set(string.punctuation)).union(OTHER_NO) - set(['%', '+', '-', '>', '<', '='])
-
 
 section_df = pd.read_csv('data/mimic/sections.csv').dropna()
 SECTION_NAMES = list(sorted(section_df.nlargest(1000, columns=['count'])['section'].tolist()))
@@ -34,7 +32,7 @@ def pattern_repl(matchobj):
 
 def create_section_token(section):
     section = re.sub('[:\s]+', '', section)
-    return '||header{}||'.format(section)
+    return '<header={}>'.format(section)
 
 
 def clean_text(text):
@@ -48,6 +46,16 @@ def clean_text(text):
     text = re.sub(r'\b(-)?[\d.]+(-)?\b', ' DIGITPARSED ', text)
     text = re.sub(r'\s+', ' ', text)
     return text
+
+
+def chunk(tokens):
+    token_str = ' '.join(tokens)
+    for chunk in nlp(token_str).ents:
+        chunk = str(chunk)
+        chunk_toks = chunk.strip().split()
+        if len(chunk_toks) > 1:
+            token_str = token_str.replace(chunk, '_'.join(chunk_toks))
+    return token_str.split()
 
 
 def preprocess_mimic(text):
@@ -71,13 +79,9 @@ def preprocess_mimic(text):
             tokens = toks.lower().strip().split()
             tokens = list(map(lambda x: x.strip(string.punctuation), tokens))
             tokens = list(filter(lambda x: not x == ' ' and x not in STOPWORDS, tokens))
-            tokens = ' '.join(tokens)
-            for chunk in nlp(tokens).ents:
-                chunk = str(chunk).strip()
-                chunk_toks = chunk.split()
-                if len(chunk_toks) > 1:
-                    tokens = tokens.replace(chunk, '_'.join(chunk_toks))
-            tokenized_text += tokens.split()
+            if USE_PHRASES:
+                tokens = chunk(tokens)
+            tokenized_text += tokens
     doc_boundary = [create_section_token('DOCUMENT')]
     return ' '.join(doc_boundary + tokenized_text)
 
@@ -86,13 +90,18 @@ if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC (v3) Note Tokenization.')
     arguments.add_argument('--mimic_fp', default='data/mimic/NOTEEVENTS')
     arguments.add_argument('-debug', default=False, action='store_true')
+    arguments.add_argument('-combine_phrases', default=False, action='store_true')
 
     args = arguments.parse_args()
+    USE_PHRASES = args.combine_phrases
+    if USE_PHRASES:
+        print('Combining ngrams into phrases')
 
     # Expand home path (~) so that pandas knows where to look
     print('Loading data...')
     args.mimic_fp = os.path.expanduser(args.mimic_fp)
     debug_str = '_mini' if args.debug else ''
+    phrase_str = '_phrase' if args.combine_phrases else ''
     df = pd.read_csv('{}{}.csv'.format(args.mimic_fp, debug_str))
 
     print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
@@ -101,7 +110,6 @@ if __name__ == '__main__':
     p = Pool()
     parsed_docs = p.map(preprocess_mimic, df['TEXT'].tolist())
     p.close()
-
     end_time = time()
     print('Took {} seconds'.format(end_time - start_time))
 
@@ -111,7 +119,7 @@ if __name__ == '__main__':
             token_cts[token] += 1
             token_cts['__ALL__'] += 1
     debug_str = '_mini' if args.debug else ''
-    with open(args.mimic_fp + '_tokenized{}_chunk.json'.format(debug_str), 'w') as fd:
+    with open(args.mimic_fp + '_tokenized{}{}.json'.format(debug_str, phrase_str), 'w') as fd:
         json.dump(list(zip(categories, parsed_docs)), fd)
-    with open(args.mimic_fp + '_token_counts{}_chunk.json'.format(debug_str), 'w') as fd:
+    with open(args.mimic_fp + '_token_counts{}{}.json'.format(debug_str, phrase_str), 'w') as fd:
         json.dump(token_cts, fd)

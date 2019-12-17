@@ -7,12 +7,10 @@ from compute_utils import compute_kl, mask_2D
 
 
 class VAE(nn.Module):
-    def __init__(self, args, vocab_size, pretrained_embeddings=None, full_variance=False):
+    def __init__(self, args, vocab_size, pretrained_embeddings=None):
         super(VAE, self).__init__()
-
-        var_dim = args.latent_dim if full_variance else 1
         self.device = args.device
-        self.encoder = Encoder(args, vocab_size, var_dim)
+        self.encoder = Encoder(args, vocab_size)
 
         self.margin = args.hinge_loss_margin or 1.0
 
@@ -22,8 +20,8 @@ class VAE(nn.Module):
             print('Loading pretrained embeddings...')
             self.embeddings_mu.load_state_dict({'weight': torch.from_numpy(pretrained_embeddings)})
 
-        self.embeddings_log_sigma = nn.Embedding(vocab_size, var_dim, padding_idx=0)
-        log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, var_dim))
+        self.embeddings_log_sigma = nn.Embedding(vocab_size, 1, padding_idx=0)
+        log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
         self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
 
     def _max_margin(self, mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p, mask):
