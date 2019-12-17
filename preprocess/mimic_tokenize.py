@@ -61,7 +61,7 @@ def tokenize_str(token_str, combine_phrases=None, chunker=None):
     combine_phrases = USE_PHRASES if combine_phrases is None else combine_phrases
     if combine_phrases:
         tokens = chunk(tokens, chunker=chunker)
-    return list(filter(lambda x: not x == ' ' and x not in STOPWORDS, tokens))
+    return list(filter(lambda x: len(x) > 0 and not x == ' ' and x not in STOPWORDS, tokens))
 
 
 def preprocess_mimic(text):

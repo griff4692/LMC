@@ -10,6 +10,21 @@ from compute_utils import compute_kl
 from eval_utils import eval_tokenize, preprocess_minnesota_dataset
 
 
+def parse_sense_df(sense_fp):
+    sense_df = pd.read_csv(sense_fp, sep='|')
+    sense_df.dropna(subset=['LF', 'SF'], inplace=True)
+    lfs = sense_df['LF'].unique().tolist()
+    lf_sf_map = {}
+    sf_lf_map = defaultdict(set)
+    for row_idx, row in sense_df.iterrows():
+        row = row.to_dict()
+        lf_sf_map[row['LF']] = row['SF']
+        sf_lf_map[row['SF']].add(row['LF'])
+    for k in sf_lf_map:
+        sf_lf_map[k] = list(sorted(sf_lf_map[k]))
+    return lfs, lf_sf_map, sf_lf_map
+
+
 def evaluate_minnesota_acronyms(prev_args, model, vocab, mini=False, combine_phrases=False):
     chunker = None
     if combine_phrases:
@@ -47,13 +62,8 @@ def evaluate_minnesota_acronyms(prev_args, model, vocab, mini=False, combine_phr
         z_mus, z_sigmas = model.encoder(center_id_tens, context_id_tens, mask)
 
     sense_fp = 'eval_data/minnesota/sense_inventory_ii'
-    sense_df = pd.read_csv(sense_fp, sep='|')
+    lfs, lf_sf_map, _ = parse_sense_df(sense_fp)
 
-    lfs = sense_df['LF'].unique().tolist()
-    lf_sf_map = {}
-    for row_idx, row in sense_df.iterrows():
-        row = row.to_dict()
-        lf_sf_map[row['LF']] = row['SF']
     tokenized_lfs = list(map(
         lambda t: eval_tokenize(t, unique_only=True, chunker=chunker, combine_phrases=combine_phrases), lfs))
     tokenized_ids = [list(map(vocab.get_id, tokens)) for tokens in tokenized_lfs]
