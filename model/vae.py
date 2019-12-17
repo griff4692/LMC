@@ -33,24 +33,33 @@ class VAE(nn.Module):
         :return: tensor [batch_size x 1]
         """
         batch_size, num_context_ids, embed_dim = pos_mu_p.size()
+        ns = neg_mu_p.size()[-2]
 
         mu_q_tiled = mu_q.unsqueeze(1).repeat(1, num_context_ids, 1)
         sigma_q_tiled = sigma_q.unsqueeze(1).repeat(1, num_context_ids, 1)
-
         mu_q_flat = mu_q_tiled.view(batch_size * num_context_ids, -1)
         sigma_q_flat = sigma_q_tiled.view(batch_size * num_context_ids, -1)
 
+        mu_q_flat_neg = mu_q_flat
+        sigma_q_flat_neg = sigma_q_flat
+        if ns > 1:
+            mu_q_tiled_neg = mu_q.unsqueeze(1).repeat(1, num_context_ids * ns, 1)
+            sigma_q_tiled_neg = sigma_q.unsqueeze(1).repeat(1, num_context_ids * ns, 1)
+            mu_q_flat_neg = mu_q_tiled_neg.view(batch_size * num_context_ids * ns, -1)
+            sigma_q_flat_neg = sigma_q_tiled_neg.view(batch_size * num_context_ids * ns, -1)
+
         pos_mu_p_flat = pos_mu_p.view(batch_size * num_context_ids, -1)
         pos_sigma_p_flat = pos_sigma_p.view(batch_size * num_context_ids, -1)
-        neg_mu_p_flat = neg_mu_p.view(batch_size * num_context_ids, -1)
-        neg_sigma_p_flat = neg_sigma_p.view(batch_size * num_context_ids, -1)
+        neg_mu_p_flat = neg_mu_p.view(batch_size * num_context_ids * ns, -1)
+        neg_sigma_p_flat = neg_sigma_p.view(batch_size * num_context_ids * ns, -1)
 
         kl_pos = compute_kl(mu_q_flat, sigma_q_flat, pos_mu_p_flat, pos_sigma_p_flat, device=self.device).view(
             batch_size, -1)
-        kl_neg = compute_kl(mu_q_flat, sigma_q_flat, neg_mu_p_flat, neg_sigma_p_flat, device=self.device).view(
-            batch_size, -1)
+        kl_neg = compute_kl(mu_q_flat_neg, sigma_q_flat_neg, neg_mu_p_flat, neg_sigma_p_flat, device=self.device).view(
+            batch_size, num_context_ids, ns)
 
-        hinge_loss = (kl_pos - kl_neg + self.margin).clamp_min_(0)
+        kl_neg_min = kl_neg.squeeze(-1) if ns == 1 else kl_neg.min(-1)[0]
+        hinge_loss = (kl_pos - kl_neg_min + self.margin).clamp_min_(0)
         hinge_loss.masked_fill_(mask, 0)
         return hinge_loss.sum(1)
 
