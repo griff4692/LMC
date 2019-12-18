@@ -1,3 +1,4 @@
+from collections import defaultdict
 import os
 from shutil import rmtree
 import sys
@@ -6,6 +7,7 @@ from time import sleep
 import argparse
 import numpy as np
 import pandas as pd
+from pycm import *
 from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
@@ -28,13 +30,83 @@ def target_lf_index(target_lf, lfs):
     return -1
 
 
-def error_analysis(test_batcher, model):
+def _render_example(sf, target_lf, converted_target_lf, pred_lf, top_pred_lfs, context_window, full_context):
+    str = 'SF={}.\nTarget LF={} ({}).\nPredicted LF={}.\nTop 5 Predicted={}\n'.format(
+        sf, target_lf, converted_target_lf, pred_lf, top_pred_lfs)
+    str += 'Context Window: {}\n'.format(context_window)
+    str += 'Full Context: {}\n'.format(full_context)
+    str += '\n\n'
+    return str
+
+
+def error_analysis(test_batcher, model, sf_lf_map, results_dir=None):
+    """
+    :param test_batcher: AcronymBatcherLoader instance
+    :param model: AcronymExpander instance
+    :param sf_lf_map: Short form to LF mappings
+    :param results_dir: where to write the results files
+    :return: None but writes a confusion matrix analysis file into results_dir
+    """
     test_batcher.reset(shuffle=False)
     model.eval()
+    sf_confusion = defaultdict(lambda: ([], []))
+
+    results_fd = open(os.path.join(results_dir, 'results.txt'), 'w')
+    errors_fd = open(os.path.join(results_dir, 'errors.txt'), 'w')
 
     for _ in tqdm(range(test_batcher.num_batches())):
-        process_batch(test_batcher, model)
-        batch_data = test_batcher.get_prev_batch(test_examples)
+        with torch.no_grad():
+            batch_loss, num_examples, num_correct, proba = process_batch(test_batcher, model)
+        batch_data = test_batcher.get_prev_batch()
+        proba = tensor_to_np(proba)
+        top_pred_idxs = np.argsort(-proba, axis=1)[:, :5]
+        pred_lf_idxs = top_pred_idxs[:, 0]
+        for batch_idx, (row_idx, row) in enumerate(batch_data.iterrows()):
+            row = row.to_dict()
+            sf = row['sf']
+            lf_map = sf_lf_map[sf]
+            target_lf = row['target_lf']
+            target_lf_idx = row['target_lf_idx']
+            pred_lf_idx = pred_lf_idxs[batch_idx]
+            pred_lf = lf_map[pred_lf_idx]
+            top_pred_lfs = ', '.join(list(map(lambda lf: lf_map[lf], top_pred_idxs[batch_idx])))
+            example_str = _render_example(sf, target_lf, lf_map[target_lf_idx], pred_lf, top_pred_lfs,
+                                          row['trimmed_tokens'], row['tokenized_context'])
+            results_fd.write(example_str)
+            if not target_lf_index == pred_lf_idx:
+                errors_fd.write(example_str)
+
+            sf_confusion[sf][0].append(target_lf_idx)
+            sf_confusion[sf][1].append(pred_lf_idx)
+
+    results_fd.close()
+    for sf in sf_confusion:
+        labels = sf_lf_map[sf]
+        labels_trunc = list(map(lambda x: x.split(';')[0], labels))
+        y_true = sf_confusion[sf][0]
+        y_pred = sf_confusion[sf][1]
+        cm = ConfusionMatrix(actual_vector=y_true, predict_vector=y_pred)
+        label_idx_to_str = dict()
+        for idx in cm.classes:
+            label_idx_to_str[idx] = labels_trunc[int(idx)]
+        cm.relabel(mapping=label_idx_to_str)
+        cm_outpath = os.path.join(results_dir, 'confusion', '{}.png'.format(sf))
+        cm.save_html(cm_outpath)
+
+
+def render_test_statistics(df, sf_lf_map):
+    N = df.shape[0]
+    sfs = df['sf'].unique().tolist()
+    sf_counts = df['sf'].value_counts()
+
+    dominant_counts = 0
+    expected_random_accuracy = 0.0
+    for sf in sfs:
+        dominant_counts += df[df['sf'] == sf]['target_lf_idx'].value_counts().max()
+        expected_random_accuracy += sf_counts[sf] / float(len(sf_lf_map[sf]))
+
+    print('Accuracy from choosing dominant class={}'.format(dominant_counts / float(N)))
+    print('Expected random accuracy={}'.format(expected_random_accuracy / float(N)))
 
 
 def process_batch(batcher, model):
@@ -53,7 +125,7 @@ if __name__ == '__main__':
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
     parser.add_argument('--data_dir', default='../eval/eval_data/minnesota/')
-    parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
+    parser.add_argument('--experiment', default='baseline', help='Save path in weights/ for experiment.')
     parser.add_argument('--bsg_experiment', default='baseline-12-16')
 
     # Training Hyperparameters
@@ -83,12 +155,17 @@ if __name__ == '__main__':
     train_batcher = AcronymBatcherLoader(train_df, batch_size=args.batch_size)
     test_batcher = AcronymBatcherLoader(test_df, batch_size=args.batch_size)
 
+    render_test_statistics(test_df, sf_lf_map)
+
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join('weights', args.experiment)
     if os.path.exists(weights_dir):
         print('Clearing out previous weights in {}'.format(weights_dir))
         rmtree(weights_dir)
     os.mkdir(weights_dir)
+    results_dir = os.path.join(weights_dir, 'results')
+    os.mkdir(results_dir)
+    os.mkdir(os.path.join(results_dir, 'confusion'))
 
     model = AcronymExpander(bsg_model)
 
@@ -156,4 +233,7 @@ if __name__ == '__main__':
             best_epoch = epoch
     print('Loading weights from {} epoch to perform error analysis'.format(best_epoch))
     model.load_state_dict(best_weights)
-    error_analysis(test_batcher, model)
+    losses_dict['test_loss'] = lowest_test_loss
+    checkpoint_fp = os.path.join(weights_dir, 'checkpoint_best.pth')
+    save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
+    error_analysis(test_batcher, model, sf_lf_map, results_dir=results_dir)
