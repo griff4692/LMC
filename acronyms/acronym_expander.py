@@ -1,8 +1,6 @@
-import numpy as np
 import torch
 import torch.nn as nn
 
-from encoder import Encoder
 from compute_utils import compute_kl, mask_2D
 
 
