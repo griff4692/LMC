@@ -118,7 +118,7 @@ if __name__ == '__main__':
             neg_id_shape = (context_ids.shape[0], context_ids.shape[1], args.ns)
             neg_ids = vocab.neg_sample(size=neg_id_shape)
             if args.section2vec:
-                neg_ids[:, 0] = np.random.choice(section_id_range, size=args.batch_size)
+                neg_ids[:, 0] = np.random.choice(section_id_range, size=[args.batch_size, args.ns])
             neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
 
             kl_loss, recon_loss = model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts)
