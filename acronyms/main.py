@@ -28,6 +28,25 @@ def target_lf_index(target_lf, lfs):
     return -1
 
 
+def error_analysis(test_batcher, model):
+    test_batcher.reset(shuffle=False)
+    model.eval()
+
+    for _ in tqdm(range(test_batcher.num_batches())):
+        process_batch(test_batcher, model)
+        batch_data = test_batcher.get_prev_batch(test_examples)
+
+
+def process_batch(batcher, model):
+    batch_input, num_outputs = batcher.next(vocab, sf_tokenized_lf_map)
+    batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0), batch_input))
+    proba, target = model(*(batch_input + [num_outputs]))
+    num_correct = len(np.where(tensor_to_np(torch.argmax(proba, 1)) == tensor_to_np(target))[0])
+    num_examples = len(num_outputs)
+    batch_loss = loss_func.forward(proba, target)
+    return batch_loss, num_examples, num_correct, proba
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Main script for Acronym Training Model')
 
@@ -38,7 +57,7 @@ if __name__ == '__main__':
     parser.add_argument('--bsg_experiment', default='baseline-12-16')
 
     # Training Hyperparameters
-    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--batch_size', default=100, type=int)
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
 
@@ -78,6 +97,9 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
 
     loss_func = nn.CrossEntropyLoss()
+    best_weights = None
+    best_epoch = 1
+    lowest_test_loss = float('inf')
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
@@ -89,34 +111,29 @@ if __name__ == '__main__':
         train_epoch_loss, train_examples, train_correct = 0.0, 0, 0
         for _ in tqdm(range(train_batcher.num_batches())):
             optimizer.zero_grad()
-            batch_input, num_outputs = train_batcher.next(vocab, sf_tokenized_lf_map)
-            batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0), batch_input))
-
-            proba, target = model(*(batch_input + [num_outputs]))
-            train_correct += len(np.where(tensor_to_np(torch.argmax(proba, 1)) == tensor_to_np(target))[0])
-            train_examples += len(num_outputs)
-            batch_loss = loss_func.forward(proba, target)
+            batch_loss, num_examples, num_correct, _ = process_batch(train_batcher, model)
             batch_loss.backward()
             optimizer.step()
 
+            # Update metrics
             train_epoch_loss += batch_loss.item()
+            train_examples += num_examples
+            train_correct += num_correct
 
         sleep(0.1)
         train_loss = train_epoch_loss / float(train_batcher.num_batches())
         train_acc = train_correct / float(train_examples)
         print('Train Loss={}. Accuracy={}'.format(train_loss, train_acc))
         sleep(0.1)
+
         test_batcher.reset(shuffle=False)
         test_epoch_loss, test_examples, test_correct = 0.0, 0, 0
         model.eval()
         for _ in tqdm(range(test_batcher.num_batches())):
-            batch_input, num_outputs = test_batcher.next(vocab, sf_tokenized_lf_map)
-            batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0), batch_input))
             with torch.no_grad():
-                proba, target = model(*(batch_input + [num_outputs]))
-            test_correct += len(np.where(tensor_to_np(torch.argmax(proba, 1)) == tensor_to_np(target))[0])
-            test_examples += len(num_outputs)
-            batch_loss = loss_func.forward(proba, target)
+                batch_loss, num_examples, num_correct, _ = process_batch(test_batcher, model)
+            test_correct += num_correct
+            test_examples += num_examples
             test_epoch_loss += batch_loss.item()
 
         sleep(0.1)
@@ -132,3 +149,11 @@ if __name__ == '__main__':
 
         checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
         save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
+
+        lowest_test_loss = min(lowest_test_loss, test_loss)
+        best_weights = model.state_dict()
+        if lowest_test_loss == test_loss:
+            best_epoch = epoch
+    print('Loading weights from {} epoch to perform error analysis'.format(best_epoch))
+    model.load_state_dict(best_weights)
+    error_analysis(test_batcher, model)

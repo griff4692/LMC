@@ -15,11 +15,12 @@ class AcronymExpander(nn.Module):
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
-    def forward(self, sf_ids, context_ids, lf_ids, target_lf_ids, num_outputs):
+    def forward(self, sf_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, num_outputs):
         """
         :param sf_ids: batch_size
         :param context_ids: batch_size, num_context_ids
         :param lf_ids: batch_size, max_output_size, max_lf_len
+        :param lf_token_ct: batch_size, max_output_size - normalizer for lf_ids
         :param target_lf_ids: batch_size
         :param num_outputs: batch_size
         :return:
@@ -39,7 +40,8 @@ class AcronymExpander(nn.Module):
         lf_mu, lf_sigma = self._compute_priors(lf_ids)
 
         # Summarize LFs
-        lf_mu_sum, lf_sigma_sum = lf_mu.mean(-2), lf_sigma.mean(-2)
+        normalizer = lf_token_ct.unsqueeze(-1).clamp_min(1.0)
+        lf_mu_sum, lf_sigma_sum = lf_mu.sum(-2) / normalizer, lf_sigma.sum(-2) / normalizer
 
         # Tile SFs across each LF and flatten both SFs and LFs
         sf_mu_flat = sf_mu.unsqueeze(1).repeat(1, max_output_size, 1).view(batch_size * max_output_size, -1)

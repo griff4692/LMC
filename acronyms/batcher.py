@@ -32,8 +32,12 @@ class AcronymBatcherLoader:
 
         return np.concatenate([left_context_truncated, right_context_truncated])
 
+    def get_prev_batch(self):
+        return self.batches[self.batch_ct - 1]
+
     def next(self, vocab, sf_tokenized_lf_map):
         batch = self.batches[self.batch_ct]
+        self.batch_ct += 1
         batch_size = batch.shape[0]
         sf_ids = np.zeros([batch_size, ], dtype=int)
         target_lf_ids = np.zeros([batch_size, ], dtype=int)
@@ -43,6 +47,8 @@ class AcronymBatcherLoader:
         max_output_length = max(num_outputs)
         max_lf_len = 5
         lf_ids = np.zeros([batch_size, max_output_length, max_lf_len], dtype=int)
+        lf_token_ct = np.zeros([batch_size, max_output_length])
+        max_lf_token_ct = 0
         for batch_idx, (_, row) in enumerate(batch.iterrows()):
             row = row.to_dict()
             sf_ids[batch_idx] = vocab.get_id(row['sf'].lower())
@@ -54,9 +60,12 @@ class AcronymBatcherLoader:
             for lf_idx, lf_toks in enumerate(candidate_lfs):
                 lf_id_seq = vocab.get_ids(lf_toks)
                 lf_id_seq_trunc = lf_id_seq[:min(max_lf_len, len(lf_id_seq))]
-                lf_ids[batch_idx, lf_idx, :len(lf_id_seq_trunc)] = lf_id_seq_trunc
+                num_toks = len(lf_id_seq_trunc)
+                lf_ids[batch_idx, lf_idx, :num_toks] = lf_id_seq_trunc
+                lf_token_ct[batch_idx, lf_idx] = num_toks
+                max_lf_token_ct = max(max_lf_token_ct, num_toks)
 
-        return (sf_ids, context_ids, lf_ids, target_lf_ids), num_outputs
+        return (sf_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct), num_outputs
 
     def reset(self, shuffle=True):
         self.batch_ct = 0
