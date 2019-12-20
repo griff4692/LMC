@@ -1,11 +1,9 @@
-import pickle
+import re
 
-import numpy as np
 import pandas as pd
 
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 from model_utils import tensor_to_np
 
@@ -13,25 +11,37 @@ import torch
 
 
 if __name__ == '__main__':
-    checkpoint_fp = '../model/weights/lga/checkpoint_4.pth'
+    is_lga = False
 
-    if not torch.cuda.is_available():
-        checkpoint_state = torch.load(checkpoint_fp, map_location=lambda storage, loc: storage)
+    fp_str = 'lga.png' if is_lga else 'sec2vec.png'
+    title = 'Latent Meaning Cells' if is_lga else 'BSG With Section Headers As Pseudo-Contexts'
+
+    if is_lga:
+        checkpoint_fp = '../model/weights/lga/checkpoint_1.pth'
+        if not torch.cuda.is_available():
+            checkpoint_state = torch.load(checkpoint_fp, map_location=lambda storage, loc: storage)
+        else:
+            checkpoint_state = torch.load(checkpoint_fp)
+        section_vocab = checkpoint_state['section_vocab']
+        embeddings = tensor_to_np(checkpoint_state['model_state_dict']['encoder.section_embeddings.weight'])
+        sections = section_vocab.i2w[1:]
     else:
-        checkpoint_state = torch.load(checkpoint_fp)
-    section_vocab = checkpoint_state['section_vocab']
-    embeddings = tensor_to_np(checkpoint_state['model_state_dict']['encoder.section_embeddings.weight'])
-
-    tsne = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=300)
+        checkpoint_fp = '../model/weights/12-20-sec2vec/checkpoint_1.pth'
+        if not torch.cuda.is_available():
+            checkpoint_state = torch.load(checkpoint_fp, map_location=lambda storage, loc: storage)
+        else:
+            checkpoint_state = torch.load(checkpoint_fp)
+        vocab = checkpoint_state['vocab']
+        offset = vocab.separator_start_vocab_id
+        embeddings = tensor_to_np(checkpoint_state['model_state_dict']['encoder.embeddings.weight'])[offset:, :]
+        sections = vocab.i2w[offset:]
+    tsne = TSNE(n_components=2, verbose=1, perplexity=50)
     tsne_results = tsne.fit_transform(embeddings)
 
-    sections = section_vocab.i2w
-    sections = [s.split('=')[-1][:-1] for s in sections]
-
+    sections = [s.split('=')[1] for s in sections]
     sections_df = pd.read_csv('../preprocess/data/mimic/sections.csv')
-    common_sections = set(sections_df[sections_df['count'] >= 25000]['section'].tolist())
-    common_sections = common_sections.intersection(set(sections))
-
+    common_sections = sections_df[sections_df['count'] >= 45000]['section'].tolist()
+    common_sections = set([re.sub('\s+', '', s).upper() for s in common_sections])
     x = []
     y = []
     for section in common_sections:
@@ -48,8 +58,11 @@ if __name__ == '__main__':
     fig, ax = plt.subplots()
     for row_idx, row in df.iterrows():
         row = row.to_dict()
-        ax.scatter(row['x'], row['y'], label=row['section'], alpha=0.3, edgecolors='none')
-    ax.legend()
-    ax.grid(True)
-    plt.show()
+        ax.scatter(row['x'], row['y'], s=150, label=row['section'], edgecolors='black')
 
+    ax.legend(bbox_to_anchor=(0, 1), loc='best', ncol=1)
+    fig.subplots_adjust(bottom=0.2)
+    ax.grid(True)
+    plt.title('Section Header T-SNE Plots for {}'.format(title))
+    plt.savefig('eval_data/{}'.format(fp_str))
+    plt.show()
