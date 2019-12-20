@@ -50,6 +50,10 @@ class AcronymExpander(nn.Module):
         lf_sigma_flat = lf_sigma_sum.view(batch_size * max_output_size, -1)
 
         kl = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(batch_size, max_output_size)
-
-        kl.masked_fill_(output_mask, float('-inf'))
-        return kl, target_lf_ids
+        # min_kl, max_kl = kl.min(-1)[0], kl.max(-1)[0]
+        # normalizer = (max_kl - min_kl).unsqueeze(-1)
+        # numerator = max_kl.unsqueeze(-1).repeat(1, kl.size()[-1]) - kl
+        # score = numerator  # / normalizer
+        score = -kl
+        score.masked_fill_(output_mask, float('-inf'))
+        return score, target_lf_ids

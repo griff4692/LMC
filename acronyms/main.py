@@ -39,11 +39,12 @@ def _render_example(sf, target_lf, converted_target_lf, pred_lf, top_pred_lfs, c
     return str
 
 
-def error_analysis(test_batcher, model, sf_lf_map, results_dir=None):
+def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, results_dir=None):
     """
     :param test_batcher: AcronymBatcherLoader instance
     :param model: AcronymExpander instance
-    :param sf_lf_map: Short form to LF mappings
+    :param used_sf_lf_map: Short form to LF mappings
+    :param loss_func: PyTorch CrossEntropyLoss instance
     :param results_dir: where to write the results files
     :return: None but writes a confusion matrix analysis file into results_dir
     """
@@ -51,35 +52,43 @@ def error_analysis(test_batcher, model, sf_lf_map, results_dir=None):
     model.eval()
     sf_confusion = defaultdict(lambda: ([], []))
 
-    results_fd = open(os.path.join(results_dir, 'results.txt'), 'w')
-    errors_fd = open(os.path.join(results_dir, 'errors.txt'), 'w')
-
+    results_str = defaultdict(str)
+    errors_str = defaultdict(str)
+    k = 5
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
-            batch_loss, num_examples, num_correct, proba = process_batch(test_batcher, model)
+            batch_loss, num_examples, num_correct, proba = process_batch(test_batcher, model, loss_func)
         batch_data = test_batcher.get_prev_batch()
         proba = tensor_to_np(proba)
-        top_pred_idxs = np.argsort(-proba, axis=1)[:, :5]
+        top_pred_idxs = np.argsort(-proba, axis=1)[:, :k]
         pred_lf_idxs = top_pred_idxs[:, 0]
         for batch_idx, (row_idx, row) in enumerate(batch_data.iterrows()):
             row = row.to_dict()
             sf = row['sf']
-            lf_map = sf_lf_map[sf]
+            lf_map = used_sf_lf_map[sf]
             target_lf = row['target_lf']
-            target_lf_idx = row['target_lf_idx']
+            target_lf_idx = row['used_target_lf_idx']
             pred_lf_idx = pred_lf_idxs[batch_idx]
             pred_lf = lf_map[pred_lf_idx]
-            top_pred_lfs = ', '.join(list(map(lambda lf: lf_map[lf], top_pred_idxs[batch_idx])))
+            top_pred_lfs = ', '.join(
+                list(map(lambda lf: lf_map[lf], top_pred_idxs[batch_idx][:min(k, len(lf_map))])))
             example_str = _render_example(sf, target_lf, lf_map[target_lf_idx], pred_lf, top_pred_lfs,
                                           row['trimmed_tokens'], row['tokenized_context'])
-            results_fd.write(example_str)
-            if not target_lf_index == pred_lf_idx:
-                errors_fd.write(example_str)
 
+            results_str[sf] += example_str
+            if not target_lf_idx == pred_lf_idx:
+                errors_str[sf] += example_str
             sf_confusion[sf][0].append(target_lf_idx)
             sf_confusion[sf][1].append(pred_lf_idx)
 
-    results_fd.close()
+    results_fp = os.path.join(results_dir, 'results.txt')
+    errors_fp = os.path.join(results_dir, 'errors.txt')
+    with open(results_fp, 'w') as fd:
+        for k in sorted(results_str.keys()):
+            fd.write(results_str[k])
+    with open(errors_fp, 'w') as fd:
+        for k in sorted(errors_str.keys()):
+            fd.write(errors_str[k])
     for sf in sf_confusion:
         labels = sf_lf_map[sf]
         labels_trunc = list(map(lambda x: x.split(';')[0], labels))
@@ -109,7 +118,7 @@ def render_test_statistics(df, sf_lf_map):
     print('Expected random accuracy={}'.format(expected_random_accuracy / float(N)))
 
 
-def process_batch(batcher, model):
+def process_batch(batcher, model, loss_func):
     batch_input, num_outputs = batcher.next(vocab, sf_tokenized_lf_map)
     batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0), batch_input))
     proba, target = model(*(batch_input + [num_outputs]))
@@ -119,17 +128,61 @@ def process_batch(batcher, model):
     return batch_loss, num_examples, num_correct, proba
 
 
+def run_test_epoch(args, test_batcher, model, loss_func):
+    test_batcher.reset(shuffle=False)
+    test_epoch_loss, test_examples, test_correct = 0.0, 0, 0
+    model.eval()
+    for _ in tqdm(range(test_batcher.num_batches())):
+        with torch.no_grad():
+            batch_loss, num_examples, num_correct, _ = process_batch(test_batcher, model, loss_func)
+        test_correct += num_correct
+        test_examples += num_examples
+        test_epoch_loss += batch_loss.item()
+        if args.debug:
+            break
+    sleep(0.1)
+    test_loss = test_epoch_loss / float(test_batcher.num_batches())
+    test_acc = test_correct / float(test_examples)
+    print('Test Loss={}. Accuracy={}'.format(test_loss, test_acc))
+    sleep(0.1)
+    return test_loss
+
+
+def run_train_epoch(args, train_batcher, model, loss_func, optimizer):
+    train_batcher.reset(shuffle=True)
+    train_epoch_loss, train_examples, train_correct = 0.0, 0, 0
+    for _ in tqdm(range(train_batcher.num_batches())):
+        optimizer.zero_grad()
+        batch_loss, num_examples, num_correct, _ = process_batch(train_batcher, model, loss_func)
+        batch_loss.backward()
+        optimizer.step()
+
+        # Update metrics
+        train_epoch_loss += batch_loss.item()
+        train_examples += num_examples
+        train_correct += num_correct
+        if args.debug:
+            break
+
+    sleep(0.1)
+    train_loss = train_epoch_loss / float(train_batcher.num_batches())
+    train_acc = train_correct / float(train_examples)
+    print('Train Loss={}. Accuracy={}'.format(train_loss, train_acc))
+    sleep(0.1)
+    return train_loss
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Main script for Acronym Training Model')
 
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
     parser.add_argument('--data_dir', default='../eval/eval_data/minnesota/')
-    parser.add_argument('--experiment', default='baseline', help='Save path in weights/ for experiment.')
+    parser.add_argument('--experiment', default='baseline-12-18', help='Save path in weights/ for experiment.')
     parser.add_argument('--bsg_experiment', default='baseline-12-16')
 
     # Training Hyperparameters
-    parser.add_argument('--batch_size', default=100, type=int)
+    parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--epochs', default=10, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
 
@@ -142,20 +195,42 @@ if __name__ == '__main__':
     # Load Data
     sense_fp = os.path.join(args.data_dir, 'sense_inventory_ii')
     lfs, lf_sf_map, sf_lf_map = parse_sense_df(sense_fp)
-    sf_tokenized_lf_map = {}
-    for sf, lf_list in sf_lf_map.items():
-        sf_tokenized_lf_map[sf] = list(map(lf_tokenizer, lf_list))
     df = pd.read_csv(os.path.join(args.data_dir, 'preprocessed_dataset_window_{}.csv'.format(prev_args.window)))
     df['target_lf_idx'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_index(lf, sf_lf_map[sf]))
     prev_N = df.shape[0]
     df = df[df['target_lf_idx'] > -1]
     print('Removed {} examples for which the target LF is not exactly in the sense inventory ii'.format(
         prev_N - df.shape[0]))
+
+    sfs = df['sf'].unique().tolist()
+    used_sf_lf_map = defaultdict(list)
+    dominant_sfs = set()
+
+    for sf in sfs:
+        subset_df = df[df['sf'] == sf]
+        used_target_idxs = subset_df['target_lf_idx'].unique()
+        if len(used_target_idxs) == 1:
+            dominant_sfs.add(sf)
+        else:
+            for lf_idx in used_target_idxs:
+                used_sf_lf_map[sf].append(sf_lf_map[sf][lf_idx])
+
+    prev_N = df.shape[0]
+    df = df[~df['sf'].isin(dominant_sfs)]
+    print(('Removing {} examples from {} SF\'s because they have only 1 sense associated with'
+          ' them after preprocessing'.format(prev_N - df.shape[0], len(dominant_sfs))))
+
+    df['used_target_lf_idx'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_index(lf, used_sf_lf_map[sf]))
+
+    sf_tokenized_lf_map = {}
+    for sf, lf_list in used_sf_lf_map.items():
+        sf_tokenized_lf_map[sf] = list(map(lf_tokenizer, lf_list))
+
     train_df, test_df = train_test_split(df, random_state=1992, test_size=0.1)
     train_batcher = AcronymBatcherLoader(train_df, batch_size=args.batch_size)
     test_batcher = AcronymBatcherLoader(test_df, batch_size=args.batch_size)
 
-    render_test_statistics(test_df, sf_lf_map)
+    render_test_statistics(test_df, used_sf_lf_map)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join('weights', args.experiment)
@@ -176,48 +251,16 @@ if __name__ == '__main__':
     loss_func = nn.CrossEntropyLoss()
     best_weights = None
     best_epoch = 1
-    lowest_test_loss = float('inf')
+    lowest_test_loss = run_test_epoch(args, test_batcher, model, loss_func)
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
     for epoch in range(1, args.epochs + 1):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
         print('Starting Epoch={}'.format(epoch))
-        train_batcher.reset(shuffle=True)
 
-        train_epoch_loss, train_examples, train_correct = 0.0, 0, 0
-        for _ in tqdm(range(train_batcher.num_batches())):
-            optimizer.zero_grad()
-            batch_loss, num_examples, num_correct, _ = process_batch(train_batcher, model)
-            batch_loss.backward()
-            optimizer.step()
-
-            # Update metrics
-            train_epoch_loss += batch_loss.item()
-            train_examples += num_examples
-            train_correct += num_correct
-
-        sleep(0.1)
-        train_loss = train_epoch_loss / float(train_batcher.num_batches())
-        train_acc = train_correct / float(train_examples)
-        print('Train Loss={}. Accuracy={}'.format(train_loss, train_acc))
-        sleep(0.1)
-
-        test_batcher.reset(shuffle=False)
-        test_epoch_loss, test_examples, test_correct = 0.0, 0, 0
-        model.eval()
-        for _ in tqdm(range(test_batcher.num_batches())):
-            with torch.no_grad():
-                batch_loss, num_examples, num_correct, _ = process_batch(test_batcher, model)
-            test_correct += num_correct
-            test_examples += num_examples
-            test_epoch_loss += batch_loss.item()
-
-        sleep(0.1)
-        test_loss = test_epoch_loss / float(test_batcher.num_batches())
-        test_acc = test_correct / float(test_examples)
-        print('Test Loss={}. Accuracy={}'.format(test_loss, test_acc))
-        sleep(0.1)
+        train_loss = run_train_epoch(args, train_batcher, model, loss_func, optimizer)
+        test_loss = run_test_epoch(args, test_batcher, model, loss_func)
 
         losses_dict = {
             'train': train_loss,
@@ -231,9 +274,12 @@ if __name__ == '__main__':
         best_weights = model.state_dict()
         if lowest_test_loss == test_loss:
             best_epoch = epoch
+
+        if args.debug:
+            break
     print('Loading weights from {} epoch to perform error analysis'.format(best_epoch))
     model.load_state_dict(best_weights)
     losses_dict['test_loss'] = lowest_test_loss
     checkpoint_fp = os.path.join(weights_dir, 'checkpoint_best.pth')
     save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
-    error_analysis(test_batcher, model, sf_lf_map, results_dir=results_dir)
+    error_analysis(test_batcher, model, used_sf_lf_map, loss_func, results_dir=results_dir)

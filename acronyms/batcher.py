@@ -53,7 +53,7 @@ class AcronymBatcherLoader:
             row = row.to_dict()
             sf_ids[batch_idx] = vocab.get_id(row['sf'].lower())
             # Find target_sf index in sf_lf_map
-            target_lf_ids[batch_idx] = row['target_lf_idx']
+            target_lf_ids[batch_idx] = row['used_target_lf_idx']
             context_id_seq = vocab.get_ids(row['trimmed_tokens'].split())
             context_ids[batch_idx, :len(context_id_seq)] = context_id_seq
             candidate_lfs = sf_tokenized_lf_map[row['sf']]
