@@ -27,8 +27,8 @@ def pattern_repl(matchobj):
 
 
 def create_section_token(section):
-    section = re.sub('[:\s]+', '', section)
-    return '<header={}>'.format(section)
+    section = re.sub('[:\s]+', '', section).upper()
+    return 'header={}'.format(section)
 
 
 def clean_text(text):
@@ -38,7 +38,7 @@ def clean_text(text):
     # Replace [**Patterns**] with spaces.
     text = re.sub(r'\[\*\*.*?\*\*\]', pattern_repl, text)
     # Replace `_` with spaces.
-    text = re.sub(r'[_*?]+', ' ', text)
+    text = re.sub(r'[_*?/()]+', ' ', text)
     text = re.sub(r'\b(-)?[\d.]+(-)?\b', ' DIGITPARSED ', text)
     text = re.sub(r'\s+', ' ', text)
     return text

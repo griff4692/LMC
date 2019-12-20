@@ -50,10 +50,7 @@ if __name__ == '__main__':
         subsampled_doc = []
         for token in tokenized_doc_str.split():
             wc = token_counts[token]
-
-            # TODO switch back
-            # is_section_header = re.match(r'<header=\S+>', token)
-            is_section_header = re.match(r'\|\|', token)
+            is_section_header = re.match(r'header=[A-Z]+', token)
 
             is_phrase = '_' in token
             if is_section_header:
