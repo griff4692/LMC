@@ -14,7 +14,7 @@ if __name__ == '__main__':
     is_lga = False
 
     fp_str = 'lga.png' if is_lga else 'sec2vec.png'
-    title = 'Latent Meaning Cells' if is_lga else 'BSG With Section Headers As Pseudo-Contexts'
+    title = 'Latent Meaning Cells' if is_lga else 'BSG With Headers As Pseudo-Contexts'
 
     if is_lga:
         checkpoint_fp = '../model/weights/lga/checkpoint_1.pth'
@@ -60,9 +60,10 @@ if __name__ == '__main__':
         row = row.to_dict()
         ax.scatter(row['x'], row['y'], s=150, label=row['section'], edgecolors='black')
 
-    ax.legend(bbox_to_anchor=(0, 1), loc='best', ncol=1)
-    fig.subplots_adjust(bottom=0.2)
+    # ax.legend(bbox_to_anchor=(0, 1), loc='best', ncol=1)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    # fig.subplots_adjust(bottom=0.2)
     ax.grid(True)
-    plt.title('Section Header T-SNE Plots for {}'.format(title))
+    plt.title('Section Header T-SNE Plots for {}'.format(title), fontdict={'fontsize': 9})
     plt.savefig('eval_data/{}'.format(fp_str))
     plt.show()
