@@ -34,7 +34,6 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=5, type=int)
     parser.add_argument('-use_pretrained', default=False, action='store_true')
-    parser.add_argument('--ns', type=int, default=1)
 
     # Model Hyperparameters
     parser.add_argument('--encoder_hidden_dim', default=64, type=int, help='hidden dimension for encoder')
@@ -115,10 +114,9 @@ if __name__ == '__main__':
             center_ids_tens = torch.LongTensor(center_ids).to(args.device)
             context_ids_tens = torch.LongTensor(context_ids).to(args.device)
 
-            neg_id_shape = (context_ids.shape[0], context_ids.shape[1], args.ns)
-            neg_ids = vocab.neg_sample(size=neg_id_shape)
+            neg_ids = vocab.neg_sample(size=context_ids.shape)
             if args.section2vec:
-                neg_ids[:, 0] = np.random.choice(section_id_range, size=[args.batch_size, args.ns])
+                neg_ids[:, 0] = np.random.choice(section_id_range, size=[args.batch_size])
             neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
 
             kl_loss, recon_loss = model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts)
