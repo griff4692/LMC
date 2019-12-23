@@ -68,7 +68,7 @@ if __name__ == '__main__':
     section_id_range = np.arange(vocab.separator_start_vocab_id, vocab.size())
     section_ids = enumerate_section_ids(ids, section_pos_idxs)
 
-    device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
+    device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     args.device = torch.device(device_str)
     print('Training on {}...'.format(device_str))
 

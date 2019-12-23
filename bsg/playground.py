@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
+    device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     args.device = torch.device(device_str)
     print('Evaluating on {}...'.format(device_str))
 
