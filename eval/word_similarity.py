@@ -7,10 +7,10 @@ import spacy
 from eval_utils import eval_tokenize, point_similarity
 
 
-def evaluate_word_similarity(model, vocab, combine_phrases=False, data_dir='eval_data'):
+def evaluate_word_similarity(model, vocab, combine_phrases=False):
     umnrs = {
         'name': 'UMNRS',
-        'file': os.path.join(data_dir, 'UMNSRS_relatedness.csv'),
+        'file': os.path.join('../eval/eval_data', 'UMNSRS_relatedness.csv'),
         'label': 'Mean',
         't1': 'Term1',
         't2': 'Term2',
@@ -18,7 +18,7 @@ def evaluate_word_similarity(model, vocab, combine_phrases=False, data_dir='eval
 
     mayo = {
         'name': 'MayoSRS',
-        'file': os.path.join(data_dir, 'MayoSRS.csv'),
+        'file': os.path.join('../eval/eval_data', 'MayoSRS.csv'),
         'label': 'Mean',
         't1': 'TERM1',
         't2': 'TERM2',

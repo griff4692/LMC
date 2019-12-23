@@ -9,10 +9,12 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from batcher import SkipGramBatchLoader
 from compute_sections import enumerate_section_ids
 from model_utils import get_git_revision_hash, render_args, restore_model, save_checkpoint
+from evaluate import evaluate
 from vae import VAE
 
 
@@ -139,3 +141,6 @@ if __name__ == '__main__':
         losses_dict = {'losses': {'joint': epoch_joint_loss, 'kl': epoch_kl_loss, 'recon': epoch_recon_loss}}
         checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
         save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
+
+    # Run evaluations
+    evaluate(args)

@@ -16,8 +16,8 @@ def render_args(args):
         print('{}={}'.format(arg, getattr(args, arg)))
 
 
-def restore_model(restore_name, weights_path='weights'):
-    checkpoint_dir = os.path.join(weights_path, restore_name)
+def restore_model(restore_name):
+    checkpoint_dir = os.path.join('../model/weights', restore_name)
     checkpoint_fns = os.listdir(checkpoint_dir)
     max_checkpoint_epoch, latest_checkpoint_idx = -1, -1
     for cidx, checkpoint_fn in enumerate(checkpoint_fns):

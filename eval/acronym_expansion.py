@@ -1,13 +1,9 @@
 from collections import defaultdict
-import os
 
-import numpy as np
 import pandas as pd
-import spacy
 import torch
 
 from compute_utils import compute_kl
-from eval_utils import eval_tokenize, preprocess_minnesota_dataset
 
 
 def parse_sense_df(sense_fp):
@@ -23,111 +19,6 @@ def parse_sense_df(sense_fp):
     for k in sf_lf_map:
         sf_lf_map[k] = list(sorted(sf_lf_map[k]))
     return lfs, lf_sf_map, sf_lf_map
-
-
-def evaluate_minnesota_acronyms(prev_args, model, vocab, mini=False, combine_phrases=False):
-    chunker = None
-    if combine_phrases:
-        chunker = spacy.load('en_core_sci_sm')
-    phrase_str = '_phrase' if combine_phrases else ''
-    data_fp = 'eval_data/minnesota/preprocessed_dataset_window_{}{}.csv'.format(prev_args.window, phrase_str)
-    if not os.path.exists(data_fp):
-        print('Preprocessing Dataset...')
-        preprocess_minnesota_dataset(prev_args.window, chunker=chunker, combine_phrases=combine_phrases)
-
-    df = pd.read_csv(data_fp)
-
-    if mini:
-        df = df.sample(100, random_state=1992).reset_index(drop=True)
-
-    context_ids = np.zeros([df.shape[0], prev_args.window * 2], dtype=int)
-    center_ids = np.zeros([df.shape[0], ], dtype=int)
-    ct = 0
-    for row_idx, row in df.iterrows():
-        assert row_idx == ct
-        ct += 1
-        row = row.to_dict()
-
-        center_id = vocab.get_id(row['sf'].lower())
-        center_ids[row_idx] = center_id
-        context_id_seq = [vocab.get_id(token.lower()) for token in row['trimmed_tokens'].split()]
-        context_ids[row_idx, :len(context_id_seq)] = context_id_seq
-
-    center_id_tens = torch.LongTensor(center_ids).clamp_min_(0).to(prev_args.device)
-    context_id_tens = torch.LongTensor(context_ids).clamp_min_(0).to(prev_args.device)
-    # TODO add proper masking
-    mask = torch.BoolTensor(torch.Size([center_id_tens.shape[0], context_id_tens.shape[-1]])).to(prev_args.device)
-    mask.fill_(0)
-    with torch.no_grad():
-        z_mus, z_sigmas = model.encoder(center_id_tens, context_id_tens, mask)
-
-    sense_fp = 'eval_data/minnesota/sense_inventory_ii'
-    lfs, lf_sf_map, _ = parse_sense_df(sense_fp)
-
-    tokenized_lfs = list(map(
-        lambda t: eval_tokenize(t, unique_only=True, chunker=chunker, combine_phrases=combine_phrases), lfs))
-    tokenized_ids = [list(map(vocab.get_id, tokens)) for tokens in tokenized_lfs]
-    lf_priors = list(map(lambda x: model._compute_priors(torch.LongTensor(x).clamp_min_(0).to(prev_args.device)),
-                         tokenized_ids))
-
-    # for each SF, create matrix of LFs and priors
-    sf_lf_prior_map = {}
-    for lf, priors in zip(lfs, lf_priors):
-        sf = lf_sf_map[lf]
-
-        if sf not in sf_lf_prior_map:
-            sf_lf_prior_map[sf] = {
-                'lf': [],
-                'lf_mu': [],
-                'lf_sigma': []
-            }
-
-        sf_lf_prior_map[sf]['lf'].append(lf)
-        # Representation of phrases is just average of words (...for now)
-        sf_lf_prior_map[sf]['lf_mu'].append(priors[0].mean(axis=0).unsqueeze(0))
-        sf_lf_prior_map[sf]['lf_sigma'].append(priors[1].mean(axis=0).unsqueeze(0))
-
-    for sf in sf_lf_prior_map.keys():
-        sf_lf_prior_map[sf]['lf_mu'] = torch.cat(sf_lf_prior_map[sf]['lf_mu'], axis=0)
-        sf_lf_prior_map[sf]['lf_sigma'] = torch.cat(sf_lf_prior_map[sf]['lf_sigma'], axis=0)
-
-    num_correct, target_kld, median_kld, num_eval = 0, 0.0, 0.0, 0
-    random_expected_acc = 0.0
-    for row_idx, row in df.iterrows():
-        sf = row['sf']
-        z_mu, z_sigma = z_mus[row_idx].unsqueeze(0), z_sigmas[row_idx].unsqueeze(0)
-        lf_obj = sf_lf_prior_map[sf]
-        lf_map, prior_mus, prior_sigmas = lf_obj['lf'], lf_obj['lf_mu'], lf_obj['lf_sigma']
-        num_lf = prior_mus.shape[0]
-        divergences = compute_kl(z_mu.repeat(num_lf, 1), z_sigma.repeat(num_lf, 1), prior_mus, prior_sigmas)
-
-        closest_lf_idx = divergences.squeeze(-1).argmin().item()
-        predicted_lf = lf_map[closest_lf_idx]
-        target_lf = row['target_lf']
-
-        try:
-            target_lf_idx = lf_map.index(target_lf)
-        except ValueError:
-            target_lf_idx = -1
-            for idx, lf in enumerate(lf_map):
-                for lf_chunk in lf.split(';'):
-                    if target_lf == lf_chunk:
-                        target_lf_idx = idx
-                        target_lf = lf_map[target_lf_idx]
-                        break
-        if target_lf in lf_map:
-            num_eval += 1
-            random_expected_acc += 1 / float(len(lf_map))
-            target_kld += divergences[target_lf_idx].item()
-            median_kld += divergences.median().item()
-            if predicted_lf == target_lf:
-                num_correct += 1
-
-    N = float(num_eval)
-    print('Statistics from {} examples'.format(int(N)))
-    print('Minnesota Acronym Accuracy={}.  KLD(SF Posterior||Target LF)={}. Median KLD(SF Posterior || LF_(i..n)={}'.
-          format(num_correct / N, target_kld / N, median_kld / N))
-    print('Random Accuracy={}'.format(random_expected_acc / N))
 
 
 # TODO deprecated for now

@@ -1,7 +1,5 @@
 from collections import defaultdict
-import os
 from shutil import rmtree
-import sys
 from time import sleep
 
 import argparse
@@ -13,6 +11,8 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/model/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from acronyms.batcher import AcronymBatcherLoader
 from acronym_expander import AcronymExpander
@@ -39,12 +39,13 @@ def _render_example(sf, target_lf, converted_target_lf, pred_lf, top_pred_lfs, c
     return str
 
 
-def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, results_dir=None):
+def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, results_dir=None):
     """
     :param test_batcher: AcronymBatcherLoader instance
     :param model: AcronymExpander instance
     :param used_sf_lf_map: Short form to LF mappings
     :param loss_func: PyTorch CrossEntropyLoss instance
+    :param vocab: Vocab instance storing tokens and corresponding token ids
     :param results_dir: where to write the results files
     :return: None but writes a confusion matrix analysis file into results_dir
     """
@@ -57,7 +58,8 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, results_dir=N
     k = 5
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
-            batch_loss, num_examples, num_correct, proba = process_batch(test_batcher, model, loss_func)
+            batch_loss, num_examples, num_correct, proba = process_batch(
+                test_batcher, model, loss_func, vocab, used_sf_lf_map)
         batch_data = test_batcher.get_prev_batch()
         proba = tensor_to_np(proba)
         top_pred_idxs = np.argsort(-proba, axis=1)[:, :k]
@@ -90,17 +92,20 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, results_dir=N
         for k in sorted(errors_str.keys()):
             fd.write(errors_str[k])
     for sf in sf_confusion:
-        labels = sf_lf_map[sf]
+        labels = used_sf_lf_map[sf]
         labels_trunc = list(map(lambda x: x.split(';')[0], labels))
         y_true = sf_confusion[sf][0]
         y_pred = sf_confusion[sf][1]
-        cm = ConfusionMatrix(actual_vector=y_true, predict_vector=y_pred)
-        label_idx_to_str = dict()
-        for idx in cm.classes:
-            label_idx_to_str[idx] = labels_trunc[int(idx)]
-        cm.relabel(mapping=label_idx_to_str)
-        cm_outpath = os.path.join(results_dir, 'confusion', '{}.png'.format(sf))
-        cm.save_html(cm_outpath)
+        try:
+            cm = ConfusionMatrix(actual_vector=y_true, predict_vector=y_pred)
+            label_idx_to_str = dict()
+            for idx in cm.classes:
+                label_idx_to_str[idx] = labels_trunc[int(idx)]
+            cm.relabel(mapping=label_idx_to_str)
+            cm_outpath = os.path.join(results_dir, 'confusion', sf)
+            cm.save_html(cm_outpath)
+        except:
+            print('Only 1 target class for test set SF={}'.format(sf))
 
 
 def render_test_statistics(df, sf_lf_map):
@@ -118,7 +123,7 @@ def render_test_statistics(df, sf_lf_map):
     print('Expected random accuracy={}'.format(expected_random_accuracy / float(N)))
 
 
-def process_batch(batcher, model, loss_func):
+def process_batch(batcher, model, loss_func, vocab, sf_tokenized_lf_map):
     batch_input, num_outputs = batcher.next(vocab, sf_tokenized_lf_map)
     batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0), batch_input))
     proba, target = model(*(batch_input + [num_outputs]))
@@ -128,13 +133,14 @@ def process_batch(batcher, model, loss_func):
     return batch_loss, num_examples, num_correct, proba
 
 
-def run_test_epoch(args, test_batcher, model, loss_func):
+def run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map):
     test_batcher.reset(shuffle=False)
     test_epoch_loss, test_examples, test_correct = 0.0, 0, 0
     model.eval()
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
-            batch_loss, num_examples, num_correct, _ = process_batch(test_batcher, model, loss_func)
+            batch_loss, num_examples, num_correct, _ = process_batch(
+                test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
         test_correct += num_correct
         test_examples += num_examples
         test_epoch_loss += batch_loss.item()
@@ -148,12 +154,13 @@ def run_test_epoch(args, test_batcher, model, loss_func):
     return test_loss
 
 
-def run_train_epoch(args, train_batcher, model, loss_func, optimizer):
+def run_train_epoch(args, train_batcher, model, loss_func, optimizer, vocab, sf_tokenized_lf_map):
     train_batcher.reset(shuffle=True)
     train_epoch_loss, train_examples, train_correct = 0.0, 0, 0
     for _ in tqdm(range(train_batcher.num_batches())):
         optimizer.zero_grad()
-        batch_loss, num_examples, num_correct, _ = process_batch(train_batcher, model, loss_func)
+        batch_loss, num_examples, num_correct, _ = process_batch(
+            train_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
         batch_loss.backward()
         optimizer.step()
 
@@ -172,30 +179,17 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer):
     return train_loss
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser('Main script for Acronym Training Model')
-
-    # Functional Arguments
-    parser.add_argument('-debug', action='store_true', default=False)
-    parser.add_argument('--data_dir', default='../eval/eval_data/minnesota/')
-    parser.add_argument('--experiment', default='baseline-12-18', help='Save path in weights/ for experiment.')
-    parser.add_argument('--bsg_experiment', default='baseline-12-16')
-
-    # Training Hyperparameters
-    parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--epochs', default=10, type=int)
-    parser.add_argument('--lr', default=0.001, type=float)
-
-    args = parser.parse_args()
+def acronyms_finetune(args):
     args.git_hash = get_git_revision_hash()
     render_args(args)
 
-    prev_args, bsg_model, vocab, _ = restore_model(args.bsg_experiment, weights_path='../model/weights/')
+    prev_args, bsg_model, vocab, _ = restore_model(args.bsg_experiment)
 
     # Load Data
-    sense_fp = os.path.join(args.data_dir, 'sense_inventory_ii')
+    data_dir = '../eval/eval_data/minnesota/'
+    sense_fp = os.path.join(data_dir, 'sense_inventory_ii')
     lfs, lf_sf_map, sf_lf_map = parse_sense_df(sense_fp)
-    df = pd.read_csv(os.path.join(args.data_dir, 'preprocessed_dataset_window_{}.csv'.format(prev_args.window)))
+    df = pd.read_csv(os.path.join(data_dir, 'preprocessed_dataset_window_{}.csv'.format(prev_args.window)))
     df['target_lf_idx'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_index(lf, sf_lf_map[sf]))
     prev_N = df.shape[0]
     df = df[df['target_lf_idx'] > -1]
@@ -218,7 +212,7 @@ if __name__ == '__main__':
     prev_N = df.shape[0]
     df = df[~df['sf'].isin(dominant_sfs)]
     print(('Removing {} examples from {} SF\'s because they have only 1 sense associated with'
-          ' them after preprocessing'.format(prev_N - df.shape[0], len(dominant_sfs))))
+           ' them after preprocessing'.format(prev_N - df.shape[0], len(dominant_sfs))))
 
     df['used_target_lf_idx'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_index(lf, used_sf_lf_map[sf]))
 
@@ -233,12 +227,12 @@ if __name__ == '__main__':
     render_test_statistics(test_df, used_sf_lf_map)
 
     # Create model experiments directory or clear if it already exists
-    weights_dir = os.path.join('weights', args.experiment)
+    weights_dir = os.path.join('../acronyms', 'weights', args.experiment)
     if os.path.exists(weights_dir):
         print('Clearing out previous weights in {}'.format(weights_dir))
         rmtree(weights_dir)
     os.mkdir(weights_dir)
-    results_dir = os.path.join(weights_dir, 'results')
+    results_dir = os.path.join('../acronyms', weights_dir, 'results')
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
@@ -251,7 +245,7 @@ if __name__ == '__main__':
     loss_func = nn.CrossEntropyLoss()
     best_weights = None
     best_epoch = 1
-    lowest_test_loss = run_test_epoch(args, test_batcher, model, loss_func)
+    lowest_test_loss = run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
@@ -259,8 +253,8 @@ if __name__ == '__main__':
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
         print('Starting Epoch={}'.format(epoch))
 
-        train_loss = run_train_epoch(args, train_batcher, model, loss_func, optimizer)
-        test_loss = run_test_epoch(args, test_batcher, model, loss_func)
+        train_loss = run_train_epoch(args, train_batcher, model, loss_func, optimizer, vocab, sf_tokenized_lf_map)
+        test_loss = run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
 
         losses_dict = {
             'train': train_loss,
@@ -282,4 +276,21 @@ if __name__ == '__main__':
     losses_dict['test_loss'] = lowest_test_loss
     checkpoint_fp = os.path.join(weights_dir, 'checkpoint_best.pth')
     save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
-    error_analysis(test_batcher, model, used_sf_lf_map, loss_func, results_dir=results_dir)
+    error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, results_dir=results_dir)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser('Main script for Acronym Training Model')
+
+    # Functional Arguments
+    parser.add_argument('-debug', action='store_true', default=False)
+    parser.add_argument('--experiment', default='baseline-12-18', help='Save path in weights/ for experiment.')
+    parser.add_argument('--bsg_experiment', default='baseline-12-16')
+
+    # Training Hyperparameters
+    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--lr', default=0.001, type=float)
+
+    args = parser.parse_args()
+    acronyms_finetune(args)

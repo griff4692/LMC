@@ -5,33 +5,35 @@ import torch
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/model/')
+from fine_tune import acronyms_finetune
 from model_utils import restore_model
 from word_similarity import evaluate_word_similarity
-from acronym_expansion import evaluate_minnesota_acronyms
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser('Main script for Bayesian Skip Gram Model')
-
-    # Functional Arguments
-    parser.add_argument('-cpu', action='store_true', default=False)
-    parser.add_argument('--eval_fp', default='../preprocess/data/')
-    parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
-    parser.add_argument('-acronym_mini', default=False, action='store_true')
-
-    args = parser.parse_args()
-
+def evaluate(args):
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
     print('Evaluating on {}...'.format(device_str))
 
-    prev_args, vae_model, vocab, optimizer_state = restore_model(args.experiment, weights_path='../model/weights')
+    prev_args, vae_model, vocab, optimizer_state = restore_model(args.experiment)
 
     # Make sure it's NOT calculating gradients
     model = vae_model.to(args.device)
     model.eval()  # just sets .requires_grad = False
 
     print('\nEvaluations...')
-    word_sim_results = evaluate_word_similarity(model, vocab, combine_phrases=prev_args.combine_phrases)
-    evaluate_minnesota_acronyms(
-        prev_args, model, vocab, mini=args.acronym_mini, combine_phrases=prev_args.combine_phrases)
+    evaluate_word_similarity(model, vocab, combine_phrases=prev_args.combine_phrases)
+    args.bsg_experiment = prev_args.experiment  # Tell which model to pull from
+    args.epochs = 10
+    args.batch_size = 32
+    acronyms_finetune(args)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser('Main script for Bayesian Skip Gram Model')
+
+    # Functional Arguments
+    parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
+
+    args = parser.parse_args()
+    evaluate(args)
