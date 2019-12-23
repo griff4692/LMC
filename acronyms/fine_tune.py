@@ -12,9 +12,9 @@ import torch.nn as nn
 from tqdm import tqdm
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/model/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-from acronyms.batcher import AcronymBatcherLoader
+from acronym_batcher import AcronymBatcherLoader
 from acronym_expander import AcronymExpander
 from acronym_expansion import parse_sense_df
 from eval_utils import lf_tokenizer

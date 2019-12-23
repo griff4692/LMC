@@ -4,7 +4,7 @@ import argparse
 import torch
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/model/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from fine_tune import acronyms_finetune
 from model_utils import restore_model

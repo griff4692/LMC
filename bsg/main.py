@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-from batcher import SkipGramBatchLoader
+from bsg_batcher import SkipGramBatchLoader
 from compute_sections import enumerate_section_ids
 from model_utils import get_git_revision_hash, render_args, restore_model, save_checkpoint
 from evaluate import evaluate

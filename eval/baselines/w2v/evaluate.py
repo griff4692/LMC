@@ -5,7 +5,7 @@ from gensim.models import Word2Vec
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/model/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 from word_similarity import evaluate_word_similarity
 
 

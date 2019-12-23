@@ -17,7 +17,7 @@ if __name__ == '__main__':
     title = 'Latent Meaning Cells' if is_lga else 'BSG With Headers As Pseudo-Contexts'
 
     if is_lga:
-        checkpoint_fp = '../model/weights/lga/checkpoint_1.pth'
+        checkpoint_fp = '../bsg/weights/lga/checkpoint_1.pth'
         if not torch.cuda.is_available():
             checkpoint_state = torch.load(checkpoint_fp, map_location=lambda storage, loc: storage)
         else:
@@ -26,7 +26,7 @@ if __name__ == '__main__':
         embeddings = tensor_to_np(checkpoint_state['model_state_dict']['encoder.section_embeddings.weight'])
         sections = section_vocab.i2w[1:]
     else:
-        checkpoint_fp = '../model/weights/12-20-sec2vec/checkpoint_1.pth'
+        checkpoint_fp = '../bsg/weights/12-20-sec2vec/checkpoint_1.pth'
         if not torch.cuda.is_available():
             checkpoint_state = torch.load(checkpoint_fp, map_location=lambda storage, loc: storage)
         else:
