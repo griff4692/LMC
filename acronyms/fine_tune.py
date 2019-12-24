@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from pycm import *
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -84,7 +85,24 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, result
             sf_confusion[sf][1].append(pred_lf_idx)
 
     results_fp = os.path.join(results_dir, 'results.txt')
+    reports_fp = os.path.join(results_dir, 'reports.txt')
     errors_fp = os.path.join(results_dir, 'errors.txt')
+    summary_fp = os.path.join(results_dir, 'summary.csv')
+    df = defaultdict(list)
+    cols = [
+        'sf',
+        'support',
+        'micro_precision',
+        'micro_recall',
+        'micro_f1',
+        'macro_precision',
+        'macro_recall',
+        'macro_f1',
+        'weighted_precision',
+        'weighted_recall',
+        'weighted_f1',
+    ]
+    reports = []
     with open(results_fp, 'w') as fd:
         for k in sorted(results_str.keys()):
             fd.write(results_str[k])
@@ -96,6 +114,26 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, result
         labels_trunc = list(map(lambda x: x.split(';')[0], labels))
         y_true = sf_confusion[sf][0]
         y_pred = sf_confusion[sf][1]
+
+        sf_results = classification_report(y_true, y_pred, labels=list(range(len(labels_trunc))),
+                                           target_names=labels_trunc, output_dict=True)
+        report = classification_report(y_true, y_pred, labels=list(range(len(labels_trunc))),
+                                       target_names=labels_trunc)
+        reports.append(report)
+        reports.append('\n\n')
+        metrics = ['micro avg', 'macro avg', 'weighted avg']
+        for metric in metrics:
+            if metric in sf_results:
+                for k, v in sf_results[metric].items():
+                    if not k == 'support':
+                        metric_key = '{}_{}'.format(metric.split(' ')[0], k.split('-')[0])
+                        df[metric_key].append(v)
+            else:
+                suffixes = ['precision', 'recall', 'f1']
+                for suffix in suffixes:
+                    df['{}_{}'.format(metric.split(' ')[0], suffix)].append(None)
+        df['sf'].append(sf)
+        df['support'].append(sf_results['weighted avg']['support'])
         try:
             cm = ConfusionMatrix(actual_vector=y_true, predict_vector=y_pred)
             label_idx_to_str = dict()
@@ -106,6 +144,10 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, result
             cm.save_html(cm_outpath)
         except:
             print('Only 1 target class for test set SF={}'.format(sf))
+
+    pd.DataFrame(df, columns=cols).to_csv(summary_fp, index=False)
+    with open(reports_fp, 'w') as fd:
+        map(fd.write, reports)
 
 
 def render_test_statistics(df, sf_lf_map):
@@ -220,7 +262,7 @@ def acronyms_finetune(args):
     for sf, lf_list in used_sf_lf_map.items():
         sf_tokenized_lf_map[sf] = list(map(lf_tokenizer, lf_list))
 
-    train_df, test_df = train_test_split(df, random_state=1992, test_size=0.1)
+    train_df, test_df = train_test_split(df, random_state=1992, test_size=0.2)
     train_batcher = AcronymBatcherLoader(train_df, batch_size=args.batch_size)
     test_batcher = AcronymBatcherLoader(test_df, batch_size=args.batch_size)
 
