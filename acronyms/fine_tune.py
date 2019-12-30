@@ -40,7 +40,7 @@ def _render_example(sf, target_lf, converted_target_lf, pred_lf, top_pred_lfs, c
     return str
 
 
-def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, results_dir=None):
+def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_tokenized_lf_map, results_dir=None):
     """
     :param test_batcher: AcronymBatcherLoader instance
     :param model: AcronymExpander instance
@@ -57,10 +57,13 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, result
     results_str = defaultdict(str)
     errors_str = defaultdict(str)
     k = 5
+    test_set_examples, test_set_correct = 0, 0
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
             batch_loss, num_examples, num_correct, proba = process_batch(
-                test_batcher, model, loss_func, vocab, used_sf_lf_map)
+                test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
+        test_set_examples += num_examples
+        test_set_correct += num_correct
         batch_data = test_batcher.get_prev_batch()
         proba = tensor_to_np(proba)
         top_pred_idxs = np.argsort(-proba, axis=1)[:, :k]
@@ -84,6 +87,7 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, result
             sf_confusion[sf][0].append(target_lf_idx)
             sf_confusion[sf][1].append(pred_lf_idx)
 
+    print('Micro Accuracy: {}'.format(test_set_correct / float(test_set_examples)))
     results_fp = os.path.join(results_dir, 'results.txt')
     reports_fp = os.path.join(results_dir, 'reports.txt')
     errors_fp = os.path.join(results_dir, 'errors.txt')
@@ -92,6 +96,7 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, result
     cols = [
         'sf',
         'support',
+        'num_targets',
         'micro_precision',
         'micro_recall',
         'micro_f1',
@@ -114,11 +119,23 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, result
         labels_trunc = list(map(lambda x: x.split(';')[0], labels))
         y_true = sf_confusion[sf][0]
         y_pred = sf_confusion[sf][1]
-
         sf_results = classification_report(y_true, y_pred, labels=list(range(len(labels_trunc))),
                                            target_names=labels_trunc, output_dict=True)
         report = classification_report(y_true, y_pred, labels=list(range(len(labels_trunc))),
                                        target_names=labels_trunc)
+
+        macro_nonzero = defaultdict(float)
+        num_nonzero = 0
+        for lf in labels_trunc:
+            d = sf_results[lf]
+            if d['support'] > 0:
+                macro_nonzero['precision'] += d['precision']
+                macro_nonzero['recall'] += d['recall']
+                macro_nonzero['f1-score'] += d['f1-score']
+                num_nonzero += 1
+
+        for suffix in ['precision', 'recall', 'f1-score']:
+            sf_results['macro avg'][suffix] = macro_nonzero[suffix] / float(num_nonzero)
         reports.append(report)
         reports.append('\n\n')
         metrics = ['micro avg', 'macro avg', 'weighted avg']
@@ -129,10 +146,10 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, result
                         metric_key = '{}_{}'.format(metric.split(' ')[0], k.split('-')[0])
                         df[metric_key].append(v)
             else:
-                suffixes = ['precision', 'recall', 'f1']
-                for suffix in suffixes:
+                for suffix in ['precision', 'recall', 'f1']:
                     df['{}_{}'.format(metric.split(' ')[0], suffix)].append(None)
         df['sf'].append(sf)
+        df['num_targets'].append(len(labels_trunc))
         df['support'].append(sf_results['weighted avg']['support'])
         try:
             cm = ConfusionMatrix(actual_vector=y_true, predict_vector=y_pred)
@@ -147,7 +164,8 @@ def error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, result
 
     pd.DataFrame(df, columns=cols).to_csv(summary_fp, index=False)
     with open(reports_fp, 'w') as fd:
-        map(fd.write, reports)
+        for report in reports:
+            fd.write(report)
 
 
 def render_test_statistics(df, sf_lf_map):
@@ -318,7 +336,7 @@ def acronyms_finetune(args):
     losses_dict['test_loss'] = lowest_test_loss
     checkpoint_fp = os.path.join(weights_dir, 'checkpoint_best.pth')
     save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
-    error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, results_dir=results_dir)
+    error_analysis(test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_tokenized_lf_map, results_dir=results_dir)
 
 
 if __name__ == '__main__':
@@ -326,12 +344,12 @@ if __name__ == '__main__':
 
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
-    parser.add_argument('--experiment', default='baseline-12-18', help='Save path in weights/ for experiment.')
+    parser.add_argument('--experiment', default='submission-baseline', help='Save path in weights/ for experiment.')
     parser.add_argument('--bsg_experiment', default='baseline-12-16')
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--epochs', default=10, type=int)
+    parser.add_argument('--epochs', default=5, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
 
     args = parser.parse_args()
