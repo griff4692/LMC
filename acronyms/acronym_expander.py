@@ -1,15 +1,31 @@
+import numpy as np
 import torch
 import torch.nn as nn
 
 from compute_utils import compute_kl, mask_2D
+from encoder import Encoder
 
 
 class AcronymExpander(nn.Module):
-    def __init__(self, bsg_model):
+    def __init__(self, args, bsg_model):
         super(AcronymExpander, self).__init__()
-        self.embeddings_mu = bsg_model.embeddings_mu
-        self.embeddings_log_sigma = bsg_model.embeddings_log_sigma
-        self.encoder = bsg_model.encoder
+
+        vocab_size, embed_dim = bsg_model.embeddings_mu.weight.size()
+        if args.random_priors:
+            self.embeddings_mu = nn.Embedding(vocab_size, embedding_dim=embed_dim, padding_idx=0)
+            self.embeddings_log_sigma = nn.Embedding(vocab_size, embedding_dim=1, padding_idx=0)
+            log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
+            self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
+        else:
+            self.embeddings_mu = bsg_model.embeddings_mu
+            self.embeddings_log_sigma = bsg_model.embeddings_log_sigma
+
+        if args.random_encoder:
+            args.latent_dim, args.encoder_hidden_dim = bsg_model.encoder.u.weight.size()
+            args.encoder_input_dim = args.encoder_hidden_dim
+            self.encoder = Encoder(args, vocab_size)
+        else:
+            self.encoder = bsg_model.encoder
         self.softmax = nn.Softmax(dim=-1)
 
     def _compute_priors(self, ids):
@@ -50,10 +66,6 @@ class AcronymExpander(nn.Module):
         lf_sigma_flat = lf_sigma_sum.view(batch_size * max_output_size, -1)
 
         kl = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(batch_size, max_output_size)
-        # min_kl, max_kl = kl.min(-1)[0], kl.max(-1)[0]
-        # normalizer = (max_kl - min_kl).unsqueeze(-1)
-        # numerator = max_kl.unsqueeze(-1).repeat(1, kl.size()[-1]) - kl
-        # score = numerator  # / normalizer
         score = -kl
         score.masked_fill_(output_mask, float('-inf'))
         return score, target_lf_ids

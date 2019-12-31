@@ -296,7 +296,7 @@ def acronyms_finetune(args):
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
-    model = AcronymExpander(bsg_model)
+    model = AcronymExpander(args, bsg_model)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
@@ -351,6 +351,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--epochs', default=5, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
+    parser.add_argument('-random_encoder', default=False, action='store_true', help='Don\'t use pretrained encoder')
+    parser.add_argument('-random_priors', default=False, action='store_true', help='Don\'t use pretrained priors')
 
     args = parser.parse_args()
     acronyms_finetune(args)
