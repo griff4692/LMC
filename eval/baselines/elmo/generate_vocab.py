@@ -5,14 +5,13 @@ import numpy as np
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('Main script for Bayesian Skip Gram Model')
+    parser = argparse.ArgumentParser()
 
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
     parser.add_argument('-combine_phrases', default=False, action='store_true')
 
     args = parser.parse_args()
-    args.debug = True
     # Load Data
     debug_str = '_mini' if args.debug else ''
     phrase_str = '_phrase' if args.combine_phrases else ''
@@ -21,7 +20,7 @@ if __name__ == '__main__':
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
     print('Loaded vocabulary of size={}...'.format(vocab.separator_start_vocab_id))
-    vocab_order = ['<S>', '</S>', '<UNK>']
+    vocab_order = ['</S>', '<S>', '@@UNKNOWN@@']
 
     tokens = vocab.i2w[1:vocab.separator_start_vocab_id]
     supports = vocab.support[1:vocab.separator_start_vocab_id]
@@ -29,5 +28,5 @@ if __name__ == '__main__':
     token_order = np.argsort(-np.array(supports))
     tokens_ordered = list(np.array(tokens)[token_order])
     vocab_order += tokens_ordered
-    with open('vocab{}.txt'.format(debug_str), 'w') as fd:
+    with open('data/vocab/tokens.txt', 'w') as fd:
         fd.write('\n'.join(vocab_order))
