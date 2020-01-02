@@ -31,8 +31,8 @@ def collect_chunks(args):
 
     for chunk in chunk_range:
         print('Adding chunk {}'.format(chunk))
-        token_fp = '{}_tokenized{}_chunk_{}.json'.format(args.mimic_fp, debug_str, chunk)
-        counts_fp = '{}_token_counts{}_chunk_{}.json'.format(args.mimic_fp, debug_str, chunk)
+        token_fp = 'data/mimic/chunks/tokenized{}_chunk_{}.json'.format(debug_str, chunk)
+        counts_fp = 'data/mimic/chunks/token_counts{}_chunk_{}.json'.format(debug_str, chunk)
         with open(token_fp, 'r') as fd:
             full_token_data += json.load(fd)
         with open(counts_fp, 'r') as fd:
@@ -42,8 +42,8 @@ def collect_chunks(args):
                     full_counts_data[k] = 0
                 full_counts_data[k] += counts[k]
 
-    token_out_fp = '{}_tokenized{}_tmp.json'.format(args.mimic_fp, debug_str)
-    counts_out_fp = '{}_token_counts{}_tmp.json'.format(args.mimic_fp, debug_str)
+    token_out_fp = '{}_tokenized{}.json'.format(args.mimic_fp, debug_str)
+    counts_out_fp = '{}_token_counts{}.json'.format(args.mimic_fp, debug_str)
     print('Saving data to {} and {}'.format(token_out_fp, counts_out_fp))
     with open(token_out_fp, 'w') as fd:
         json.dump(full_token_data, fd)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     arguments.add_argument('-debug', default=False, action='store_true')
     arguments.add_argument('--chunk', type=int, required=True)
     arguments.add_argument('--chunksize', type=int, required=True)
-    arguments.add_argument('-collect_chunks', default=True, action='store_true')
+    arguments.add_argument('-collect_chunks', default=False, action='store_true')
 
     args = arguments.parse_args()
 
@@ -87,7 +87,7 @@ if __name__ == '__main__':
                 token_cts[token] += 1
                 token_cts['__ALL__'] += 1
         debug_str = '_mini' if args.debug else ''
-        with open(args.mimic_fp + '_tokenized{}_chunk_{}.json'.format(debug_str, args.chunk), 'w') as fd:
+        with open('data/mimic/chunks/tokenized{}_chunk_{}.json'.format(debug_str, args.chunk), 'w') as fd:
             json.dump(list(zip(categories, parsed_docs)), fd)
-        with open(args.mimic_fp + '_token_counts{}_chunk_{}.json'.format(debug_str, args.chunk), 'w') as fd:
+        with open('data/mimic/chunks/token_counts{}_chunk_{}.json'.format(debug_str, args.chunk), 'w') as fd:
             json.dump(token_cts, fd)

@@ -11,12 +11,19 @@ from nltk.corpus import stopwords
 import pandas as pd
 import spacy
 
-nlp = None
+section_df = pd.read_csv('data/mimic/sections.csv').dropna()
+SECTION_NAMES = list(sorted(section_df.nlargest(100, columns=['count'])['section'].tolist()))
+SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES))
+
+nlp = spacy.load('en_core_sci_sm')
 
 OTHER_NO = set(['\'s', '`'])
 USE_PHRASES = False
 STOPWORDS = set(stopwords.words('english')).union(
     set(string.punctuation)).union(OTHER_NO) - set(['%', '+', '-', '>', '<', '='])
+with open('data/prepositions.txt', 'r') as fd:
+    prepositions = set(map(lambda x: x.strip(), fd.readlines()))
+STOPWORDS -= prepositions
 
 
 def pattern_repl(matchobj):
@@ -82,7 +89,11 @@ def preprocess_mimic(text):
             if tok_idx + 1 == len(sectioned_text) or not sectioned_text[tok_idx + 1] in SECTION_NAMES:
                 tokenized_text += [create_section_token(toks)]
         else:
-            tokenized_text += tokenize_str(toks)
+            for sentence in nlp(toks).sents:
+                tokens = tokenize_str(str(sentence))
+                if len(tokens) > 1:
+                    tokenized_text += ([create_section_token('SENTENCESTART')] + tokens +
+                                      [create_section_token('SENTENCEEND')])
     doc_boundary = [create_section_token('DOCUMENT')]
     return ' '.join(doc_boundary + tokenized_text)
 
@@ -97,12 +108,6 @@ if __name__ == '__main__':
     USE_PHRASES = args.combine_phrases
     if USE_PHRASES:
         print('Combining ngrams into phrases')
-
-    section_df = pd.read_csv('data/mimic/sections.csv').dropna()
-    SECTION_NAMES = list(sorted(section_df.nlargest(1000, columns=['count'])['section'].tolist()))
-    SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES))
-
-    nlp = spacy.load('en_core_sci_sm')
 
     # Expand home path (~) so that pandas knows where to look
     print('Loading data...')
