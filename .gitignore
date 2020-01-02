@@ -2,7 +2,7 @@
 *.pyc
 __pycache__
 preprocess/*.pyc
-preprocess/data/
+data/
 BSG/*.pyc
 weights/
 screenlog.*
