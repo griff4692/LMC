@@ -3,6 +3,9 @@ import pickle
 import argparse
 import numpy as np
 
+import sys
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -28,5 +31,7 @@ if __name__ == '__main__':
     token_order = np.argsort(-np.array(supports))
     tokens_ordered = list(np.array(tokens)[token_order])
     vocab_order += tokens_ordered
-    with open('data/vocab/tokens.txt', 'w') as fd:
+    out_fn = 'data/vocab/tokens.txt'
+    print('Saving {} tokens to {}'.format(len(vocab_order), out_fn))
+    with open(out_fn, 'w') as fd:
         fd.write('\n'.join(vocab_order))
