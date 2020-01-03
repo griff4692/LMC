@@ -19,11 +19,11 @@ nlp = spacy.load('en_core_sci_sm')
 
 OTHER_NO = set(['\'s', '`'])
 USE_PHRASES = False
-STOPWORDS = set(stopwords.words('english')).union(
+swords = set(stopwords.words('english')).union(
     set(string.punctuation)).union(OTHER_NO) - set(['%', '+', '-', '>', '<', '='])
 with open('../preprocess/data/prepositions.txt', 'r') as fd:
     prepositions = set(map(lambda x: x.strip(), fd.readlines()))
-STOPWORDS -= prepositions
+STOPWORDS = swords - prepositions
 
 
 def pattern_repl(matchobj):
