@@ -3,17 +3,12 @@ import string
 import sys
 
 import numpy as np
-from nltk.corpus import stopwords
 import pandas as pd
 from scipy.spatial.distance import cosine
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-from mimic_tokenize import tokenize_str
+from mimic_tokenize import clean_text, STOPWORDS, tokenize_str
 from model_utils import tensor_to_np
-
-
-PUNCTUATION = '-' + string.punctuation.replace( '-', '')
-STOPWORDS = set(stopwords.words('english'))
 
 
 def get_known_ids(vocab, tokens):
@@ -36,7 +31,7 @@ def point_similarity(model, vocab, tokens_a, tokens_b):
 
 
 # UMLS concepts annoyingly include these terms quite frequently
-UMLS_BLACKLIST = set(['unidentified', 'otherwise', 'specified', 'nos', 'procedure'])
+UMLS_BLACKLIST = set(['unidentified', 'otherwise', 'specified', 'nos', 'procedure', 'digitparsed'])
 TOKEN_BLACKLIST = set(string.punctuation).union(STOPWORDS).union(UMLS_BLACKLIST)
 
 
@@ -51,7 +46,8 @@ def lf_tokenizer(str, chunker=None, combine_phrases=False):
 
 
 def eval_tokenize(str, unique_only=False, chunker=None, combine_phrases=False):
-    str = re.sub(r'_%#\S+#%_', '', str)
+    str = re.sub(r'_%#(\S+)#%_', r'\1', str)
+    str = clean_text(str)
     tokens = tokenize_str(str, combine_phrases=combine_phrases, chunker=chunker)
     tokens = list(filter(lambda t: t not in TOKEN_BLACKLIST, tokens))
 

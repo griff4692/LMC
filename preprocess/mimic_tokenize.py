@@ -11,7 +11,7 @@ from nltk.corpus import stopwords
 import pandas as pd
 import spacy
 
-section_df = pd.read_csv('data/mimic/sections.csv').dropna()
+section_df = pd.read_csv('../preprocess/data/mimic/sections.csv').dropna()
 SECTION_NAMES = list(sorted(section_df.nlargest(100, columns=['count'])['section'].tolist()))
 SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES))
 
@@ -19,11 +19,11 @@ nlp = spacy.load('en_core_sci_sm')
 
 OTHER_NO = set(['\'s', '`'])
 USE_PHRASES = False
-STOPWORDS = set(stopwords.words('english')).union(
+swords = set(stopwords.words('english')).union(
     set(string.punctuation)).union(OTHER_NO) - set(['%', '+', '-', '>', '<', '='])
-with open('data/prepositions.txt', 'r') as fd:
+with open('../preprocess/data/prepositions.txt', 'r') as fd:
     prepositions = set(map(lambda x: x.strip(), fd.readlines()))
-STOPWORDS -= prepositions
+STOPWORDS = swords - prepositions
 
 
 def pattern_repl(matchobj):
