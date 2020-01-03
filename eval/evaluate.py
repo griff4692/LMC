@@ -30,6 +30,8 @@ def evaluate(args):
     args.batch_size = 32
     args.debug = prev_args.debug
     args.lr = 0.001
+    args.random_priors = False
+    args.random_encoder = False
     acronyms_finetune(args)
 
 
