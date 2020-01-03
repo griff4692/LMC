@@ -18,7 +18,8 @@ if __name__ == '__main__':
     debug_str = '_mini' if args.debug else ''
     phrase_str = '_phrase' if args.combine_phrases else ''
     print('Loading subsampled data...')
-    data_fp = '../../../preprocess/data/mimic/NOTEEVENTS_tokenized_subsampled{}{}.json'.format(debug_str, phrase_str)
+    data_fp = '../../../preprocess/data/mimic/NOTEEVENTS_tokenized_subsampled{}{}_sentence.json'.format(
+        debug_str, phrase_str)
     with open(data_fp, 'rb') as fd:
         data = json.load(fd)
     sentences = []
@@ -26,7 +27,7 @@ if __name__ == '__main__':
     print('Separating sentences...')
     for i in tqdm(range(len(data))):
         _, doc = data[i]
-        doc_sentences = re.split(r'\bheader=SENTENCESTART|header=SENTENCEEND\b', doc)
+        doc_sentences = re.split(r'\bheader=SENTENCES|header=SENTENCESTART|header=SENTENCEEND\b', doc)
         for sentence in doc_sentences:
             sentence = sentence.strip()
             tokens = sentence.split()

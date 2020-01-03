@@ -21,6 +21,7 @@ if __name__ == '__main__':
     arguments.add_argument('--min_token_count', default=10, type=int)
     arguments.add_argument('--min_phrase_count', default=5, type=int)
     arguments.add_argument('--subsample_param', default=0.001, type=float)
+    arguments.add_argument('-split_sentences', default=False, action='store_true')
 
     args = arguments.parse_args()
 
@@ -30,10 +31,11 @@ if __name__ == '__main__':
 
     debug_str = '_mini' if args.debug else ''
     phrase_str = '_phrase' if args.combine_phrases else ''
-    tokenized_data_fn = '{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str)
+    sentence_str = '_sentence' if args.split_sentences else ''
+    tokenized_data_fn = '{}{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str, sentence_str)
     with open(tokenized_data_fn, 'r') as fd:
         tokenized_data = json.load(fd)
-    token_counts_fn = '{}{}{}.json'.format(args.token_counts_fp, debug_str, phrase_str)
+    token_counts_fn = '{}{}{}{}.json'.format(args.token_counts_fp, debug_str, phrase_str, sentence_str)
     with open(token_counts_fn, 'r') as fd:
         token_counts = json.load(fd)
     N = float(token_counts['__ALL__'])
@@ -73,11 +75,11 @@ if __name__ == '__main__':
     vocab.separator_start_vocab_id = separator_start_vocab_id
     vocab.add_tokens(sections, token_support=0)
 
-    subsampled_out_fn = '{}_subsampled{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str)
+    subsampled_out_fn = '{}_subsampled{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str, sentence_str)
     print('Saving subsampled tokens to {}'.format(subsampled_out_fn))
     with open(subsampled_out_fn, 'w') as fd:
         json.dump(tokenized_subsampled_data, fd)
-    vocab_out_fn = 'data/vocab{}{}.pk'.format(debug_str, phrase_str)
+    vocab_out_fn = 'data/vocab{}{}{}.pk'.format(debug_str, phrase_str, sentence_str)
     print('Saving vocabulary of size {} to {}'.format(vocab.size(), vocab_out_fn))
     with open(vocab_out_fn, 'wb') as fd:
         pickle.dump(vocab, fd)

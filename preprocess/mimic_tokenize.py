@@ -11,6 +11,8 @@ from nltk.corpus import stopwords
 import pandas as pd
 import spacy
 
+from model_utils import render_args
+
 section_df = pd.read_csv('../preprocess/data/mimic/sections.csv').dropna()
 SECTION_NAMES = list(sorted(section_df.nlargest(100, columns=['count'])['section'].tolist()))
 SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES))
@@ -89,11 +91,13 @@ def preprocess_mimic(text):
             if tok_idx + 1 == len(sectioned_text) or not sectioned_text[tok_idx + 1] in SECTION_NAMES:
                 tokenized_text += [create_section_token(toks)]
         else:
-            for sentence in nlp(toks).sents:
-                tokens = tokenize_str(str(sentence))
-                if len(tokens) > 1:
-                    tokenized_text += ([create_section_token('SENTENCESTART')] + tokens +
-                                      [create_section_token('SENTENCEEND')])
+            if args.split_sentences:
+                for sentence in nlp(toks).sents:
+                    tokens = tokenize_str(str(sentence))
+                    if len(tokens) > 1:
+                        tokenized_text += [create_section_token('SENTENCE')] + tokens
+            else:
+                tokenized_text += tokenize_str(toks)
     doc_boundary = [create_section_token('DOCUMENT')]
     return ' '.join(doc_boundary + tokenized_text)
 
@@ -103,8 +107,10 @@ if __name__ == '__main__':
     arguments.add_argument('--mimic_fp', default='data/mimic/NOTEEVENTS')
     arguments.add_argument('-debug', default=False, action='store_true')
     arguments.add_argument('-combine_phrases', default=False, action='store_true')
+    arguments.add_argument('-split_sentences', default=False, action='store_true')
 
     args = arguments.parse_args()
+    render_args(args)
     USE_PHRASES = args.combine_phrases
     if USE_PHRASES:
         print('Combining ngrams into phrases')
@@ -114,6 +120,7 @@ if __name__ == '__main__':
     args.mimic_fp = os.path.expanduser(args.mimic_fp)
     debug_str = '_mini' if args.debug else ''
     phrase_str = '_phrase' if args.combine_phrases else ''
+    sentence_str = '_sentence' if args.split_sentences else ''
     df = pd.read_csv('{}{}.csv'.format(args.mimic_fp, debug_str))
 
     print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
@@ -131,7 +138,7 @@ if __name__ == '__main__':
             token_cts[token] += 1
             token_cts['__ALL__'] += 1
     debug_str = '_mini' if args.debug else ''
-    with open(args.mimic_fp + '_tokenized{}{}.json'.format(debug_str, phrase_str), 'w') as fd:
+    with open(args.mimic_fp + '_tokenized{}{}{}.json'.format(debug_str, phrase_str, sentence_str), 'w') as fd:
         json.dump(list(zip(categories, parsed_docs)), fd)
-    with open(args.mimic_fp + '_token_counts{}{}.json'.format(debug_str, phrase_str), 'w') as fd:
+    with open(args.mimic_fp + '_token_counts{}{}{}.json'.format(debug_str, phrase_str, sentence_str), 'w') as fd:
         json.dump(token_cts, fd)
