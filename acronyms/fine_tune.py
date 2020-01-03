@@ -107,7 +107,11 @@ def acronyms_finetune(args):
 
     sf_tokenized_lf_map = {}
     for sf, lf_list in used_sf_lf_map.items():
-        sf_tokenized_lf_map[sf] = list(map(lf_tokenizer, lf_list))
+        sf_tokenized_lf_map[sf] = list(map(
+            lambda toks: list(filter(
+                lambda tok: vocab.get_id(tok) > -1, toks)
+            ),
+            list(map(lf_tokenizer, lf_list))))
 
     train_df, test_df = train_test_split(df, random_state=1992, test_size=0.2)
     train_batcher = AcronymBatcherLoader(train_df, batch_size=args.batch_size)
