@@ -4,6 +4,7 @@ from multiprocessing import Pool
 import os
 import re
 import string
+import sys
 from time import time
 
 import argparse
@@ -11,6 +12,7 @@ from nltk.corpus import stopwords
 import pandas as pd
 import spacy
 
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 from model_utils import render_args
 
 section_df = pd.read_csv('../preprocess/data/mimic/sections.csv').dropna()
