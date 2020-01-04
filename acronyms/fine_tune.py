@@ -113,9 +113,11 @@ def acronyms_finetune(args):
             ),
             list(map(lf_tokenizer, lf_list))))
 
+    df['row_idx'] = list(range(df.shape[0]))
     train_df, test_df = train_test_split(df, random_state=1992, test_size=0.2)
     train_batcher = AcronymBatcherLoader(train_df, batch_size=args.batch_size)
     test_batcher = AcronymBatcherLoader(test_df, batch_size=args.batch_size)
+    assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
 
     render_test_statistics(test_df, used_sf_lf_map)
 

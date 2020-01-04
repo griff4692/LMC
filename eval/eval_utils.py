@@ -30,9 +30,9 @@ def point_similarity(model, vocab, tokens_a, tokens_b):
     return sim
 
 
+TOKEN_BLACKLIST = set(string.punctuation).union(STOPWORDS).union(set(['digitparsed']))
 # UMLS concepts annoyingly include these terms quite frequently
-UMLS_BLACKLIST = set(['unidentified', 'otherwise', 'specified', 'nos', 'procedure', 'digitparsed'])
-TOKEN_BLACKLIST = set(string.punctuation).union(STOPWORDS).union(UMLS_BLACKLIST)
+UMLS_BLACKLIST = TOKEN_BLACKLIST.union(set(['unidentified', 'otherwise', 'specified', 'nos', 'procedure']))
 
 
 def lf_tokenizer(str, chunker=None, combine_phrases=False):
@@ -42,7 +42,7 @@ def lf_tokenizer(str, chunker=None, combine_phrases=False):
         tokens = tokenize_str(token_str, combine_phrases=combine_phrases, chunker=chunker)
         for t in tokens:
             token_bag.add(t)
-    return list(filter(lambda x: x not in TOKEN_BLACKLIST, list(token_bag)))
+    return list(filter(lambda x: x not in UMLS_BLACKLIST, list(token_bag)))
 
 
 def eval_tokenize(str, unique_only=False, chunker=None, combine_phrases=False):
