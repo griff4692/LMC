@@ -18,7 +18,7 @@ from acronym_expander import AcronymExpander
 from acronym_expansion import parse_sense_df
 from acronym_utils import process_batch, target_lf_index
 from error_analysis import analyze, render_test_statistics
-from eval_utils import lf_tokenizer
+from eval_utils import lf_tokenizer, preprocess_minnesota_dataset
 from model_utils import get_git_revision_hash, render_args, restore_model, save_checkpoint
 
 
@@ -78,7 +78,12 @@ def acronyms_finetune(args):
     data_dir = '../eval/eval_data/minnesota/'
     sense_fp = os.path.join(data_dir, 'sense_inventory_ii')
     lfs, lf_sf_map, sf_lf_map = parse_sense_df(sense_fp)
-    df = pd.read_csv(os.path.join(data_dir, 'preprocessed_dataset_window_{}.csv'.format(prev_args.window)))
+    data_fp = os.path.join(data_dir, 'preprocessed_dataset_window_{}.csv'.format(prev_args.window))
+    if not os.path.exists(data_fp):
+        print('Need to preprocess dataset first...')
+        preprocess_minnesota_dataset(window=prev_args.window, combine_phrases=prev_args.combine_phrases)
+        print('Saving dataset to {}'.format(data_fp))
+    df = pd.read_csv(data_fp)
     df['target_lf_idx'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_index(lf, sf_lf_map[sf]))
     prev_N = df.shape[0]
     df = df[df['target_lf_idx'] > -1]

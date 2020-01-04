@@ -44,8 +44,10 @@ class EncoderLSTM(nn.Module):
         self.dropout = nn.Dropout(0.2)
         self.lstm = nn.LSTM(
             args.encoder_input_dim * 2, args.encoder_hidden_dim, bidirectional=True, batch_first=True)
+        self.att = nn.Linear(args.encoder_hidden_dim * 2, 1, bias=True)
         self.u = nn.Linear(args.encoder_hidden_dim * 2, args.latent_dim, bias=True)
         self.v = nn.Linear(args.encoder_hidden_dim * 2, 1, bias=True)
+        self.softmax = nn.Softmax(1)
 
     def forward(self, center_ids, context_ids, mask):
         """
@@ -64,6 +66,9 @@ class EncoderLSTM(nn.Module):
         mask_tiled = mask.unsqueeze(-1).repeat(1, 1, merged_embeds.size()[-1])
         merged_embeds.masked_fill_(mask_tiled, 0)
 
-        _, (h, _) = self.lstm(merged_embeds)
-        h = self.dropout(h.transpose(1, 0).contiguous().view(batch_size, -1))
-        return self.u(h), self.v(h).exp()
+        h, _ = self.lstm(merged_embeds)
+        att_scores = self.att(h).squeeze(-1)
+        att_scores.masked_fill_(mask, -1e5)
+        att_weights = self.softmax(att_scores)
+        h_sum = (att_weights.unsqueeze(-1) * h).sum(1)
+        return self.u(h_sum), self.v(h_sum).exp()
