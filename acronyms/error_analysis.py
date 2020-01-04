@@ -188,7 +188,7 @@ def render_test_statistics(df, sf_lf_map):
 
 def _analyze(args):
     # Load Data
-    data_dir = os.path.join('weights', args.experiment, 'results')
+    data_dir = os.path.join('../acronyms/weights', args.experiment, 'results')
     summary = pd.read_csv(os.path.join(data_dir, 'summary.csv'))
 
     suffixes = ['precision', 'recall', 'f1']
