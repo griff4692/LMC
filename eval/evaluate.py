@@ -26,12 +26,14 @@ def evaluate(args):
     evaluate_word_similarity(model, vocab, combine_phrases=prev_args.combine_phrases)
     args.bsg_experiment = prev_args.experiment  # Tell which model to pull from
     # TODO integrate these better
-    args.epochs = 3
+    args.epochs = 5
     args.batch_size = 32
     args.debug = prev_args.debug
     args.lr = 0.001
     args.random_priors = False
     args.random_encoder = False
+    args.use_att = False
+    args.att_style = None
     acronyms_finetune(args)
 
 

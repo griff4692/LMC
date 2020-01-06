@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from acronym_batcher import AcronymBatcherLoader
 from acronym_expander import AcronymExpander
@@ -28,8 +29,8 @@ def run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_
     model.eval()
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
-            batch_loss, num_examples, num_correct, _, _ = process_batch(
-                test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
+            batch_loss, num_examples, num_correct, _, top_global_weights = process_batch(
+                args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
         test_correct += num_correct
         test_examples += num_examples
         test_epoch_loss += batch_loss.item()
@@ -49,7 +50,7 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, vocab, sf_
     for _ in tqdm(range(train_batcher.num_batches())):
         optimizer.zero_grad()
         batch_loss, num_examples, num_correct, _, _ = process_batch(
-            train_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
+            args, train_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
         batch_loss.backward()
         optimizer.step()
 
@@ -89,6 +90,7 @@ def acronyms_finetune(args):
     df = df[df['target_lf_idx'] > -1]
     print('Removed {} examples for which the target LF is not exactly in the sense inventory ii'.format(
         prev_N - df.shape[0]))
+    df['tokenized_context_unique'] = df['tokenized_context'].apply(lambda x: list(set(x.split())))
 
     sfs = df['sf'].unique().tolist()
     used_sf_lf_map = defaultdict(list)
@@ -199,6 +201,8 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('-random_encoder', default=False, action='store_true', help='Don\'t use pretrained encoder')
     parser.add_argument('-random_priors', default=False, action='store_true', help='Don\'t use pretrained priors')
+    parser.add_argument('-use_att', default=False, action='store_true')
+    parser.add_argument('--att_style', default='weighted', help='weighted or two_step')
 
     args = parser.parse_args()
     acronyms_finetune(args)

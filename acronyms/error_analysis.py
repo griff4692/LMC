@@ -17,11 +17,14 @@ from acronym_utils import process_batch
 from model_utils import tensor_to_np
 
 
-def _render_example(sf, target_lf, converted_target_lf, pred_lf, top_pred_lfs, context_window, full_context):
-    str = 'SF={}.\nTarget LF={} ({}).\nPredicted LF={}.\nTop 5 Predicted={}\n'.format(
+def _render_example(sf, target_lf, converted_target_lf, pred_lf, top_pred_lfs, context_window, full_context,
+                    global_tokens, top_global_weights):
+    str = 'SF={}.\nTarget LF={} ({}).\nPredicted LF={}.\nTop 10 Predicted={}\n'.format(
         sf, target_lf, converted_target_lf, pred_lf, top_pred_lfs)
     str += 'Context Window: {}\n'.format(context_window)
     str += 'Full Context: {}\n'.format(full_context)
+    if top_global_weights is not None:
+        str += 'Top Global Words: {}\n'.format(', '.join([global_tokens[i] for i in top_global_weights]))
     str += '\n\n'
     return str
 
@@ -45,16 +48,16 @@ def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_toke
     errors_str = defaultdict(str)
     k = 5
     test_set_examples, test_set_correct = 0, 0
-    correct_vars, error_vars = [], []
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
-            batch_loss, num_examples, num_correct, proba, var = process_batch(
-                test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
+            batch_loss, num_examples, num_correct, proba, top_global_weights = process_batch(
+                args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
         test_set_examples += num_examples
         test_set_correct += num_correct
         batch_data = test_batcher.get_prev_batch()
         proba = tensor_to_np(proba)
-        var = tensor_to_np(var)
+        if top_global_weights is not None:
+            top_global_weights = tensor_to_np(top_global_weights)
         top_pred_idxs = np.argsort(-proba, axis=1)[:, :k]
         pred_lf_idxs = top_pred_idxs[:, 0]
         for batch_idx, (row_idx, row) in enumerate(batch_data.iterrows()):
@@ -65,24 +68,19 @@ def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_toke
             target_lf_idx = row['used_target_lf_idx']
             pred_lf_idx = pred_lf_idxs[batch_idx]
             pred_lf = lf_map[pred_lf_idx]
+            att_weights = None if top_global_weights is None else top_global_weights[batch_idx]
             top_pred_lfs = ', '.join(
                 list(map(lambda lf: lf_map[lf], top_pred_idxs[batch_idx][:min(k, len(lf_map))])))
             example_str = _render_example(sf, target_lf, lf_map[target_lf_idx], pred_lf, top_pred_lfs,
-                                          row['trimmed_tokens'], row['tokenized_context'])
+                                          row['trimmed_tokens'], row['tokenized_context'],
+                                          row['tokenized_context_unique'], att_weights)
 
             results_str[sf] += example_str
             if not target_lf_idx == pred_lf_idx:
                 errors_str[sf] += example_str
-                error_vars.append(float(var[batch_idx]))
-            else:
-                correct_vars.append(float(var[batch_idx]))
             sf_confusion[sf][0].append(target_lf_idx)
             sf_confusion[sf][1].append(pred_lf_idx)
 
-    print('Correct Var Mean={}. Error Var Mean={}'.format(sum(correct_vars) / float(len(correct_vars)),
-                                                          sum(error_vars) / float(len(error_vars))))
-    with open(os.path.join(results_dir, 'variances.json'), 'w') as fd:
-        json.dump({'error': error_vars, 'correct': correct_vars}, fd)
     print('Micro Accuracy: {}'.format(test_set_correct / float(test_set_examples)))
     results_fp = os.path.join(results_dir, 'results.txt')
     reports_fp = os.path.join(results_dir, 'reports.txt')
@@ -157,12 +155,6 @@ def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_toke
             cm.save_html(cm_outpath)
         except:
             print('Only 1 target class for test set SF={}'.format(sf))
-
-    ax = axes()
-    boxplot([correct_vars, error_vars])
-    title('Distribution of Posterior Variances')
-    ax.set_xticklabels(['Correct', 'Error'])
-    savefig('{}.png'.format(os.path.join(results_dir, 'variances')))
 
     pd.DataFrame(df, columns=cols).to_csv(summary_fp, index=False)
     with open(reports_fp, 'w') as fd:

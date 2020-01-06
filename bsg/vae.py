@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from encoder import EncoderLSTM
+from encoder import Encoder, EncoderLSTM
 from compute_utils import compute_kl, mask_2D
 
 
@@ -10,8 +10,7 @@ class VAE(nn.Module):
     def __init__(self, args, vocab_size, pretrained_embeddings=None):
         super(VAE, self).__init__()
         self.device = args.device
-        self.encoder = EncoderLSTM(args, vocab_size)
-
+        self.encoder = EncoderLSTM(args, vocab_size) if args.encoder_lstm else Encoder(args, vocab_size)
         self.margin = args.hinge_loss_margin or 1.0
 
         # The output representations of words(used in KL regularization and max_margin).

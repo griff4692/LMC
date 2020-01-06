@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('-section2vec', default=False, action='store_true')
     parser.add_argument('--epochs', default=4, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
-    parser.add_argument('--window', default=5, type=int)
+    parser.add_argument('--window', default=10, type=int)
     parser.add_argument('-use_pretrained', default=False, action='store_true')
 
     # Model Hyperparameters
@@ -42,6 +42,8 @@ if __name__ == '__main__':
     parser.add_argument('--encoder_input_dim', default=64, type=int, help='embedding dimemsions for encoder')
     parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
     parser.add_argument('--latent_dim', default=100, type=int, help='z dimension')
+    parser.add_argument('-encoder_lstm', default=False, action='store_true')
+    parser.add_argument('-encoder_att', default=False, action='store_true')
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()

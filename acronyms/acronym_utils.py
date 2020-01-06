@@ -16,11 +16,12 @@ def target_lf_index(target_lf, lfs):
     return -1
 
 
-def process_batch(batcher, model, loss_func, vocab, sf_tokenized_lf_map):
+def process_batch(args, batcher, model, loss_func, vocab, sf_tokenized_lf_map):
     batch_input, num_outputs = batcher.next(vocab, sf_tokenized_lf_map)
     batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0), batch_input))
-    proba, target, var = model(*(batch_input + [num_outputs]))
+    proba, target, top_global_weights = model(*(batch_input + [num_outputs]),
+                                              use_att=args.use_att, att_style=args.att_style)
     num_correct = len(np.where(tensor_to_np(torch.argmax(proba, 1)) == tensor_to_np(target))[0])
     num_examples = len(num_outputs)
     batch_loss = loss_func.forward(proba, target)
-    return batch_loss, num_examples, num_correct, proba, var
+    return batch_loss, num_examples, num_correct, proba, top_global_weights
