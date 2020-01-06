@@ -71,9 +71,9 @@ def eval_tokenize(str, unique_only=False, chunker=None, combine_phrases=False):
 
 
 def preprocess_minnesota_dataset(window=5, chunker=None, combine_phrases=False):
-    in_fp = 'eval_data/minnesota/AnonymizedClinicalAbbreviationsAndAcronymsDataSet.txt'
+    in_fp = '../eval/eval_data/minnesota/AnonymizedClinicalAbbreviationsAndAcronymsDataSet.txt'
     phrase_str = '_phrase' if combine_phrases else ''
-    out_fp = 'eval_data/minnesota/preprocessed_dataset_window_{}{}.csv'.format(window, phrase_str)
+    out_fp = '../eval/eval_data/minnesota/preprocessed_dataset_window_{}{}.csv'.format(window, phrase_str)
     # cols = ['sf', 'target_lf', 'sf_rep', 'start_idx', 'end_idx', 'section', 'context']
     df = pd.read_csv(in_fp, sep='|')
     df.dropna(subset=['sf', 'target_lf', 'context'], inplace=True)

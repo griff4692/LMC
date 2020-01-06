@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from compute_utils import compute_kl, mask_2D
-from encoder import Encoder
+from encoder import EncoderLSTM
 
 
 class AcronymExpander(nn.Module):
@@ -30,7 +30,7 @@ class AcronymExpander(nn.Module):
         if args.random_encoder:
             args.latent_dim, args.encoder_hidden_dim = bsg_model.encoder.u.weight.size()
             args.encoder_input_dim = args.encoder_hidden_dim
-            self.encoder = Encoder(args, vocab_size)
+            self.encoder = EncoderLSTM(args, vocab_size)
         else:
             self.encoder = bsg_model.encoder
             encoder_embed_dim = self.encoder.embeddings.weight.size()[-1]
