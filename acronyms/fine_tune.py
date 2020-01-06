@@ -105,13 +105,19 @@ def acronyms_finetune(args):
 
     df['used_target_lf_idx'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_index(lf, used_sf_lf_map[sf]))
 
-    sf_tokenized_lf_map = {}
+    sf_tokenized_lf_map = defaultdict(list)
+    prev_vocab_size = vocab.size()
     for sf, lf_list in used_sf_lf_map.items():
-        sf_tokenized_lf_map[sf] = list(map(
-            lambda toks: list(filter(
-                lambda tok: vocab.get_id(tok) > -1, toks)
-            ),
-            list(map(lf_tokenizer, lf_list))))
+        for lf in lf_list:
+            tokens = lf_tokenizer(lf, vocab)
+            sf_tokenized_lf_map[sf].append(tokens)
+            for t in tokens:
+                vocab.add_token(t)
+
+    for t in sfs:
+        vocab.add_token(t.lower())
+    new_vocab_size = vocab.size()
+    print('Added {} tokens to vocabulary from LF targets and SFs.'.format(new_vocab_size - prev_vocab_size))
 
     df['row_idx'] = list(range(df.shape[0]))
     train_df, test_df = train_test_split(df, random_state=1992, test_size=0.2)
@@ -131,7 +137,7 @@ def acronyms_finetune(args):
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
-    model = AcronymExpander(args, bsg_model)
+    model = AcronymExpander(args, bsg_model, vocab)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())

@@ -1,3 +1,4 @@
+from collections import Counter, defaultdict
 import re
 import string
 import sys
@@ -35,14 +36,27 @@ TOKEN_BLACKLIST = set(string.punctuation).union(STOPWORDS).union(set(['digitpars
 UMLS_BLACKLIST = TOKEN_BLACKLIST.union(set(['unidentified', 'otherwise', 'specified', 'nos', 'procedure']))
 
 
-def lf_tokenizer(str, chunker=None, combine_phrases=False):
+def lf_tokenizer(str, vocab, chunker=None, combine_phrases=False, max_lf_len=5):
     tokens_sep = str.split(';')
     token_bag = set()
+    token_counts = defaultdict(int)
     for token_str in tokens_sep:
         tokens = tokenize_str(token_str, combine_phrases=combine_phrases, chunker=chunker)
         for t in tokens:
             token_bag.add(t)
-    return list(filter(lambda x: x not in UMLS_BLACKLIST, list(token_bag)))
+    token_counts[t] += 1
+    token_bag = list(token_bag)
+    tokens = list(filter(lambda x: x not in UMLS_BLACKLIST and vocab.get_id(x) > -1, token_bag))
+    if len(tokens) == 0:
+        assert len(token_bag) > 0
+        tokens = token_bag
+    if len(tokens) > max_lf_len:
+        available_token_counts = {}
+        for t in tokens:
+            available_token_counts[t] = token_counts[t]
+        truncated_token_counts = Counter(available_token_counts).most_common(max_lf_len)
+        tokens = list(map(lambda x: x[0], truncated_token_counts))
+    return tokens
 
 
 def eval_tokenize(str, unique_only=False, chunker=None, combine_phrases=False):

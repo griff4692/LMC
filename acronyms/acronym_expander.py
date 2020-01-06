@@ -7,18 +7,25 @@ from encoder import Encoder
 
 
 class AcronymExpander(nn.Module):
-    def __init__(self, args, bsg_model):
+    def __init__(self, args, bsg_model, vocab):
         super(AcronymExpander, self).__init__()
 
-        vocab_size, embed_dim = bsg_model.embeddings_mu.weight.size()
+        vocab_size = vocab.size()
+        prev_vocab_size, embed_dim = bsg_model.embeddings_mu.weight.size()
         if args.random_priors:
             self.embeddings_mu = nn.Embedding(vocab_size, embedding_dim=embed_dim, padding_idx=0)
             self.embeddings_log_sigma = nn.Embedding(vocab_size, embedding_dim=1, padding_idx=0)
             log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
             self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
         else:
-            self.embeddings_mu = bsg_model.embeddings_mu
-            self.embeddings_log_sigma = bsg_model.embeddings_log_sigma
+            self.embeddings_mu = nn.Embedding(vocab_size, embedding_dim=embed_dim, padding_idx=0)
+            mu_init = np.random.normal(0, 1, size=(vocab_size, embed_dim))
+            mu_init[:prev_vocab_size, :] = bsg_model.embeddings_mu.weight.detach().numpy()
+            self.embeddings_mu.load_state_dict({'weight': torch.from_numpy(mu_init)})
+            self.embeddings_log_sigma = nn.Embedding(vocab_size, embedding_dim=1, padding_idx=0)
+            log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
+            log_weights_init[:prev_vocab_size, :] = bsg_model.embeddings_log_sigma.weight.detach().numpy()
+            self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
 
         if args.random_encoder:
             args.latent_dim, args.encoder_hidden_dim = bsg_model.encoder.u.weight.size()
@@ -26,6 +33,11 @@ class AcronymExpander(nn.Module):
             self.encoder = Encoder(args, vocab_size)
         else:
             self.encoder = bsg_model.encoder
+            encoder_embed_dim = self.encoder.embeddings.weight.size()[-1]
+            encoder_embed_init = np.random.normal(0, 1, size=(vocab_size, encoder_embed_dim))
+            encoder_embed_init[:prev_vocab_size, :] = self.encoder.embeddings.weight.detach().numpy()
+            self.encoder.embeddings = nn.Embedding(vocab_size, embedding_dim=encoder_embed_dim, padding_idx=0)
+            self.encoder.embeddings.load_state_dict({'weight': torch.from_numpy(encoder_embed_init)})
         self.softmax = nn.Softmax(dim=-1)
 
     def _compute_priors(self, ids):

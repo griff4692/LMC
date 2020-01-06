@@ -61,6 +61,7 @@ class AcronymBatcherLoader:
                 lf_id_seq = vocab.get_ids(lf_toks)
                 lf_id_seq_trunc = lf_id_seq[:min(max_lf_len, len(lf_id_seq))]
                 num_toks = len(lf_id_seq_trunc)
+                assert num_toks > 0
                 lf_ids[batch_idx, lf_idx, :num_toks] = lf_id_seq_trunc
                 lf_token_ct[batch_idx, lf_idx] = num_toks
                 max_lf_token_ct = max(max_lf_token_ct, num_toks)
