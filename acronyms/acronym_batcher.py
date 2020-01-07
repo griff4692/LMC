@@ -1,3 +1,4 @@
+from allennlp.data.tokenizers.token import Token
 import numpy as np
 
 
@@ -16,6 +17,38 @@ class AcronymBatcherLoader:
 
     def get_prev_batch(self):
         return self.batches[self.batch_ct - 1]
+
+    def elmo_tokenize(self, tokens, vocab, indexer):
+        tokens = list(map(lambda t: Token(t), tokens))
+        return indexer.tokens_to_indices(tokens, vocab, 'elmo')['elmo']
+
+    def elmo_next(self, vocab, indexer, sf_tokenized_lf_map):
+        batch = self.batches[self.batch_ct]
+        self.batch_ct += 1
+        batch_size = batch.shape[0]
+        target_lf_ids = np.zeros([batch_size, ], dtype=int)
+        max_context_len = max([len(tt.split()) for tt in batch['trimmed_tokens'].tolist()])
+        num_outputs = [len(sf_tokenized_lf_map[sf]) for sf in batch['sf'].tolist()]
+        context_ids = np.zeros([batch_size, max_context_len, 50])
+        max_output_length = max(num_outputs)
+        max_lf_len = 5
+        lf_ids = np.zeros([batch_size, max_output_length, max_lf_len, 50], dtype=int)
+        sf_idxs = np.zeros([batch_size])
+        for batch_idx, (_, row) in enumerate(batch.iterrows()):
+            row = row.to_dict()
+            sf = row['sf'].lower()
+            # Find target_sf index in sf_lf_map
+            target_lf_ids[batch_idx] = row['used_target_lf_idx']
+            context_tokens = row['trimmed_tokens'].split()
+            sf_idxs[batch_idx] = np.where(np.array(context_tokens) == sf)[0][0]
+            context_id_seq = self.elmo_tokenize(context_tokens, vocab, indexer)
+            context_ids[batch_idx, :len(context_id_seq), :] = context_id_seq
+            candidate_lfs = sf_tokenized_lf_map[row['sf']]
+            for lf_idx, lf_toks in enumerate(candidate_lfs):
+                lf_id_seq = self.elmo_tokenize(lf_toks, vocab, indexer)
+                lf_ids[batch_idx, lf_idx, :len(lf_id_seq), :] = lf_id_seq
+
+        return (context_ids, lf_ids, target_lf_ids, sf_idxs), num_outputs
 
     def next(self, vocab, sf_tokenized_lf_map):
         batch = self.batches[self.batch_ct]

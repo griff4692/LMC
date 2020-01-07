@@ -69,12 +69,7 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, vocab, sf_
     return train_loss
 
 
-def acronyms_finetune(args):
-    args.git_hash = get_git_revision_hash()
-    render_args(args)
-
-    prev_args, bsg_model, vocab, _ = restore_model(args.bsg_experiment)
-
+def load_data(prev_args):
     # Load Data
     data_dir = '../eval/eval_data/minnesota/'
     sense_fp = os.path.join(data_dir, 'sense_inventory_ii')
@@ -112,6 +107,21 @@ def acronyms_finetune(args):
 
     df['used_target_lf_idx'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_index(lf, used_sf_lf_map[sf]))
 
+    df['row_idx'] = list(range(df.shape[0]))
+    train_df, test_df = train_test_split(df, random_state=1992, test_size=0.2)
+    train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
+    test_batcher = AcronymBatcherLoader(test_df, batch_size=32)
+    assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
+    return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs
+
+
+def acronyms_finetune(args):
+    args.git_hash = get_git_revision_hash()
+    render_args(args)
+
+    prev_args, bsg_model, vocab, _ = restore_model(args.bsg_experiment)
+    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs = load_data(prev_args)
+
     sf_tokenized_lf_map = defaultdict(list)
     prev_vocab_size = vocab.size()
     for sf, lf_list in used_sf_lf_map.items():
@@ -125,12 +135,6 @@ def acronyms_finetune(args):
         vocab.add_token(t.lower())
     new_vocab_size = vocab.size()
     print('Added {} tokens to vocabulary from LF targets and SFs.'.format(new_vocab_size - prev_vocab_size))
-
-    df['row_idx'] = list(range(df.shape[0]))
-    train_df, test_df = train_test_split(df, random_state=1992, test_size=0.2)
-    train_batcher = AcronymBatcherLoader(train_df, batch_size=args.batch_size)
-    test_batcher = AcronymBatcherLoader(test_df, batch_size=args.batch_size)
-    assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
 
     render_test_statistics(test_df, used_sf_lf_map)
 

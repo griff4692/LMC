@@ -36,7 +36,7 @@ TOKEN_BLACKLIST = set(string.punctuation).union(STOPWORDS).union(set(['digitpars
 UMLS_BLACKLIST = TOKEN_BLACKLIST.union(set(['unidentified', 'otherwise', 'specified', 'nos', 'procedure']))
 
 
-def lf_tokenizer(str, vocab, chunker=None, combine_phrases=False, max_lf_len=5):
+def lf_tokenizer(str, vocab=None, chunker=None, combine_phrases=False, max_lf_len=5):
     tokens_sep = str.split(';')
     token_bag = set()
     token_counts = defaultdict(int)
@@ -46,7 +46,10 @@ def lf_tokenizer(str, vocab, chunker=None, combine_phrases=False, max_lf_len=5):
             token_bag.add(t)
     token_counts[t] += 1
     token_bag = list(token_bag)
-    tokens = list(filter(lambda x: x not in UMLS_BLACKLIST and vocab.get_id(x) > -1, token_bag))
+    if vocab is None:
+        tokens = list(filter(lambda x: x not in UMLS_BLACKLIST, token_bag))
+    else:
+        tokens = list(filter(lambda x: x not in UMLS_BLACKLIST and vocab.get_id(x) > -1, token_bag))
     if len(tokens) == 0:
         assert len(token_bag) > 0
         tokens = token_bag
@@ -129,7 +132,7 @@ def preprocess_minnesota_dataset(window=5, chunker=None, combine_phrases=False):
             sf_idx = sf_idxs[sf_label_order]
             start_idx = max(0, sf_idx - window)
             end_idx = min(sf_idx + window + 1, len(tokens))
-            tc = tokens[start_idx:sf_idx] + tokens[sf_idx + 1: end_idx]
+            tc = tokens[start_idx:end_idx]
             trimmed_contexts.append(' '.join(tc))
 
     df['trimmed_tokens'] = trimmed_contexts
