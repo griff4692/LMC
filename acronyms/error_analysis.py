@@ -1,4 +1,5 @@
 from collections import defaultdict
+import json
 import os
 import sys
 
@@ -17,9 +18,10 @@ from acronym_utils import process_batch
 from model_utils import tensor_to_np
 
 
-def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window, full_context,
+def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window, full_context, row_idx,
                     global_tokens=None, top_global_weights=None):
     str = 'SF={}.\nTarget LF={} ({}).\nPredicted LF={}.\n'.format(sf, target_lf, converted_target_lf, pred_lf)
+    str += 'Example ID={}\n'.format(row_idx)
     str += 'Context Window: {}\n'.format(context_window)
     str += 'Full Context: {}\n'.format(full_context)
     if top_global_weights is not None:
@@ -28,8 +30,8 @@ def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window,
     return str
 
 
-def _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, results_str, errors_str, sf_confusion,
-                   top_global_weights=None):
+def _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion,
+                   id_map, top_global_weights=None):
     for batch_idx, (row_idx, row) in enumerate(batch_data.iterrows()):
         row = row.to_dict()
         sf = row['sf']
@@ -40,21 +42,25 @@ def _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, results_str, errors
         pred_lf = lf_map[pred_lf_idx]
         global_weights = top_global_weights[batch_idx, :] if top_global_weights is not None else None
         example_str = _render_example(sf, target_lf, lf_map[target_lf_idx], pred_lf,
-                                      row['trimmed_tokens'], row['tokenized_context'],
+                                      row['trimmed_tokens'], row['tokenized_context'], row['row_idx'],
                                       global_tokens=row['tokenized_context_unique'],
                                       top_global_weights=global_weights)
-        results_str[sf] += example_str
-        if not target_lf_idx == pred_lf_idx:
+        if target_lf_idx == pred_lf_idx:
+            id_map['correct'].append(row['row_idx'])
+            correct_str[sf] += example_str
+        else:
+            id_map['error'].append(row['row_idx'])
             errors_str[sf] += example_str
         sf_confusion[sf][0].append(target_lf_idx)
         sf_confusion[sf][1].append(pred_lf_idx)
 
 
-def _analyze_stats(results_dir, used_sf_lf_map, results_str, errors_str, sf_confusion):
-    results_fp = os.path.join(results_dir, 'results.txt')
+def _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_confusion, id_map):
+    correct_fp = os.path.join(results_dir, 'correct.txt')
     reports_fp = os.path.join(results_dir, 'reports.txt')
     errors_fp = os.path.join(results_dir, 'errors.txt')
     summary_fp = os.path.join(results_dir, 'summary.csv')
+    id_fp = os.path.join(results_dir, 'error_tracker.json')
     df = defaultdict(list)
     cols = [
         'sf',
@@ -70,10 +76,12 @@ def _analyze_stats(results_dir, used_sf_lf_map, results_str, errors_str, sf_conf
         'weighted_recall',
         'weighted_f1',
     ]
+    with open(id_fp, 'w') as fd:
+        json.dump(id_map, fd)
     reports = []
-    with open(results_fp, 'w') as fd:
-        for k in sorted(results_str.keys()):
-            fd.write(results_str[k])
+    with open(correct_fp, 'w') as fd:
+        for k in sorted(correct_str.keys()):
+            fd.write(correct_str[k])
     with open(errors_fp, 'w') as fd:
         for k in sorted(errors_str.keys()):
             fd.write(errors_str[k])
@@ -163,17 +171,18 @@ def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_toke
     model.eval()
 
     sf_confusion = defaultdict(lambda: ([], []))
-    errors_str, results_str = defaultdict(str), defaultdict(str)
+    id_map = {'correct': [], 'error': []}
+    errors_str, correct_str = defaultdict(str), defaultdict(str)
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
             _, _, _, batch_scores, top_global_weights = process_batch(
                 args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
         batch_data = test_batcher.get_prev_batch()
         pred_lf_idxs = tensor_to_np(torch.argmax(batch_scores, 1))
-        _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, results_str, errors_str, sf_confusion,
+        _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map,
                        top_global_weights=top_global_weights)
 
-    _analyze_stats(results_dir, used_sf_lf_map, results_str, errors_str, sf_confusion)
+    _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
 
 
 def elmo_analyze(test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=None):
@@ -191,7 +200,8 @@ def elmo_analyze(test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map
     model.eval()
 
     sf_confusion = defaultdict(lambda: ([], []))
-    errors_str, results_str = defaultdict(str), defaultdict(str)
+    id_map = {'correct': [], 'error': []}
+    errors_str, correct_str = defaultdict(str), defaultdict(str)
 
     for _ in tqdm(range(test_batcher.num_batches())):
         batch_input, num_outputs = test_batcher.elmo_next(vocab, indexer, sf_tokenized_lf_map)
@@ -200,8 +210,8 @@ def elmo_analyze(test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map
             scores, target = model(*batch_input + [num_outputs])
         pred_lf_idxs = tensor_to_np(torch.argmax(scores, 1))
         batch_data = test_batcher.get_prev_batch()
-        _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, results_str, errors_str, sf_confusion)
-    _analyze_stats(results_dir, used_sf_lf_map, results_str, errors_str, sf_confusion)
+        _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map)
+    _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
 
 
 def render_test_statistics(df, sf_lf_map):
