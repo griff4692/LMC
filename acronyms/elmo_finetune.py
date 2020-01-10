@@ -46,6 +46,7 @@ def run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, los
     test_acc = test_correct / float(test_examples)
     print('Test Loss={}. Accuracy={}'.format(test_loss, test_acc))
     sleep(0.1)
+    return test_loss
 
 
 def elmo_finetune(args):
@@ -78,7 +79,10 @@ def elmo_finetune(args):
     optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
     loss_func = nn.CrossEntropyLoss()
 
-    run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, loss_func)
+    best_weights = None
+    best_epoch = 1
+    lowest_test_loss = run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, loss_func)
+    elmo_analyze(test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=results_dir)
 
     for epoch in range(1, args.epochs + 1):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
@@ -110,7 +114,14 @@ def elmo_finetune(args):
         print('Train Loss={}. Accuracy={}'.format(train_loss, train_acc))
         sleep(0.1)
 
-        run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, loss_func)
+        test_loss = run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, loss_func)
+        lowest_test_loss = min(lowest_test_loss, test_loss)
+        if lowest_test_loss == test_loss:
+            best_weights = model.state_dict()
+            best_epoch = epoch
+
+    print('Loading weights from {} epoch to perform error analysis'.format(best_epoch))
+    model.load_state_dict(best_weights)
     elmo_analyze(test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=results_dir)
 
 
