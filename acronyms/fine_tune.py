@@ -23,7 +23,7 @@ from eval_utils import lf_tokenizer, preprocess_minnesota_dataset
 from model_utils import get_git_revision_hash, render_args, restore_model, save_checkpoint
 
 
-def run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map):
+def run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map, used_sf_lf_map, results_dir=None):
     test_batcher.reset(shuffle=False)
     test_epoch_loss, test_examples, test_correct = 0.0, 0, 0
     model.eval()
@@ -41,6 +41,9 @@ def run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_
     test_acc = test_correct / float(test_examples)
     print('Test Loss={}. Accuracy={}'.format(test_loss, test_acc))
     sleep(0.1)
+
+    analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_tokenized_lf_map, results_dir=results_dir)
+
     return test_loss
 
 
@@ -157,7 +160,8 @@ def acronyms_finetune(args):
     loss_func = nn.CrossEntropyLoss()
     best_weights = None
     best_epoch = 1
-    lowest_test_loss = run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
+    lowest_test_loss = run_test_epoch(
+        args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map, used_sf_lf_map, results_dir=results_dir)
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
@@ -166,7 +170,8 @@ def acronyms_finetune(args):
         print('Starting Epoch={}'.format(epoch))
 
         train_loss = run_train_epoch(args, train_batcher, model, loss_func, optimizer, vocab, sf_tokenized_lf_map)
-        test_loss = run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
+        test_loss = run_test_epoch(
+            args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map, used_sf_lf_map, results_dir=results_dir)
 
         losses_dict = {
             'train': train_loss,

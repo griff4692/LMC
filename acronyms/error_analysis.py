@@ -147,12 +147,12 @@ def _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_conf
             avg_val = summary_df[key].mean()
             print('Global {} --> {}'.format(key, avg_val))
 
-    num_targets = summary_df['num_targets'].unique().tolist()
-    print('Num Targets, Macro F1, Weighted F1')
-    for t in sorted(num_targets):
-        avg_macro_f1 = summary_df[summary_df['num_targets'] == t]['macro_f1'].mean()
-        avg_weighted_f1 = summary_df[summary_df['num_targets'] == t]['weighted_f1'].mean()
-        print('{},{},{}'.format(t, avg_macro_f1, avg_weighted_f1))
+    # num_targets = summary_df['num_targets'].unique().tolist()
+    # print('Num Targets, Macro F1, Weighted F1')
+    # for t in sorted(num_targets):
+    #     avg_macro_f1 = summary_df[summary_df['num_targets'] == t]['macro_f1'].mean()
+    #     avg_weighted_f1 = summary_df[summary_df['num_targets'] == t]['weighted_f1'].mean()
+        # print('{},{},{}'.format(t, avg_macro_f1, avg_weighted_f1))
 
 
 def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_tokenized_lf_map, results_dir=None):
@@ -173,7 +173,7 @@ def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_toke
     sf_confusion = defaultdict(lambda: ([], []))
     id_map = {'correct': [], 'error': []}
     errors_str, correct_str = defaultdict(str), defaultdict(str)
-    for _ in tqdm(range(test_batcher.num_batches())):
+    for _ in range(test_batcher.num_batches()):
         with torch.no_grad():
             _, _, _, batch_scores, top_global_weights = process_batch(
                 args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
