@@ -182,8 +182,8 @@ def acronyms_finetune(args):
         save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
 
         lowest_test_loss = min(lowest_test_loss, test_loss)
-        best_weights = model.state_dict()
         if lowest_test_loss == test_loss:
+            best_weights = model.state_dict()
             best_epoch = epoch
 
         if args.debug:
