@@ -1,6 +1,9 @@
+import sys
+
 import torch
 import torch.nn as nn
 
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from lmc_encoder import LMCEncoder
 from compute_utils import compute_kl, mask_2D
 

@@ -1,11 +1,15 @@
 from collections import OrderedDict
 import os
-import subprocess
+import pickle
+import sys
 
 import argparse
 import torch
 
 from lmc_model import LMC
+
+
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 
 
 def restore_model(restore_name, weights_path='weights'):
@@ -41,7 +45,13 @@ def restore_model(restore_name, weights_path='weights'):
         new_state_dict[name] = v
     lmc_model.load_state_dict(new_state_dict)
     optimizer_state = checkpoint_state['optimizer_state_dict']
-    token_section_counts = checkpoint_state['token_section_counts']
+    # TODO backward compatibility - remove
+    if not 'token_section_counts' in checkpoint_state:
+        fn = os.path.expanduser('~/ClinicalBayesianSkipGram/lmc/weights/token_section_counts.pk')
+        with open(fn, 'rb') as fd:
+            token_section_counts = pickle.load(fd)
+    else:
+        token_section_counts = checkpoint_state['token_section_counts']
     return args, lmc_model, token_vocab, section_vocab, optimizer_state, token_section_counts
 
 

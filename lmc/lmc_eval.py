@@ -1,4 +1,5 @@
 import argparse
+import os
 import numpy as np
 import pandas as pd
 import torch
@@ -13,7 +14,7 @@ if __name__ == '__main__':
     parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
     args = parser.parse_args()
 
-    device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
+    device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     args.device = torch.device(device_str)
     print('Evaluating on {}...'.format(device_str))
 
@@ -55,7 +56,11 @@ if __name__ == '__main__':
         top_word_ids = sim.topk(10).indices.cpu().numpy()
         top_tokens = [token_vocab.get_token(id) for id in top_word_ids]
         str.append('Closest words {} --> {}'.format(center_word, ', '.join(top_tokens)))
-    fp = 'weights/{}/results/token_sim.txt'.format(args.experiment)
+
+    results_dir = 'weights/{}/results'.format(args.experiment)
+    if not os.path.exists(results_dir):
+        os.mkdir(results_dir)
+    fp = os.path.join(results_dir, 'token_sim.txt')
     print('Saving token results to {}'.format(fp))
     with open(fp, 'w') as fd:
         fd.write('\n'.join(str))
@@ -71,7 +76,7 @@ if __name__ == '__main__':
         top_sections = [section_vocab.get_token(id) for id in top_section_ids[1:]]
         str.append('Closest sections {} --> {}'.format(section, ', '.join(top_sections)))
 
-    fp = 'weights/{}/results/section_sim.txt'.format(args.experiment)
+    fp = os.path.join(results_dir, 'section_sim.txt')
     print('Saving section results to {}'.format(fp))
     with open(fp, 'w') as fd:
         fd.write('\n'.join(str))
