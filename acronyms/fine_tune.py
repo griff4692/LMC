@@ -14,13 +14,15 @@ sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from acronym_batcher import AcronymBatcherLoader
 from acronym_expander import AcronymExpander
 from acronym_expansion import parse_sense_df
 from acronym_utils import process_batch, target_lf_index
+from bsg_utils import restore_model, save_checkpoint
 from error_analysis import analyze, render_test_statistics
 from eval_utils import lf_tokenizer, preprocess_minnesota_dataset
-from model_utils import get_git_revision_hash, render_args, restore_model, save_checkpoint
+from model_utils import get_git_revision_hash, render_args
 
 
 def run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map, used_sf_lf_map, results_dir=None):

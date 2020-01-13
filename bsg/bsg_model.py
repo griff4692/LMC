@@ -1,16 +1,19 @@
+import sys
+
 import numpy as np
 import torch
 import torch.nn as nn
 
-from encoder import Encoder, EncoderLSTM
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+from bsg_encoder import BSGEncoder, BSGEncoderLSTM
 from compute_utils import compute_kl, mask_2D
 
 
-class VAE(nn.Module):
+class BSG(nn.Module):
     def __init__(self, args, vocab_size, pretrained_embeddings=None):
-        super(VAE, self).__init__()
+        super(BSG, self).__init__()
         self.device = args.device
-        self.encoder = EncoderLSTM(args, vocab_size) if args.encoder_lstm else Encoder(args, vocab_size)
+        self.encoder = BSGEncoderLSTM(args, vocab_size) if args.encoder_lstm else BSGEncoder(args, vocab_size)
         self.margin = args.hinge_loss_margin or 1.0
 
         # The output representations of words(used in KL regularization and max_margin).

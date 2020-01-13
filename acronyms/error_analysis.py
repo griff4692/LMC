@@ -12,8 +12,7 @@ import torch
 from tqdm import tqdm
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from acronym_utils import process_batch
 from model_utils import tensor_to_np
 

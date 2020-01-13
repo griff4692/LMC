@@ -7,7 +7,7 @@ sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from fine_tune import acronyms_finetune
-from model_utils import restore_model
+from bsg_utils import restore_model
 from word_similarity import evaluate_word_similarity
 
 

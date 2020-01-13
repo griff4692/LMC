@@ -17,12 +17,13 @@ os.environ['BIDIRECTIONAL_LM_TRAIN_PATH'] = '/home/ga2530/ClinicalBayesianSkipGr
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from acronym_utils import get_pretrained_elmo
 from elmo_acronym_expander import ELMoAcronymExpander
 from error_analysis import elmo_analyze
 from eval_utils import lf_tokenizer, preprocess_minnesota_dataset
 from fine_tune import load_data
-from model_utils import get_git_revision_hash, render_args, restore_model, save_checkpoint, tensor_to_np
+from model_utils import tensor_to_np
 
 
 def run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, loss_func):

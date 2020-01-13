@@ -1,6 +1,15 @@
 import torch
 from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.distributions.kl import kl_divergence
+import torch.nn as nn
+
+
+def compute_att(h, mask, att_linear):
+    att_scores = att_linear(h).squeeze(-1)
+    att_scores.masked_fill_(mask, -1e5)
+    att_weights = nn.Softmax(1)(att_scores)
+    h_sum = (att_weights.unsqueeze(-1) * h).sum(1)
+    return h_sum
 
 
 def compute_kl(mu_a, sigma_a, mu_b, sigma_b, device=None):

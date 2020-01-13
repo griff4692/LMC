@@ -1,24 +1,15 @@
 import os
-import subprocess
 
 import argparse
 import torch
 
-from vae import VAE
-
-
-def get_git_revision_hash():
-    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip().decode('utf-8')
-
-
-def render_args(args):
-    for arg in vars(args):
-        print('{}={}'.format(arg, getattr(args, arg)))
+from bsg_model import BSG
 
 
 def restore_model(restore_name):
     checkpoint_dir = os.path.join('../bsg/weights', restore_name)
     checkpoint_fns = os.listdir(checkpoint_dir)
+    checkpoint_fns = list(filter(lambda x: 'results' not in x, checkpoint_fns))
     max_checkpoint_epoch, latest_checkpoint_idx = -1, -1
     for cidx, checkpoint_fn in enumerate(checkpoint_fns):
         if 'best' in checkpoint_fn:
@@ -42,7 +33,7 @@ def restore_model(restore_name):
     for k, v in checkpoint_state['args'].items():
         print('{}={}'.format(k, v))
         setattr(args, k, v)
-    vae_model = VAE(args, vocab.size())
+    vae_model = BSG(args, vocab.size())
     vae_model.load_state_dict(checkpoint_state['model_state_dict'])
     optimizer_state = checkpoint_state['optimizer_state_dict']
     return args, vae_model, vocab, optimizer_state
@@ -59,11 +50,3 @@ def save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=No
     # Serialize model and statistics
     print('Saving model state to {}'.format(checkpoint_fp))
     torch.save(state_dict, checkpoint_fp)
-
-
-def tensor_to_np(tens):
-    tens = tens.detach()
-    try:
-        return tens.numpy()
-    except TypeError:
-        return tens.cpu().numpy()

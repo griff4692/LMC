@@ -46,6 +46,11 @@ class Vocab:
     def token_count(self, token):
         return self.id_count(self.get_id(token))
 
+    def truncate(self):
+        print('Removing section pseudo-tokens from vocabulary...')
+        self.support = self.support[:self.separator_start_vocab_id]
+        self.i2w = self.i2w[:self.separator_start_vocab_id]
+
     def get_ids(self, tokens):
         return list(map(self.get_id, tokens))
 

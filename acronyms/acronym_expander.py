@@ -1,9 +1,13 @@
+import sys
+
 import numpy as np
 import torch
 import torch.nn as nn
 
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from compute_utils import compute_kl, mask_2D
-from encoder import Encoder, EncoderLSTM
+from bsg_encoder import BSGEncoder, BSGEncoderLSTM
 
 
 class AcronymExpander(nn.Module):
@@ -30,10 +34,10 @@ class AcronymExpander(nn.Module):
         if args.random_encoder:
             args.latent_dim, args.encoder_hidden_dim = bsg_model.encoder.u.weight.size()
             args.encoder_input_dim = args.encoder_hidden_dim
-            if type(bsg_model.encoder) == EncoderLSTM:
-                self.encoder = EncoderLSTM(args, vocab_size)
+            if type(bsg_model.encoder) == BSGEncoderLSTM:
+                self.encoder = BSGEncoderLSTM(args, vocab_size)
             else:
-                self.encoder = Encoder(args, vocab_size)
+                self.encoder = BSGEncoder(args, vocab_size)
         else:
             self.encoder = bsg_model.encoder
             encoder_embed_dim = self.encoder.embeddings.weight.size()[-1]
@@ -51,7 +55,7 @@ class AcronymExpander(nn.Module):
         # First thing is to pass the SF with the context to the encoder
         mask = torch.BoolTensor(torch.Size([batch_size, num_context_ids]))
         mask.fill_(0)
-        sf_mu, sf_sigma = self.encoder(sf_ids, context_ids, mask, add_pos=False)
+        sf_mu, sf_sigma = self.encoder(sf_ids, context_ids, mask)
         top_global_weights = None
         if use_att:
             global_mu, global_sigma = self._compute_priors(global_ids)
@@ -88,7 +92,7 @@ class AcronymExpander(nn.Module):
                 addl_mask = torch.BoolTensor(torch.Size([batch_size, k]))
                 addl_mask.fill_(0)
                 full_mask = torch.cat([addl_mask, mask], axis=1)
-                sf_mu, sf_sigma = self.encoder(sf_ids, addl_context_ids, full_mask, add_pos=False)
+                sf_mu, sf_sigma = self.encoder(sf_ids, addl_context_ids, full_mask)
         return sf_mu, sf_sigma, top_global_weights
 
     def forward(self, sf_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids, global_token_ct,
