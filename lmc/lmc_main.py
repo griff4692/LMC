@@ -44,6 +44,8 @@ if __name__ == '__main__':
     parser.add_argument('--encoder_input_dim', default=100, type=int, help='embedding dimemsions for encoder')
     parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
     parser.add_argument('--latent_dim', default=100, type=int, help='z dimension')
+    parser.add_argument('-sample_sections', action='store_true', default=False,
+                        help='Sample 1 section rather than compute full marginal across all sections.')
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()
@@ -115,6 +117,9 @@ if __name__ == '__main__':
         rmtree(weights_dir)
     os.mkdir(weights_dir)
 
+    batch_incr = batcher.sample_next if args.sample_sections else batcher.marginal_next
+    token_section_data = token_section_samples if args.sample_sections else token_section_counts
+
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
     for epoch in range(1, args.epochs + 1):
@@ -127,10 +132,15 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            batch_ids = batcher.next(ids, full_section_ids, token_section_samples, token_vocab, args.window)
+            batch_ids, batch_p = batch_incr(
+                ids, full_section_ids, token_section_data, token_vocab, args.window,
+                max_num_sections=section_vocab.size()
+            )
             batch_ids = list(map(lambda x: torch.LongTensor(x).to(args.device), batch_ids))
+            batch_p = (list(map(lambda x: torch.FloatTensor(x).to(args.device), batch_p)) if batch_p[0] is not None else
+                       list(batch_p))
 
-            loss = model(*batch_ids)
+            loss = model(*(batch_ids + batch_p))
             if len(loss.size()) > 0:
                 loss = loss.mean(0)
             loss.backward()  # backpropagate loss

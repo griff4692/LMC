@@ -21,15 +21,17 @@ class LMC(nn.Module):
         return mu, sigma + 1e-3
 
     def forward(self, center_ids, center_section_ids, context_ids, context_section_ids, neg_ids, neg_section_ids,
-                num_contexts):
+                num_contexts, context_section_p=None, neg_section_p=None):
         """
         :param center_ids: batch_size
         :param center_section_ids: batch_size
         :param context_ids: batch_size, 2 * context_window
-        :param context_section_ids: batch_size, 2 * context_window
+        :param context_section_ids: batch_size, 2 * context_window, max_num_sections
         :param neg_ids: batch_size, 2 * context_window
-        :param neg_section_ids: batch_size, 2 * context_window
+        :param neg_section_ids: batch_size, 2 * context_window, max_num_sections
         :param num_contexts: batch_size (how many context words for each center id - necessary for masking padding)
+        :param context_section_p: batch_size, 2 * context_window, max_num_sections
+        :param neg_section_p: batch_size, 2 * context_window, max_num_sections
         :return: cost components: KL-Divergence (q(z|w,c) || p(z|w)) and max margin (reconstruction error)
         """
         # Mask padded context ids
@@ -45,8 +47,14 @@ class LMC(nn.Module):
         sigma_center_flat = sigma_center_tiled.view(batch_size * num_context_ids, -1)
 
         # Compute positive and negative encoded samples
-        mu_pos_context, sigma_pos_context = self.encoder(context_ids, context_section_ids)
-        mu_neg_context, sigma_neg_context = self.encoder(neg_ids, neg_section_ids)
+        if context_section_p is None and neg_section_p is None:
+            mu_pos_context, sigma_pos_context = self.encoder(context_ids, context_section_ids)
+            mu_neg_context, sigma_neg_context = self.encoder(neg_ids, neg_section_ids)
+        else:
+            mu_pos_context, sigma_pos_context = self._compute_marginal(
+                context_ids, context_section_ids, context_section_p)
+            mu_neg_context, sigma_neg_context = self._compute_marginal(
+                neg_ids, neg_section_ids, neg_section_p)
 
         # Flatten positive context
         mu_pos_context_flat = mu_pos_context.view(batch_size * num_context_ids, -1)

@@ -42,7 +42,49 @@ class SkipGramBatchLoader:
             token_section_samples[token_id] = [0, sids]
         return sid
 
-    def next(self, ids, full_section_ids, token_section_samples, token_vocab, window_size):
+    def marginal_next(self, ids, full_section_ids, token_section_data, token_vocab, window_size, max_num_sections=100):
+        batch_idxs = self.batches[self.batch_ct]
+        center_ids = ids[batch_idxs]
+        context_ids = np.zeros([self.batch_size, (window_size * 2)], dtype=int)
+        neg_ids = token_vocab.neg_sample(size=(self.batch_size, (window_size * 2)))
+
+        center_section_ids = np.zeros([self.batch_size, ], dtype=int)
+        context_section_ids = np.zeros([self.batch_size, (window_size * 2), max_num_sections], dtype=int)
+        context_section_p = np.zeros([self.batch_size, (window_size * 2), max_num_sections])
+        neg_section_ids = np.zeros([self.batch_size, (window_size * 2), max_num_sections], dtype=int)
+        neg_section_p = np.zeros([self.batch_size, (window_size * 2), max_num_sections])
+
+        window_sizes = []
+        max_pos_sections, max_neg_sections = 0, 0
+        for batch_idx, center_idx in enumerate(batch_idxs):
+            example_context_ids = self.extract_context_ids(ids, center_idx, window_size)
+            center_section_ids[batch_idx] = full_section_ids[center_idx]
+            context_ids[batch_idx, :len(example_context_ids)] = example_context_ids
+            window_sizes.append(len(example_context_ids))
+
+            for idx, context_id in enumerate(example_context_ids):
+                cs_ids, cs_p = token_section_data[context_id]
+                nps = len(cs_ids)
+                context_section_ids[batch_idx, idx, :nps] = cs_ids
+                context_section_p[batch_idx, idx, :nps] = cs_p
+                max_pos_sections = max(nps, max_pos_sections)
+
+                neg_id = neg_ids[batch_idx, idx]
+                neg_s, neg_p = token_section_data[neg_id]
+                nns = len(neg_s)
+                neg_section_ids[batch_idx, idx, :nns] = neg_s
+                neg_section_p[batch_idx, idx, :nns] = neg_p
+                max_neg_sections = max(nns, max_neg_sections)
+
+        self.batch_ct += 1
+        context_section_ids = context_section_ids[:, :, :max_pos_sections]
+        context_section_p = context_section_p[:, :, :max_pos_sections]
+        neg_section_ids = neg_section_ids[:, :, :max_neg_sections]
+        neg_section_p = neg_section_p[:, :, :max_neg_sections]
+        return (center_ids, center_section_ids, context_ids, context_section_ids, neg_ids, neg_section_ids,
+                window_sizes), (context_section_p, neg_section_p)
+
+    def sample_next(self, ids, full_section_ids, token_section_data, token_vocab, window_size, max_num_sections=None):
         batch_idxs = self.batches[self.batch_ct]
         center_ids = ids[batch_idxs]
         context_ids = np.zeros([self.batch_size, (window_size * 2)], dtype=int)
@@ -60,14 +102,15 @@ class SkipGramBatchLoader:
             window_sizes.append(len(example_context_ids))
             for idx, context_id in enumerate(example_context_ids):
                 n_id = neg_ids[batch_idx, idx]
-                c_sid = self._get_section_id_sample(token_section_samples, context_id)
-                n_sid = self._get_section_id_sample(token_section_samples, n_id)
+                c_sid = self._get_section_id_sample(token_section_data, context_id)
+                n_sid = self._get_section_id_sample(token_section_data, n_id)
                 context_section_ids[batch_idx, idx] = c_sid
                 neg_section_ids[batch_idx, idx] = n_sid
 
         self.batch_ct += 1
+        context_section_p, neg_section_p = None, None
         return (center_ids, center_section_ids, context_ids, context_section_ids, neg_ids, neg_section_ids,
-                window_sizes)
+                window_sizes), (context_section_p, neg_section_p )
 
     def reset(self):
         batch_idxs = np.array(list(set(np.arange(self.N)) - set(self.section_idxs)))
