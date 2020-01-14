@@ -32,7 +32,7 @@ if __name__ == '__main__':
         else:
             checkpoint_state = torch.load(checkpoint_fp)
         vocab = checkpoint_state['vocab']
-        offset = vocab.separator_start_vocab_id
+        offset = vocab.section_start_vocab_id
         embeddings = tensor_to_np(checkpoint_state['model_state_dict']['encoder.embeddings.weight'])[offset:, :]
         sections = vocab.i2w[offset:]
     tsne = TSNE(n_components=2, verbose=1, perplexity=50)

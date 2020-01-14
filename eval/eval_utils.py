@@ -9,7 +9,8 @@ from scipy.spatial.distance import cosine
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
-from mimic_tokenize import clean_text, STOPWORDS, tokenize_str
+from clean_mimic import clean_text
+from mimic_tokenize import STOPWORDS, tokenize_str
 from model_utils import tensor_to_np
 
 

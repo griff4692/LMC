@@ -12,12 +12,13 @@ from nltk.corpus import stopwords
 import pandas as pd
 import spacy
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from model_utils import render_args
 
-section_df = pd.read_csv('../preprocess/data/mimic/sections.csv').dropna()
+section_df = pd.read_csv('../preprocess/data/mimic/section.csv').dropna()
 SECTION_NAMES = list(sorted(section_df.nlargest(100, columns=['count'])['section'].tolist()))
-SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES))
+SECTION_NAMES_LOWER = list(set(list(map(lambda x: x.lower(), SECTION_NAMES))))
+SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES_LOWER))
 
 nlp = spacy.load('en_core_sci_sm')
 
@@ -30,29 +31,14 @@ with open('../preprocess/data/prepositions.txt', 'r') as fd:
 STOPWORDS = swords - prepositions
 
 
-def pattern_repl(matchobj):
-    """
-    Return a replacement string to be used for match object
-    """
-    return ' '.rjust(len(matchobj.group(0)))
-
-
 def create_section_token(section):
     section = re.sub('[:\s]+', '', section).upper()
     return 'header={}'.format(section)
 
 
-def clean_text(text):
-    """
-    Clean text
-    """
-    # Replace [**Patterns**] with spaces.
-    text = re.sub(r'\[\*\*.*?\*\*\]', pattern_repl, text)
-    # Replace `_` with spaces.
-    text = re.sub(r'[_*?/()]+', ' ', text)
-    text = re.sub(r'\b(-)?[\d.]+(-)?\b', ' DIGITPARSED ', text)
-    text = re.sub(r'\s+', ' ', text)
-    return text
+def create_document_token(category):
+    category = re.sub('[:\s]+', '', category).upper()
+    return 'document={}'.format(category)
 
 
 def chunk(tokens, chunker=None):
@@ -75,7 +61,7 @@ def tokenize_str(token_str, combine_phrases=None, chunker=None):
     return list(filter(lambda x: len(x) > 0 and not x == ' ' and x not in STOPWORDS, tokens))
 
 
-def preprocess_mimic(text):
+def preprocess_mimic(input):
     """
     Preprocess reports in MIMIC-III.
     1. remove [**Patterns**] and signature
@@ -83,14 +69,14 @@ def preprocess_mimic(text):
     3. tokenize words
     4. lowercase
     """
-    cleaned_text = clean_text(text)
+    category, text = input
     tokenized_text = []
-    sectioned_text = list(filter(lambda x: len(x) > 0 and not x == ' ', re.split(SECTION_REGEX, cleaned_text)))
+    sectioned_text = list(filter(lambda x: len(x) > 0 and not x == ' ', re.split(SECTION_REGEX, text)))
     for tok_idx, toks in enumerate(sectioned_text):
         if len(toks) == 0:
             continue
-        elif toks in SECTION_NAMES:
-            if tok_idx + 1 == len(sectioned_text) or not sectioned_text[tok_idx + 1] in SECTION_NAMES:
+        elif toks in SECTION_NAMES_LOWER:
+            if tok_idx + 1 == len(sectioned_text) or not sectioned_text[tok_idx + 1] in SECTION_NAMES_LOWER:
                 tokenized_text += [create_section_token(toks)]
         else:
             if args.split_sentences:
@@ -100,7 +86,7 @@ def preprocess_mimic(text):
                         tokenized_text += [create_section_token('SENTENCE')] + tokens
             else:
                 tokenized_text += tokenize_str(toks)
-    doc_boundary = [create_section_token('DOCUMENT')]
+    doc_boundary = [create_document_token(category)]
     return ' '.join(doc_boundary + tokenized_text)
 
 
@@ -123,13 +109,14 @@ if __name__ == '__main__':
     debug_str = '_mini' if args.debug else ''
     phrase_str = '_phrase' if args.combine_phrases else ''
     sentence_str = '_sentence' if args.split_sentences else ''
-    df = pd.read_csv('{}{}.csv'.format(args.mimic_fp, debug_str))
+    df = pd.read_csv('{}{}{}.csv'.format(args.mimic_fp, '_clean', debug_str))
 
     print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
     categories = df['CATEGORY'].tolist()
+    text = df['TEXT'].tolist()
     start_time = time()
     p = Pool()
-    parsed_docs = p.map(preprocess_mimic, df['TEXT'].tolist())
+    parsed_docs = p.map(preprocess_mimic, zip(categories, text))
     p.close()
     end_time = time()
     print('Took {} seconds'.format(end_time - start_time))
@@ -141,6 +128,6 @@ if __name__ == '__main__':
             token_cts['__ALL__'] += 1
     debug_str = '_mini' if args.debug else ''
     with open(args.mimic_fp + '_tokenized{}{}{}.json'.format(debug_str, phrase_str, sentence_str), 'w') as fd:
-        json.dump(list(zip(categories, parsed_docs)), fd)
+        json.dump(parsed_docs, fd)
     with open(args.mimic_fp + '_token_counts{}{}{}.json'.format(debug_str, phrase_str, sentence_str), 'w') as fd:
         json.dump(token_cts, fd)

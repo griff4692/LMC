@@ -10,7 +10,7 @@ from compute_utils import compute_kl, mask_2D
 
 
 class BSG(nn.Module):
-    def __init__(self, args, vocab_size, pretrained_embeddings=None):
+    def __init__(self, args, vocab_size):
         super(BSG, self).__init__()
         self.device = args.device
         self.encoder = BSGEncoderLSTM(args, vocab_size) if args.encoder_lstm else BSGEncoder(args, vocab_size)
@@ -18,9 +18,6 @@ class BSG(nn.Module):
 
         # The output representations of words(used in KL regularization and max_margin).
         self.embeddings_mu = nn.Embedding(vocab_size, args.latent_dim, padding_idx=0)
-        if pretrained_embeddings is not None:
-            print('Loading pretrained embeddings...')
-            self.embeddings_mu.load_state_dict({'weight': torch.from_numpy(pretrained_embeddings)})
 
         self.embeddings_log_sigma = nn.Embedding(vocab_size, 1, padding_idx=0)
         log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))

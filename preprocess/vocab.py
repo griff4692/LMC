@@ -10,7 +10,8 @@ class Vocab:
         self.support = []
         self.add_token(Vocab.PAD_TOKEN)
         self.cached_neg_sample_prob = None
-        self.separator_start_vocab_id = None
+        self.section_start_vocab_id = None
+        self.category_start_vocab_id = None
 
     def pad_id(self):
         return self.get_id(Vocab.PAD_TOKEN)
@@ -20,7 +21,7 @@ class Vocab:
             self.add_token(token, token_support=token_support)
 
     def add_token(self, token, token_support=1):
-        if token not in self.w2i:
+        if token not in self.w2i or self.w2i[token] >= self.size():
             self.w2i[token] = len(self.i2w)
             self.i2w.append(token)
             self.support.append(0)
@@ -46,10 +47,11 @@ class Vocab:
     def token_count(self, token):
         return self.id_count(self.get_id(token))
 
-    def truncate(self):
+    def truncate(self, end_idx):
+        assert end_idx in (self.category_start_vocab_id, self.section_start_vocab_id)
         print('Removing section pseudo-tokens from vocabulary...')
-        self.support = self.support[:self.separator_start_vocab_id]
-        self.i2w = self.i2w[:self.separator_start_vocab_id]
+        self.support = self.support[:end_idx]
+        self.i2w = self.i2w[:end_idx]
 
     def get_ids(self, tokens):
         return list(map(self.get_id, tokens))

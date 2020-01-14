@@ -221,7 +221,7 @@ def render_test_statistics(df, sf_lf_map):
     dominant_counts = 0
     expected_random_accuracy = 0.0
     for sf in sfs:
-        dominant_counts += df[df['sf'] == sf]['target_lf_idx'].value_counts().max()
+        dominant_counts += df[df['sf'] == sf]['used_target_lf_idx'].value_counts().max()
         expected_random_accuracy += sf_counts[sf] / float(len(sf_lf_map[sf]))
 
     print('Accuracy from choosing dominant class={}'.format(dominant_counts / float(N)))

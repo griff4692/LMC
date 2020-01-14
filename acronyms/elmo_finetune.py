@@ -22,7 +22,7 @@ from acronym_utils import get_pretrained_elmo
 from elmo_acronym_expander import ELMoAcronymExpander
 from error_analysis import elmo_analyze
 from eval_utils import lf_tokenizer, preprocess_minnesota_dataset
-from fine_tune import load_data
+from fine_tune import load_casi, load_mimic
 from model_utils import tensor_to_np
 
 
@@ -50,8 +50,8 @@ def run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, los
     return test_loss
 
 
-def elmo_finetune(args):
-    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs = load_data(args)
+def elmo_finetune(args, loader):
+    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs = loader(args)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join('../acronyms', 'weights', args.experiment)
@@ -132,6 +132,7 @@ if __name__ == '__main__':
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
     parser.add_argument('--experiment', default='elmo', help='Save path in weights/ for experiment.')
+    parser.add_argument('--dataset', default='casi', help='casi or mimic')
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=32, type=int)
@@ -148,4 +149,6 @@ if __name__ == '__main__':
         preprocess_minnesota_dataset(window=10, combine_phrases=False)
         print('Saving dataset to {}'.format(data_fp))
 
-    elmo_finetune(args)
+    args.experiment += '_{}'.format(args.dataset)
+    loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
+    elmo_finetune(args, loader)

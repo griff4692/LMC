@@ -6,7 +6,7 @@ import torch
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-from fine_tune import acronyms_finetune
+from fine_tune import acronyms_finetune, load_casi, load_mimic
 from bsg_utils import restore_model
 from word_similarity import evaluate_word_similarity
 
@@ -34,7 +34,10 @@ def evaluate(args):
     args.random_encoder = False
     args.use_att = False
     args.att_style = None
-    acronyms_finetune(args)
+    print('Fine Tuning on CASI')
+    acronyms_finetune(args, load_casi)
+    print('Fine Tuning on MIMIC Reverse Substitution')
+    acronyms_finetune(args, load_mimic)
 
 
 if __name__ == '__main__':

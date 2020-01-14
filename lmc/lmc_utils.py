@@ -28,7 +28,7 @@ def restore_model(restore_name, weights_path='weights'):
         checkpoint_state = torch.load(latest_checkpoint_fn, map_location=lambda storage, loc: storage)
     else:
         checkpoint_state = torch.load(latest_checkpoint_fn)
-    token_vocab, section_vocab = checkpoint_state['token_vocab'], checkpoint_state['section_vocab']
+    token_vocab, metadata_vocab = checkpoint_state['token_vocab'], checkpoint_state['metadata_vocab']
     print('Previous checkpoint at epoch={}...'.format(max_checkpoint_epoch))
     for k, v in checkpoint_state['losses'].items():
         print('{}={}'.format(k, v))
@@ -36,7 +36,7 @@ def restore_model(restore_name, weights_path='weights'):
     for k, v in checkpoint_state['args'].items():
         print('{}={}'.format(k, v))
         setattr(args, k, v)
-    lmc_model = LMC(args, token_vocab.size(), section_vocab.size())
+    lmc_model = LMC(args, token_vocab.size(), metadata_vocab.size())
     new_state_dict = OrderedDict()
     for k, v in checkpoint_state['model_state_dict'].items():
         name = k
@@ -45,26 +45,20 @@ def restore_model(restore_name, weights_path='weights'):
         new_state_dict[name] = v
     lmc_model.load_state_dict(new_state_dict)
     optimizer_state = checkpoint_state['optimizer_state_dict']
-    # TODO backward compatibility - remove
-    if not 'token_section_counts' in checkpoint_state:
-        fn = os.path.expanduser('~/ClinicalBayesianSkipGram/lmc/weights/token_section_counts.pk')
-        with open(fn, 'rb') as fd:
-            token_section_counts = pickle.load(fd)
-    else:
-        token_section_counts = checkpoint_state['token_section_counts']
-    return args, lmc_model, token_vocab, section_vocab, optimizer_state, token_section_counts
+    token_metadata_counts = checkpoint_state['token_metadata_counts']
+    return args, lmc_model, token_vocab, metadata_vocab, optimizer_state, token_metadata_counts
 
 
-def save_checkpoint(args, model, optimizer, token_vocab, section_vocab, losses_dict, token_section_counts,
+def save_checkpoint(args, model, optimizer, token_vocab, metadata_vocab, losses_dict, token_metadata_counts,
                     checkpoint_fp=None):
     # Serializing everything from model weights and optimizer state, to to loss function and arguments
-    state_dict = {'model_state_dict': model.state_dict(), 'token_section_counts': token_section_counts}
+    state_dict = {'model_state_dict': model.state_dict(), 'token_metadata_counts': token_metadata_counts}
     state_dict.update(losses_dict)
     state_dict.update({'optimizer_state_dict': optimizer.state_dict()})
     args_dict = {'args': {arg: getattr(args, arg) for arg in vars(args)}}
     state_dict.update(args_dict)
     state_dict.update({'token_vocab': token_vocab})
-    state_dict.update({'section_vocab': section_vocab})
+    state_dict.update({'metadata_vocab': metadata_vocab})
     # Serialize model and statistics
     print('Saving model state to {}'.format(checkpoint_fp))
     torch.save(state_dict, checkpoint_fp)

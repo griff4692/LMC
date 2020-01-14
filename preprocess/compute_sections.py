@@ -8,6 +8,9 @@ import pandas as pd
 from tqdm import tqdm
 
 
+"""
+Deprecated for now - TODO remove
+"""
 def enumerate_section_ids(ids, section_pos_idxs):
     """
     :param ids: List of token ids where negative numbers are section ids and 0 are document boundaries.
@@ -15,40 +18,40 @@ def enumerate_section_ids(ids, section_pos_idxs):
     :param section_pos_idxs: Positional indices where ids <= 0 indicating either section or document boundaries
     :return: List of len(ids) representing the section each token in ids lies within (for efficient access by batcher)
     """
-    section_ids = []
-    for section_num, section_pos_idx in enumerate(section_pos_idxs):
-        section_id = -ids[section_pos_idx]
-        assert section_id >= 0
-        if section_num + 1 == len(section_pos_idxs):
-            section_len = len(ids) - section_pos_idx
-        else:
-            section_len = section_pos_idxs[section_num + 1] - section_pos_idx
-        section_ids += [section_id] * section_len
-    return section_ids
+    raise Exception('Not supported!')
+    # section_ids = []
+    # for section_num, section_pos_idx in enumerate(section_pos_idxs):
+    #     section_id = ids[section_pos_idx]
+    #     assert section_id >= 0
+    #     if section_num + 1 == len(section_pos_idxs):
+    #         section_len = len(ids) - section_pos_idx
+    #     else:
+    #         section_len = section_pos_idxs[section_num + 1] - section_pos_idx
+    #     section_ids += [section_id] * section_len
+    # return section_ids
 
 
-def enumerate_section_ids_lmc(ids, section_pos_idxs, token_vocab, section_vocab):
+def enumerate_metadata_ids_lmc(ids, metadata_pos_idxs, token_vocab, metadata_vocab):
     """
-    :param ids: List of token ids where negative numbers are section ids and 0 are document boundaries.
-    Regular tokens are represented by positive ids
-    :param section_pos_idxs: Positional indices where ids <= 0 indicating either section or document boundaries
-    :return: List of len(ids) representing the section each token in ids lies within (for efficient access by batcher)
+    :param ids: List of token ids.
+    :param metadata_pos_idxs: Positional indices where ids are metadata
+    :return: List of len(ids) representing the metadata each token in ids lies within (for efficient access by batcher)
     """
-    section_ids = []
-    token_section_counts = defaultdict(list)
-    for section_num, section_pos_idx in enumerate(section_pos_idxs):
-        token_section_id = -ids[section_pos_idx]
-        # Make an adjustment to find the appropriate id in the new section vocabulary
-        section_id = section_vocab.get_id(token_vocab.get_token(token_section_id))
-        assert section_id >= 0
-        if section_num + 1 == len(section_pos_idxs):
-            section_len = len(ids) - section_pos_idx
+    metadata_ids = [-1] * metadata_pos_idxs[0]
+    token_metadata_counts = defaultdict(list)
+    for metadata_num, metadata_pos_idx in enumerate(metadata_pos_idxs):
+        token_metadata_id = ids[metadata_pos_idx]
+        # Make an adjustment to find the appropriate id in the new metadata vocabulary
+        metadata_id = metadata_vocab.get_id(token_vocab.get_token(token_metadata_id))
+        assert metadata_id >= 0
+        if metadata_num + 1 == len(metadata_pos_idxs):
+            metadata_len = len(ids) - metadata_pos_idx
         else:
-            section_len = section_pos_idxs[section_num + 1] - section_pos_idx
-        section_ids += [section_id] * section_len
-        for id in list(ids[section_pos_idx + 1:section_pos_idx + section_len]):
-            token_section_counts[id] += [section_id]
-    for k, v in token_section_counts.items():
+            metadata_len = metadata_pos_idxs[metadata_num + 1] - metadata_pos_idx
+        metadata_ids += [metadata_id] * metadata_len
+        for id in list(ids[metadata_pos_idx + 1:metadata_pos_idx + metadata_len]):
+            token_metadata_counts[id] += [metadata_id]
+    for k, v in token_metadata_counts.items():
         tf = Counter(v)
         keys = list(tf.keys())
         freqs = []
@@ -56,8 +59,8 @@ def enumerate_section_ids_lmc(ids, section_pos_idxs, token_vocab, section_vocab)
             freqs.append(tf[key])
         freqs = np.array(freqs, dtype=float)
         freqs /= freqs.sum()
-        token_section_counts[k] = (keys, freqs)
-    return section_ids, token_section_counts
+        token_metadata_counts[k] = (keys, freqs)
+    return metadata_ids, token_metadata_counts
 
 
 if __name__ == '__main__':

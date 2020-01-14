@@ -47,17 +47,22 @@ if __name__ == '__main__':
     vocab = Vocab()
     num_docs = len(tokenized_data)
     sections = set()
+    categories = set()
     for doc_idx in tqdm(range(num_docs)):
-        category, tokenized_doc_str = tokenized_data[doc_idx]
+        tokenized_doc_str = tokenized_data[doc_idx]
         subsampled_doc = []
         for token in tokenized_doc_str.split():
             wc = token_counts[token]
             is_section_header = re.match(r'header=[A-Z]+', token)
+            is_doc_header = re.match(r'document=[A-Z]+', token)
 
             is_phrase = '_' in token
             if is_section_header:
                 subsampled_doc.append(token)
                 sections.add(token)
+            elif is_doc_header:
+                subsampled_doc.append(token)
+                categories.add(token)
             else:
                 threshold = args.min_phrase_count if is_phrase else args.min_token_count
                 if wc < threshold:
@@ -68,12 +73,15 @@ if __name__ == '__main__':
                 if should_keep:
                     subsampled_doc.append(token)
                     vocab.add_token(token, token_support=1)
-        tokenized_subsampled_data.append((category, ' '.join(subsampled_doc)))
+        tokenized_subsampled_data.append(' '.join(subsampled_doc))
 
     print('Reduced tokens from {} to {}'.format(int(N), sum(vocab.support)))
-    separator_start_vocab_id = vocab.size()
-    vocab.separator_start_vocab_id = separator_start_vocab_id
+    vocab.section_start_vocab_id = vocab.size()
+    print('Adding {} section headers'.format(len(sections)))
     vocab.add_tokens(sections, token_support=0)
+    vocab.category_start_vocab_id = vocab.size()
+    print('Adding {} document categories'.format(len(categories)))
+    vocab.add_tokens(categories)
 
     subsampled_out_fn = '{}_subsampled{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str, sentence_str)
     print('Saving subsampled tokens to {}'.format(subsampled_out_fn))

@@ -74,7 +74,7 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, vocab, sf_
     return train_loss
 
 
-def load_data(prev_args):
+def load_casi(prev_args):
     # Load Data
     data_dir = '../eval/eval_data/minnesota/'
     sense_fp = os.path.join(data_dir, 'sense_inventory_ii')
@@ -91,6 +91,11 @@ def load_data(prev_args):
     print('Removed {} examples for which the target LF is not exactly in the sense inventory ii'.format(
         prev_N - df.shape[0]))
     df['tokenized_context_unique'] = df['tokenized_context'].apply(lambda x: list(set(x.split())))
+
+    prev_N = df.shape[0]
+    df.drop_duplicates(subset=['target_lf', 'tokenized_context'], inplace=True)
+    N = df.shape[0]
+    print('Removed {} examples with duplicate context-target LF pairs'.format(prev_N - N))
 
     sfs = df['sf'].unique().tolist()
     used_sf_lf_map = defaultdict(list)
@@ -120,12 +125,31 @@ def load_data(prev_args):
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs
 
 
-def acronyms_finetune(args):
+def load_mimic(prev_args):
+    with open('../context_extraction/data/sf_lf_map.json', 'r') as fd:
+        sf_lf_map = json.load(fd)
+    used_sf_lf_map = {}
+    df = pd.read_csv('../context_extraction/data/mimic_rs_dataset_preprocessed_window_{}.csv'.format(prev_args.window))
+    df['tokenized_context_unique'] = df['tokenized_context'].apply(lambda x: list(set(x.split())))
+    sfs = df['sf'].unique().tolist()
+    for sf in sfs:
+        used_sf_lf_map[sf] = sf_lf_map[sf]
+    train_df = df[df['is_train']]
+    test_df = df[~df['is_train']]
+    train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
+    test_batcher = AcronymBatcherLoader(test_df, batch_size=32)
+    assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
+    assert len(set(train_df['tokenized_context'].tolist()).intersection(
+        set(test_df['tokenized_context'].tolist()))) == 0
+    return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs
+
+
+def acronyms_finetune(args, loader):
     args.git_hash = get_git_revision_hash()
     render_args(args)
 
     prev_args, bsg_model, vocab, _ = restore_model(args.bsg_experiment)
-    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs = load_data(prev_args)
+    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs = loader(prev_args)
 
     sf_tokenized_lf_map = defaultdict(list)
     prev_vocab_size = vocab.size()
@@ -160,7 +184,7 @@ def acronyms_finetune(args):
     optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
 
     loss_func = nn.CrossEntropyLoss()
-    best_weights = None
+    best_weights = model.state_dict()
     best_epoch = 1
     lowest_test_loss = run_test_epoch(
         args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map, used_sf_lf_map, results_dir=results_dir)
@@ -204,7 +228,8 @@ if __name__ == '__main__':
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
     parser.add_argument('--experiment', default='submission-baseline', help='Save path in weights/ for experiment.')
-    parser.add_argument('--bsg_experiment', default='baseline-12-16')
+    parser.add_argument('--bsg_experiment', default='baseline-1-13')
+    parser.add_argument('--dataset', default='casi', help='casi or mimic')
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=32, type=int)
@@ -216,4 +241,6 @@ if __name__ == '__main__':
     parser.add_argument('--att_style', default='weighted', help='weighted or two_step')
 
     args = parser.parse_args()
-    acronyms_finetune(args)
+    args.experiment += '_{}'.format(args.dataset)
+    loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
+    acronyms_finetune(args, loader)

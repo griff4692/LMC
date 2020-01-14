@@ -15,7 +15,6 @@ sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from bsg_batcher import SkipGramBatchLoader
 from bsg_model import BSG
 from bsg_utils import restore_model, save_checkpoint
-from compute_sections import enumerate_section_ids
 from model_utils import get_git_revision_hash, render_args
 from evaluate import evaluate
 
@@ -33,11 +32,10 @@ if __name__ == '__main__':
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=1024, type=int)
     parser.add_argument('-combine_phrases', default=False, action='store_true')
-    parser.add_argument('-section2vec', default=False, action='store_true')
     parser.add_argument('--epochs', default=4, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=10, type=int)
-    parser.add_argument('-use_pretrained', default=False, action='store_true')
+    parser.add_argument('-cache_windows', default=False, action='store_true')
 
     # Model Hyperparameters
     parser.add_argument('--encoder_hidden_dim', default=64, type=int, help='hidden dimension for encoder')
@@ -65,28 +63,21 @@ if __name__ == '__main__':
     print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
-    print('Loaded vocabulary of size={}...'.format(vocab.separator_start_vocab_id))
+    print('Loaded vocabulary of size={}...'.format(vocab.section_start_vocab_id))
 
-    print('Collecting document information...')
-    section_pos_idxs = np.where(ids <= 0)[0]
-    section_id_range = np.arange(vocab.separator_start_vocab_id, vocab.size())
-    section_ids = enumerate_section_ids(ids, section_pos_idxs)
+    print('Collecting document/section information...')
+    metadata_start_id = min(vocab.section_start_vocab_id, vocab.category_start_vocab_id)
+    metadata_pos_idxs = np.where(ids >= metadata_start_id)[0]
+    # Demarcates boundary tokens
+    ids[metadata_pos_idxs] = -1
 
     device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     args.device = torch.device(device_str)
     print('Training on {}...'.format(device_str))
 
-    batcher = SkipGramBatchLoader(len(ids), section_pos_idxs, batch_size=args.batch_size)
+    batcher = SkipGramBatchLoader(len(ids), metadata_pos_idxs, batch_size=args.batch_size)
 
-    # # Load pretrained word embeddings if requested
-    pretrained_in_fn = '../preprocess/data/embeddings{}.npy'.format(debug_str)
-    pretrained_embeddings = None
-    if args.use_pretrained:
-        with open(pretrained_in_fn, 'rb') as fd:
-            pretrained_embeddings = np.load(fd)
-            assert vocab.size() == pretrained_embeddings.shape[0]
-
-    model = BSG(args, vocab.size(), pretrained_embeddings=pretrained_embeddings).to(args.device)
+    model = BSG(args, vocab.size()).to(args.device)
     if args.restore_experiment is not None:
         prev_args, model, vocab, optimizer_state = restore_model(args.restore_experiment)
 
@@ -115,14 +106,11 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            center_ids, context_ids, num_contexts = batcher.next(ids, section_ids, args.window,
-                                                                 add_section_as_context=args.section2vec)
+            center_ids, context_ids, num_contexts = batcher.next(ids, args.window, use_cache=args.cache_windows)
             center_ids_tens = torch.LongTensor(center_ids).to(args.device)
             context_ids_tens = torch.LongTensor(context_ids).to(args.device)
 
             neg_ids = vocab.neg_sample(size=context_ids.shape)
-            if args.section2vec:
-                neg_ids[:, 0] = np.random.choice(section_id_range, size=[args.batch_size])
             neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
 
             kl_loss, recon_loss = model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts)
