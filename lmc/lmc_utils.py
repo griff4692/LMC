@@ -1,15 +1,14 @@
 from collections import OrderedDict
 import os
-import pickle
 import sys
 
 import argparse
 import torch
 
-from lmc_model import LMC
-
-
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
+from lmc_model import LMC
+from lmc_context_model import LMCC
 
 
 def restore_model(restore_name, weights_path='weights'):
@@ -36,7 +35,8 @@ def restore_model(restore_name, weights_path='weights'):
     for k, v in checkpoint_state['args'].items():
         print('{}={}'.format(k, v))
         setattr(args, k, v)
-    lmc_model = LMC(args, token_vocab.size(), metadata_vocab.size())
+    archetype = LMCC if 'lmc_context' in os.getcwd() else LMC
+    lmc_model = archetype(args, token_vocab.size(), metadata_vocab.size())
     new_state_dict = OrderedDict()
     for k, v in checkpoint_state['model_state_dict'].items():
         name = k

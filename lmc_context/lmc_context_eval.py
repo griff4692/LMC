@@ -1,9 +1,11 @@
+import sys
+
 import argparse
 import os
 import numpy as np
-import pandas as pd
 import torch
 
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc/')
 from lmc_utils import restore_model
 
 
@@ -18,17 +20,14 @@ if __name__ == '__main__':
     args.device = torch.device(device_str)
     print('Evaluating on {}...'.format(device_str))
 
-    sfs = pd.read_csv('../eval/eval_data/minnesota/preprocessed_dataset_window_10.csv')['sf'].unique().tolist()
-    sfs = list(map(lambda x: x.lower(), sfs))
-
-    prev_args, model, token_vocab, section_vocab, optimizer_state, token_section_counts = restore_model(args.experiment)
+    prev_args, model, token_vocab, metadata_vocab, optimizer_state, token_section_counts = restore_model(args.experiment)
     model.eval()
     model.to(args.device)
 
-    top_n = 10000
+    top_n = min(10000, token_vocab.size())
     top_word_ids = list(range(top_n))
-    section_ids = np.zeros([top_n,  section_vocab.size()])
-    section_p = np.zeros([top_n, section_vocab.size()])
+    section_ids = np.zeros([top_n,  metadata_vocab.size()])
+    section_p = np.zeros([top_n, metadata_vocab.size()])
     for i in top_word_ids:
         if i > 0:
             sids, sp = token_section_counts[i]
@@ -38,6 +37,7 @@ if __name__ == '__main__':
     center_ids_tens = torch.LongTensor(top_word_ids).unsqueeze(-1).to(args.device)
     section_ids_tens = torch.LongTensor(section_ids).to(args.device)
     section_p_tens = torch.FloatTensor(section_p).to(args.device)
+    print('Computing marginals...')
     with torch.no_grad():
         token_embeddings, _ = model._compute_marginal(
             center_ids_tens, section_ids_tens.unsqueeze(1), section_p_tens.unsqueeze(1))
@@ -49,6 +49,7 @@ if __name__ == '__main__':
     ]
 
     str = []
+    print('Computing similarity with respect to {}'.format(','.join(center_words)))
     for center_word in center_words:
         center_id = token_vocab.get_id(center_word)
         mu = token_embeddings[center_id, :]
@@ -65,15 +66,15 @@ if __name__ == '__main__':
     with open(fp, 'w') as fd:
         fd.write('\n'.join(str))
 
-    section_embeddings = model.encoder.section_embeddings.weight
-    sections = section_vocab.i2w[1:]
+    metadata_embeddings = model.decoder.metadata_embeddings.weight
+    metadata = metadata_vocab.i2w[1:]
     str = []
-    for section in sections:
-        sid = section_vocab.get_id(section)
-        mu = section_embeddings[sid, :]
-        sim = torch.nn.CosineSimilarity()(section_embeddings, mu.unsqueeze(0))
+    for section in metadata:
+        sid = metadata_vocab.get_id(section)
+        mu = metadata_embeddings[sid, :]
+        sim = torch.nn.CosineSimilarity()(metadata_embeddings, mu.unsqueeze(0))
         top_section_ids = sim.topk(5).indices.cpu().numpy()
-        top_sections = [section_vocab.get_token(id) for id in top_section_ids[1:]]
+        top_sections = [metadata_vocab.get_token(id) for id in top_section_ids[1:]]
         str.append('Closest sections {} --> {}'.format(section, ', '.join(top_sections)))
 
     fp = os.path.join(results_dir, 'section_sim.txt')

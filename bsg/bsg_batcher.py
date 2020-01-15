@@ -63,8 +63,6 @@ class SkipGramBatchLoader:
         left_context = ids[left_idx:center_idx]
         right_context = ids[center_idx + 1: right_idx]
         full_context = np.concatenate([left_context, right_context])
-        # TODO remove once it passes
-        assert len(full_context) >= 0 and len(full_context) <= target_window * 2
         return full_context
 
     def next(self, ids, window_size, use_cache=False):
