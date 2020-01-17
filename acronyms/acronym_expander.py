@@ -45,7 +45,6 @@ class AcronymExpander(nn.Module):
             encoder_embed_init[:prev_vocab_size, :] = self.encoder.embeddings.weight.detach().numpy()
             self.encoder.embeddings = nn.Embedding(vocab_size, embedding_dim=encoder_embed_dim, padding_idx=0)
             self.encoder.embeddings.load_state_dict({'weight': torch.from_numpy(encoder_embed_init)})
-        self.softmax = nn.Softmax(dim=-1)
 
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
@@ -95,8 +94,8 @@ class AcronymExpander(nn.Module):
                 sf_mu, sf_sigma = self.encoder(sf_ids, addl_context_ids, full_mask)
         return sf_mu, sf_sigma, top_global_weights
 
-    def forward(self, sf_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids, global_token_ct,
-                num_outputs, use_att=False, att_style='weighted'):
+    def forward(self, sf_ids, metadata_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
+                global_token_ct, num_outputs, use_att=False, att_style='weighted'):
         """
         :param sf_ids: batch_size
         :param context_ids: batch_size, num_context_ids

@@ -5,13 +5,12 @@ import sys
 import argparse
 import torch
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-from lmc_model import LMC
+from lmc_context_model import LMCC
 
 
 def restore_model(restore_name, weights_path='weights'):
-    checkpoint_dir = os.path.join('../lmc', weights_path, restore_name)
+    checkpoint_dir = os.path.join('../lmc_context', weights_path, restore_name)
     checkpoint_fns = os.listdir(checkpoint_dir)
     checkpoint_fns = list(filter(lambda x: 'results' not in x, checkpoint_fns))
     max_checkpoint_epoch, latest_checkpoint_idx = -1, -1
@@ -34,7 +33,7 @@ def restore_model(restore_name, weights_path='weights'):
     for k, v in checkpoint_state['args'].items():
         print('{}={}'.format(k, v))
         setattr(args, k, v)
-    lmc_model = LMC(args, token_vocab.size(), metadata_vocab.size())
+    lmc_model = LMCC(args, token_vocab.size(), metadata_vocab.size())
     new_state_dict = OrderedDict()
     for k, v in checkpoint_state['model_state_dict'].items():
         name = k

@@ -154,7 +154,8 @@ def _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_conf
         # print('{},{},{}'.format(t, avg_macro_f1, avg_weighted_f1))
 
 
-def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_tokenized_lf_map, results_dir=None):
+def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+            token_metadata_counts, results_dir=None):
     """
     :param args: ArgParse instance
     :param test_batcher: AcronymBatcherLoader instance
@@ -175,7 +176,8 @@ def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_toke
     for _ in range(test_batcher.num_batches()):
         with torch.no_grad():
             _, _, _, batch_scores, top_global_weights = process_batch(
-                args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
+                args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+                token_metadata_counts)
         batch_data = test_batcher.get_prev_batch()
         pred_lf_idxs = tensor_to_np(torch.argmax(batch_scores, 1))
         _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map,

@@ -13,26 +13,32 @@ from tqdm import tqdm
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from acronym_batcher import AcronymBatcherLoader
 from acronym_expander import AcronymExpander
+from acronym_expander_lmc import AcronymExpanderLMC
 from acronym_expansion import parse_sense_df
 from acronym_utils import process_batch, target_lf_index
-from bsg_utils import restore_model, save_checkpoint
+from bsg_utils import restore_model as restore_bsg, save_checkpoint as save_bsg
 from error_analysis import analyze, render_test_statistics
 from eval_utils import lf_tokenizer, preprocess_minnesota_dataset
+from lmc_context_utils import save_checkpoint as lmc_context_save, restore_model as lmc_context_restore
+from mimic_tokenize import create_document_token
 from model_utils import get_git_revision_hash, render_args
 
 
-def run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map, used_sf_lf_map, results_dir=None):
+def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+                   used_sf_lf_map, token_metadata_counts, results_dir=None):
     test_batcher.reset(shuffle=False)
     test_epoch_loss, test_examples, test_correct = 0.0, 0, 0
     model.eval()
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
             batch_loss, num_examples, num_correct, _, top_global_weights = process_batch(
-                args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
+                args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+                token_metadata_counts)
         test_correct += num_correct
         test_examples += num_examples
         test_epoch_loss += batch_loss.item()
@@ -44,18 +50,21 @@ def run_test_epoch(args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_
     print('Test Loss={}. Accuracy={}'.format(test_loss, test_acc))
     sleep(0.1)
 
-    analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_tokenized_lf_map, results_dir=results_dir)
+    analyze(args, test_batcher, model, used_sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+            token_metadata_counts, results_dir=results_dir)
 
     return test_loss
 
 
-def run_train_epoch(args, train_batcher, model, loss_func, optimizer, vocab, sf_tokenized_lf_map):
+def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+                    token_metadata_counts):
     train_batcher.reset(shuffle=True)
     train_epoch_loss, train_examples, train_correct = 0.0, 0, 0
     for _ in tqdm(range(train_batcher.num_batches())):
         optimizer.zero_grad()
         batch_loss, num_examples, num_correct, _, _ = process_batch(
-            args, train_batcher, model, loss_func, vocab, sf_tokenized_lf_map)
+            args, train_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+            token_metadata_counts)
         batch_loss.backward()
         optimizer.step()
 
@@ -129,8 +138,11 @@ def load_mimic(prev_args):
     with open('../context_extraction/data/sf_lf_map.json', 'r') as fd:
         sf_lf_map = json.load(fd)
     used_sf_lf_map = {}
-    df = pd.read_csv('../context_extraction/data/mimic_rs_dataset_preprocessed_window_{}.csv'.format(prev_args.window))
+    # TODO fixing window at 10 for now
+    window = 10
+    df = pd.read_csv('../context_extraction/data/mimic_rs_dataset_preprocessed_window_{}.csv'.format(window))
     df['tokenized_context_unique'] = df['tokenized_context'].apply(lambda x: list(set(x.split())))
+    df['metadata'] = df['category'].apply(create_document_token)
     sfs = df['sf'].unique().tolist()
     for sf in sfs:
         used_sf_lf_map[sf] = sf_lf_map[sf]
@@ -144,25 +156,30 @@ def load_mimic(prev_args):
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs
 
 
-def acronyms_finetune(args, loader):
+def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
     args.git_hash = get_git_revision_hash()
     render_args(args)
 
-    prev_args, bsg_model, vocab, _ = restore_model(args.bsg_experiment)
+    if args.lm_type == 'bsg':
+        prev_args, lm, token_vocab, _ = restore_func(args.lm_experiment)
+        metadata_vocab = None
+        token_metadata_counts = None
+    else:
+        prev_args, lm, token_vocab, metadata_vocab, _, token_metadata_counts = restore_func(args.lm_experiment)
     train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs = loader(prev_args)
 
     sf_tokenized_lf_map = defaultdict(list)
-    prev_vocab_size = vocab.size()
+    prev_vocab_size = token_vocab.size()
     for sf, lf_list in used_sf_lf_map.items():
         for lf in lf_list:
-            tokens = lf_tokenizer(lf, vocab)
+            tokens = lf_tokenizer(lf, token_vocab)
             sf_tokenized_lf_map[sf].append(tokens)
             for t in tokens:
-                vocab.add_token(t)
+                token_vocab.add_token(t)
 
     for t in sfs:
-        vocab.add_token(t.lower())
-    new_vocab_size = vocab.size()
+        token_vocab.add_token(t.lower())
+    new_vocab_size = token_vocab.size()
     print('Added {} tokens to vocabulary from LF targets and SFs.'.format(new_vocab_size - prev_vocab_size))
 
     render_test_statistics(test_df, used_sf_lf_map)
@@ -177,7 +194,7 @@ def acronyms_finetune(args, loader):
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
-    model = AcronymExpander(args, bsg_model, vocab)
+    model = acronym_model(args, lm, token_vocab)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
@@ -186,8 +203,9 @@ def acronyms_finetune(args, loader):
     loss_func = nn.CrossEntropyLoss()
     best_weights = model.state_dict()
     best_epoch = 1
-    lowest_test_loss = run_test_epoch(
-        args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map, used_sf_lf_map, results_dir=results_dir)
+    lowest_test_loss = run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab,
+                                      sf_tokenized_lf_map, used_sf_lf_map, token_metadata_counts,
+                                      results_dir=results_dir)
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
@@ -195,9 +213,11 @@ def acronyms_finetune(args, loader):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
         print('Starting Epoch={}'.format(epoch))
 
-        train_loss = run_train_epoch(args, train_batcher, model, loss_func, optimizer, vocab, sf_tokenized_lf_map)
+        train_loss = run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_vocab, metadata_vocab,
+                                     sf_tokenized_lf_map, token_metadata_counts)
         test_loss = run_test_epoch(
-            args, test_batcher, model, loss_func, vocab, sf_tokenized_lf_map, used_sf_lf_map, results_dir=results_dir)
+            args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map, used_sf_lf_map,
+            token_metadata_counts, results_dir=results_dir)
 
         losses_dict = {
             'train': train_loss,
@@ -205,7 +225,8 @@ def acronyms_finetune(args, loader):
         }
 
         checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
-        save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
+        save_func(args, model, optimizer, token_vocab, losses_dict,
+                  checkpoint_fp=checkpoint_fp, metadata_vocab=metadata_vocab)
 
         lowest_test_loss = min(lowest_test_loss, test_loss)
         if lowest_test_loss == test_loss:
@@ -218,8 +239,10 @@ def acronyms_finetune(args, loader):
     model.load_state_dict(best_weights)
     losses_dict['test_loss'] = lowest_test_loss
     checkpoint_fp = os.path.join(weights_dir, 'checkpoint_best.pth')
-    save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
-    analyze(args, test_batcher, model, used_sf_lf_map, loss_func, vocab, sf_tokenized_lf_map, results_dir=results_dir)
+    save_func(args, model, optimizer, token_vocab, losses_dict,
+              checkpoint_fp=checkpoint_fp, metadata_vocab=metadata_vocab)
+    analyze(args, test_batcher, model, used_sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+            token_metadata_counts, results_dir=results_dir)
 
 
 if __name__ == '__main__':
@@ -228,12 +251,13 @@ if __name__ == '__main__':
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
     parser.add_argument('--experiment', default='submission-baseline', help='Save path in weights/ for experiment.')
-    parser.add_argument('--bsg_experiment', default='baseline-1-13')
+    parser.add_argument('--lm_experiment', default='baseline-1-13')
+    parser.add_argument('--lm_type', default='bsg')
     parser.add_argument('--dataset', default='casi', help='casi or mimic')
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--epochs', default=5, type=int)
+    parser.add_argument('--epochs', default=3, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('-random_encoder', default=False, action='store_true', help='Don\'t use pretrained encoder')
     parser.add_argument('-random_priors', default=False, action='store_true', help='Don\'t use pretrained priors')
@@ -243,4 +267,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.experiment += '_{}'.format(args.dataset)
     loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
-    acronyms_finetune(args, loader)
+    restore_func = restore_bsg if args.lm_type == 'bsg' else lmc_context_restore
+    save_func = save_bsg if args.lm_type == 'bsg' else lmc_context_save
+    acronym_model = AcronymExpander if args.lm_type == 'bsg' else AcronymExpanderLMC
+    acronyms_finetune(args, acronym_model, loader, restore_func, save_func)

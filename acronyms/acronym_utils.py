@@ -28,11 +28,14 @@ def target_lf_index(target_lf, lfs):
     return -1
 
 
-def process_batch(args, batcher, model, loss_func, vocab, sf_tokenized_lf_map):
-    batch_input, num_outputs = batcher.next(vocab, sf_tokenized_lf_map)
+def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+                  token_metadata_counts):
+    batch_input, batch_p, num_outputs = batcher.next(
+        token_vocab, sf_tokenized_lf_map, token_metadata_counts, metadata_vocab=metadata_vocab)
     batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0), batch_input))
-    scores, target, top_global_weights = model(*(batch_input + [num_outputs]),
-                                               use_att=args.use_att, att_style=args.att_style)
+    batch_p = list(map(lambda x: torch.FloatTensor(x), batch_p))
+    full_input = batch_input + [num_outputs] if args.lm_type == 'bsg' else batch_input + batch_p + [num_outputs]
+    scores, target, top_global_weights = model(*full_input, use_att=args.use_att, att_style=args.att_style)
     num_correct = len(np.where(tensor_to_np(torch.argmax(scores, 1)) == tensor_to_np(target))[0])
     num_examples = len(num_outputs)
     batch_loss = loss_func.forward(scores, target)

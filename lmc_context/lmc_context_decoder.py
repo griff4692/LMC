@@ -15,7 +15,7 @@ class LMCDecoder(nn.Module):
         self.token_embeddings = nn.Embedding(token_vocab_size, args.input_dim, padding_idx=0)
         self.metadata_embeddings = nn.Embedding(section_vocab_size, args.input_dim, padding_idx=0)
 
-    def forward(self, center_ids, metadata_ids):
+    def forward(self, center_ids, metadata_ids, normalizer=None):
         """
         :param center_ids: LongTensor of batch_size
         :param metadata_ids: LongTensor of batch_size
@@ -23,6 +23,9 @@ class LMCDecoder(nn.Module):
         :return: mu (batch_size, latent_dim), var (batch_size, 1)
         """
         center_embedding = self.token_embeddings(center_ids)
+        if len(center_embedding.size()) == 3:
+            center_embedding = center_embedding.sum(1) / normalizer
+
         metadata_embedding = self.metadata_embeddings(metadata_ids)
 
         merged_embeds = self.dropout(torch.cat([center_embedding, metadata_embedding], dim=-1))

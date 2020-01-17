@@ -12,13 +12,12 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from compute_sections import enumerate_metadata_ids_lmc
-from lmc_utils import save_checkpoint
 from lmc_context_batcher import LMCContextSkipGramBatchLoader
 from lmc_context_model import LMCC
+from lmc_context_utils import save_checkpoint
 from model_utils import get_git_revision_hash, render_args
 from vocab import Vocab
 
@@ -170,5 +169,5 @@ if __name__ == '__main__':
         # Serializing everything from model weights and optimizer state, to to loss function and arguments
         losses_dict = {'losses': {'joint': epoch_joint_loss, 'kl': epoch_kl_loss, 'recon': epoch_recon_loss}}
         checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
-        save_checkpoint(args, model, optimizer, token_vocab, metadata_vocab, losses_dict, token_metadata_counts,
-                        checkpoint_fp=checkpoint_fp)
+        save_checkpoint(args, model, optimizer, token_vocab, losses_dict, token_metadata_counts,
+                        checkpoint_fp=checkpoint_fp, metadata_vocab=metadata_vocab)

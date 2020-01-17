@@ -39,14 +39,14 @@ def restore_model(restore_name):
     return args, vae_model, vocab, optimizer_state
 
 
-def save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=None):
+def save_checkpoint(args, model, optimizer, token_vocab, losses_dict, checkpoint_fp=None, metadata_vocab=None):
     # Serializing everything from model weights and optimizer state, to to loss function and arguments
     state_dict = {'model_state_dict': model.state_dict()}
     state_dict.update(losses_dict)
     state_dict.update({'optimizer_state_dict': optimizer.state_dict()})
     args_dict = {'args': {arg: getattr(args, arg) for arg in vars(args)}}
     state_dict.update(args_dict)
-    state_dict.update({'vocab': vocab})
+    state_dict.update({'vocab': token_vocab})
     # Serialize model and statistics
     print('Saving model state to {}'.format(checkpoint_fp))
     torch.save(state_dict, checkpoint_fp)

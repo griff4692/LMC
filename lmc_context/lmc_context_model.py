@@ -40,7 +40,6 @@ class LMCC(nn.Module):
         :return: cost components: KL-Divergence (q(z|w,c) || p(z|w)) and max margin (reconstruction error)
         """
         # Mask padded context ids
-        # Mask padded context ids
         batch_size, num_context_ids = context_ids.size()
         mask_size = torch.Size([batch_size, num_context_ids])
         mask = mask_2D(mask_size, num_contexts).to(self.device)

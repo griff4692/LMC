@@ -161,8 +161,8 @@ if __name__ == '__main__':
         print('Epoch={}. Loss={}.'.format(epoch, epoch_loss))
         assert not batcher.has_next()
 
-        # Serializing everything from model weights and optimizer state, to to loss function and arguments
+        # Serializing everythingc from model weights and optimizer state, to to loss function and arguments
         losses_dict = {'losses': {'kl_loss': epoch_loss}}
         checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
-        save_checkpoint(args, model, optimizer, token_vocab, metadata_vocab, losses_dict, token_metadata_counts,
-                        checkpoint_fp=checkpoint_fp)
+        save_checkpoint(args, model, optimizer, token_vocab, losses_dict, token_metadata_counts,
+                        checkpoint_fp=checkpoint_fp, metadata_vocab=metadata_vocab)
