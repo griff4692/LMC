@@ -110,7 +110,7 @@ class SkipGramBatchLoader:
         self.batch_ct += 1
         context_metadata_p, neg_metadata_p = None, None
         return (center_ids, center_metadata_ids, context_ids, context_metadata_ids, neg_ids, neg_metadata_ids,
-                window_sizes), (context_metadata_p, neg_metadata_p )
+                window_sizes), (context_metadata_p, neg_metadata_p)
 
     def reset(self):
         batch_idxs = np.array(list(set(np.arange(self.N)) - set(self.all_metadata_idxs)))

@@ -42,7 +42,7 @@ class LMCContextSkipGramBatchLoader:
             token_metadata_samples[token_id] = [0, sids]
         return sid
 
-    def next_same(self, ids, full_metadata_ids, token_vocab, window_size):
+    def next_same(self, ids, full_metadata_ids, token_metadata, token_vocab, window_size, max_num_metadata=None):
         batch_idxs = self.batches[self.batch_ct]
         center_ids = ids[batch_idxs]
         context_ids = np.zeros([self.batch_size, (window_size * 2)], dtype=int)
@@ -57,7 +57,9 @@ class LMCContextSkipGramBatchLoader:
             window_sizes.append(len(example_context_ids))
 
         self.batch_ct += 1
-        return center_ids, metadata_ids, context_ids, neg_ids, window_sizes
+        context_metadata_p, neg_metadata_p = None, None
+        return (center_ids, metadata_ids, context_ids, metadata_ids, neg_ids, metadata_ids,
+                window_sizes), (context_metadata_p, neg_metadata_p)
 
     def marginal_next(self, ids, full_metadata_ids, token_metadata, token_vocab, window_size, max_num_metadata=100):
         batch_idxs = self.batches[self.batch_ct]
@@ -98,6 +100,43 @@ class LMCContextSkipGramBatchLoader:
         context_metadata_p = context_metadata_p[:, :, :max_pos_metadata]
         neg_metadata_ids = neg_metadata_ids[:, :, :max_neg_metadata]
         neg_metadata_p = neg_metadata_p[:, :, :max_neg_metadata]
+        return (center_ids, center_metadata_ids, context_ids, context_metadata_ids, neg_ids, neg_metadata_ids,
+                window_sizes), (context_metadata_p, neg_metadata_p)
+
+    def _get_metadata_id_sample(self, token_metadata_samples, token_id):
+        counter, sids = token_metadata_samples[token_id]
+        sid = sids[counter]
+        token_metadata_samples[token_id][0] += 1
+        if token_metadata_samples[token_id][0] >= len(sids):
+            np.random.shuffle(sids)
+            token_metadata_samples[token_id] = [0, sids]
+        return sid
+
+    def sample_next(self, ids, full_metadata_ids, token_metadata_data, token_vocab, window_size, max_num_metadata=None):
+        batch_idxs = self.batches[self.batch_ct]
+        center_ids = ids[batch_idxs]
+        context_ids = np.zeros([self.batch_size, (window_size * 2)], dtype=int)
+        neg_ids = token_vocab.neg_sample(size=(self.batch_size, (window_size * 2)))
+
+        center_metadata_ids = np.zeros([self.batch_size, ], dtype=int)
+        context_metadata_ids = np.zeros([self.batch_size, (window_size * 2)], dtype=int)
+        neg_metadata_ids = np.zeros([self.batch_size, (window_size * 2)], dtype=int)
+
+        window_sizes = []
+        for batch_idx, center_idx in enumerate(batch_idxs):
+            example_context_ids = self.extract_context_ids(ids, center_idx, window_size)
+            center_metadata_ids[batch_idx] = full_metadata_ids[center_idx]
+            context_ids[batch_idx, :len(example_context_ids)] = example_context_ids
+            window_sizes.append(len(example_context_ids))
+            for idx, context_id in enumerate(example_context_ids):
+                n_id = neg_ids[batch_idx, idx]
+                c_sid = self._get_metadata_id_sample(token_metadata_data, context_id)
+                n_sid = self._get_metadata_id_sample(token_metadata_data, n_id)
+                context_metadata_ids[batch_idx, idx] = c_sid
+                neg_metadata_ids[batch_idx, idx] = n_sid
+
+        self.batch_ct += 1
+        context_metadata_p, neg_metadata_p = None, None
         return (center_ids, center_metadata_ids, context_ids, context_metadata_ids, neg_ids, neg_metadata_ids,
                 window_sizes), (context_metadata_p, neg_metadata_p)
 

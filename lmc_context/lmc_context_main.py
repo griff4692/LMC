@@ -47,6 +47,9 @@ if __name__ == '__main__':
     parser.add_argument('--latent_dim', default=100, type=int, help='z dimension')
     parser.add_argument('--metadata', default='section',
                         help='sections or category. What to define latent variable over.')
+    parser.add_argument('-same_metadata', default=False, action='store_true')
+    parser.add_argument('-sample_metadata', action='store_true', default=False,
+                        help='Sample 1 metadata rather than compute full marginal across all metadata.')
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()
@@ -88,6 +91,13 @@ if __name__ == '__main__':
     full_metadata_ids, token_metadata_counts = enumerate_metadata_ids_lmc(
         ids, metadata_pos_idxs, token_vocab, metadata_vocab)
 
+    token_metadata_samples = {}
+    for k, (sids, sp) in token_metadata_counts.items():
+        size = min(len(sp) * 10, 250)
+        rand_sids = np.random.choice(sids, size=size, replace=True, p=sp)
+        start_idx = 0
+        token_metadata_samples[k] = [start_idx, rand_sids]
+
     token_vocab.truncate(token_vocab.section_start_vocab_id)
     ids[all_metadata_pos_idxs] = -1
 
@@ -113,6 +123,10 @@ if __name__ == '__main__':
         rmtree(weights_dir)
     os.mkdir(weights_dir)
 
+    batch_incr = batcher.next_same if args.same_metadata else (
+        batcher.sample_next if args.sample_metadata else batcher.marginal_next)
+    token_metadata = token_metadata_samples if args.sample_metadata else token_metadata_counts
+
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
     for epoch in range(1, args.epochs + 1):
@@ -125,8 +139,8 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            batch_ids, batch_p = batcher.marginal_next(
-                ids, full_metadata_ids, token_metadata_counts, token_vocab, args.window,
+            batch_ids, batch_p = batch_incr(
+                ids, full_metadata_ids, token_metadata, token_vocab, args.window,
                 max_num_metadata=metadata_vocab.size()
             )
             batch_ids = list(map(lambda x: torch.LongTensor(x).to(args.device), batch_ids))

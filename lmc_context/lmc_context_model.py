@@ -54,10 +54,18 @@ class LMCC(nn.Module):
 
         # Compute decoded representations of (w, d), E(c), E(n)
         mu_center, sigma_center = self.decoder(center_ids, center_metadata_ids)
-        mu_pos_context, sigma_pos_context = self._compute_marginal(
-            context_ids, context_metadata_ids, context_metadata_p)
-        mu_neg_context, sigma_neg_context = self._compute_marginal(
-            neg_ids, neg_metadata_ids, neg_metadata_p)
+        if context_metadata_p is None:
+            assert neg_metadata_p is None
+            if len(context_metadata_ids.size()) == 1:
+                context_metadata_ids = context_metadata_ids.unsqueeze(-1).repeat(1, num_context_ids)
+                neg_metadata_ids = context_metadata_ids
+            mu_pos_context, sigma_pos_context = self.decoder(context_ids, context_metadata_ids)
+            mu_neg_context, sigma_neg_context = self.decoder(neg_ids, neg_metadata_ids)
+        else:
+            mu_pos_context, sigma_pos_context = self._compute_marginal(
+                context_ids, context_metadata_ids, context_metadata_p)
+            mu_neg_context, sigma_neg_context = self._compute_marginal(
+                neg_ids, neg_metadata_ids, neg_metadata_p)
 
         # Flatten positive context
         mu_pos_context_flat = mu_pos_context.view(batch_size * num_context_ids, -1)
