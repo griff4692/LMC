@@ -51,10 +51,10 @@ def render_stats():
     print('SFs with at least 2 contexts for every LF={}'.format(viable_sfs))
 
 
-def get_lf_contexts(row, window=10):
+def get_lf_contexts(row, window=20):
     doc_id, doc_category, doc_string = row['ROW_ID'], row['CATEGORY'], row['TEXT']
     contexts, doc_ids, forms = [], [], []
-    config = {'type': ContextType.WORD, 'size': window}
+    config = {'type': ContextType.WORD, 'size': 20}
     for lf in LFS:
         c = CONTEXT_EXTRACTOR.get_contexts_for_long_form(
             lf, doc_string, config, allow_inflections=False, ignore_case=True)
@@ -72,7 +72,9 @@ def extract_mimic_contexts(chunk, chunksize, debug):
         os.mkdir(tmp_batch_dir)
 
     debug_str = '_mini' if debug else ''
-    mimic_df = pd.read_csv('../preprocess/data/mimic/NOTEEVENTS_clean{}.csv'.format(debug_str))
+    in_fp = '../preprocess/data/mimic/NOTEEVENTS{}.csv'.format(debug_str)
+    print('Loading MIMIC from {}'.format(in_fp))
+    mimic_df = pd.read_csv(in_fp)
 
     target_size = int(mimic_df.shape[0] / float(chunksize))
     mimic_df = split(mimic_df, target_size)[chunk]

@@ -5,8 +5,8 @@ import os
 import numpy as np
 import torch
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc/')
-from lmc_utils import restore_model
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
+from lmc_context_utils import restore_model
 
 
 if __name__ == '__main__':
