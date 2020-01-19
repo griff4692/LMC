@@ -49,7 +49,8 @@ class AcronymExpander(nn.Module):
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
-    def encode_context(self, sf_ids, context_ids, global_ids, global_token_ct, use_att=False, att_style=None):
+    def encode_context(self, sf_ids, context_ids, global_ids, global_token_ct, use_att=False, att_style=None,
+                       compute_marginal=False):
         batch_size, num_context_ids = context_ids.size()
         # First thing is to pass the SF with the context to the encoder
         mask = torch.BoolTensor(torch.Size([batch_size, num_context_ids]))
@@ -95,7 +96,7 @@ class AcronymExpander(nn.Module):
         return sf_mu, sf_sigma, top_global_weights
 
     def forward(self, sf_ids, metadata_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
-                global_token_ct, num_outputs, use_att=False, att_style='weighted'):
+                global_token_ct, num_outputs, use_att=False, att_style='weighted', compute_marginal=None):
         """
         :param sf_ids: batch_size
         :param context_ids: batch_size, num_context_ids

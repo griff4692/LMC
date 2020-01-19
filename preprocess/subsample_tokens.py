@@ -1,7 +1,6 @@
 import json
 import os
 import pickle
-import re
 
 import argparse
 import numpy as np
@@ -19,11 +18,14 @@ if __name__ == '__main__':
     arguments.add_argument('-combine_phrases', default=False, action='store_true')
     arguments.add_argument('-debug', default=False, action='store_true')
     arguments.add_argument('--min_token_count', default=10, type=int)
-    arguments.add_argument('--min_phrase_count', default=5, type=int)
     arguments.add_argument('--subsample_param', default=0.001, type=float)
     arguments.add_argument('-split_sentences', default=False, action='store_true')
 
     args = arguments.parse_args()
+
+    np.random.seed(1992)
+    rand_arr = np.random.rand(10000)
+    rand_ct = 0
 
     # Expand home path (~) so that pandas knows where to look
     args.tokenized_fp = os.path.expanduser(args.tokenized_fp)
@@ -51,28 +53,39 @@ if __name__ == '__main__':
     for doc_idx in tqdm(range(num_docs)):
         tokenized_doc_str = tokenized_data[doc_idx]
         subsampled_doc = []
-        for token in tokenized_doc_str.split():
+        prev_token = 'dummy'
+        doc_tokens = tokenized_doc_str.split()
+        for tidx, token in enumerate(doc_tokens):
+            if prev_token == token:
+                continue
             wc = token_counts[token]
-            is_section_header = re.match(r'header=[A-Z]+', token)
-            is_doc_header = re.match(r'document=[A-Z]+', token)
-
-            is_phrase = '_' in token
+            is_section_header = 'header=' in token
+            is_doc_header = 'document=' in token
             if is_section_header:
-                subsampled_doc.append(token)
-                sections.add(token)
+                if not tidx + 1 == len(doc_tokens) and not 'header=' in doc_tokens[tidx + 1]:
+                    subsampled_doc.append(token)
+                    sections.add(token)
             elif is_doc_header:
                 subsampled_doc.append(token)
                 categories.add(token)
             else:
-                threshold = args.min_phrase_count if is_phrase else args.min_token_count
-                if wc < threshold:
+                if wc < args.min_token_count:
                     continue
                 frac = wc / N
                 keep_prob = min((np.sqrt(frac / args.subsample_param) + 1) * (args.subsample_param / frac), 1.0)
-                should_keep = np.random.binomial(1, keep_prob) == 1
+
+                should_keep = rand_arr[rand_ct] < keep_prob
+
+                rand_ct += 1
+                if rand_ct == len(rand_arr):
+                    rand_ct = 0
+                    rand_arr = np.random.rand(10000)
                 if should_keep:
                     subsampled_doc.append(token)
                     vocab.add_token(token, token_support=1)
+                else:
+                    continue
+            prev_token = token
         tokenized_subsampled_data.append(' '.join(subsampled_doc))
 
     print('Reduced tokens from {} to {}'.format(int(N), sum(vocab.support)))
@@ -81,7 +94,7 @@ if __name__ == '__main__':
     vocab.add_tokens(sections, token_support=0)
     vocab.category_start_vocab_id = vocab.size()
     print('Adding {} document categories'.format(len(categories)))
-    vocab.add_tokens(categories)
+    vocab.add_tokens(categories, token_support=0)
 
     subsampled_out_fn = '{}_subsampled{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str, sentence_str)
     print('Saving subsampled tokens to {}'.format(subsampled_out_fn))

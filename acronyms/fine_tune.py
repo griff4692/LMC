@@ -138,11 +138,15 @@ def load_mimic(prev_args):
     with open('../context_extraction/data/sf_lf_map.json', 'r') as fd:
         sf_lf_map = json.load(fd)
     used_sf_lf_map = {}
-    # TODO fixing window at 10 for now
     window = 10
     df = pd.read_csv('../context_extraction/data/mimic_rs_dataset_preprocessed_window_{}.csv'.format(window))
     df['tokenized_context_unique'] = df['tokenized_context'].apply(lambda x: list(set(x.split())))
-    df['metadata'] = df['category'].apply(create_document_token)
+
+    if prev_args.metadata == 'category':
+        df['metadata'] = df['category'].apply(create_document_token)
+    else:
+        df['metadata'] = df['section']
+        df['metadata'].fillna('<pad>', inplace=True)
     sfs = df['sf'].unique().tolist()
     for sf in sfs:
         used_sf_lf_map[sf] = sf_lf_map[sf]
@@ -164,6 +168,7 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
         prev_args, lm, token_vocab, _ = restore_func(args.lm_experiment)
         metadata_vocab = None
         token_metadata_counts = None
+        prev_args.metadata = None
     else:
         prev_args, lm, token_vocab, metadata_vocab, _, token_metadata_counts = restore_func(args.lm_experiment)
     train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs = loader(prev_args)
@@ -263,6 +268,8 @@ if __name__ == '__main__':
     parser.add_argument('-random_priors', default=False, action='store_true', help='Don\'t use pretrained priors')
     parser.add_argument('-use_att', default=False, action='store_true')
     parser.add_argument('--att_style', default='weighted', help='weighted or two_step')
+
+    parser.add_argument('-metadata_marginal', action='store_true', default=False)
 
     args = parser.parse_args()
     args.experiment += '_{}'.format(args.dataset)

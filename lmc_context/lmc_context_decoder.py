@@ -27,7 +27,6 @@ class LMCDecoder(nn.Module):
             center_embedding = center_embedding.sum(1) / normalizer
 
         metadata_embedding = self.metadata_embeddings(metadata_ids)
-
         merged_embeds = self.dropout(torch.cat([center_embedding, metadata_embedding], dim=-1))
 
         h = self.dropout(F.relu(self.f(merged_embeds)))

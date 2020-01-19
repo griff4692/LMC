@@ -61,12 +61,13 @@ class ContextExtractor:
         :param context_config: The context configuration
         :return: A string containing the context around the found match (Can parameterize later to return str or list!)
         """
+        match_str = document[match_found.start():match_found.end()].strip()
         preceding_text = document[:match_found.start()]
         succeeding_text = document[match_found.end():]
         if context_config['type'] == ContextType.WORD:
-            preceding_text_words = self.trim_boundaries(re.split(r'\W+', preceding_text))
-            succeeding_text_words = self.trim_boundaries(re.split(r'\W+', succeeding_text))
-            return ' '.join(preceding_text_words[len(preceding_text_words) - context_config['size']:]
+            preceding_text_words = self.trim_boundaries(re.split(r'\s+', preceding_text))
+            succeeding_text_words = self.trim_boundaries(re.split(r'\s+', succeeding_text))
+            return match_str, ' '.join(preceding_text_words[len(preceding_text_words) - context_config['size']:]
                             + ['TARGETWORD'] + succeeding_text_words[:context_config['size']])
         if context_config['type'] == ContextType.PARAGRAPH:
             preceding_text_lines = self.trim_boundaries(re.split(self.split_lines_regex, preceding_text))

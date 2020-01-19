@@ -14,11 +14,13 @@ import spacy
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from model_utils import render_args
+from compute_sections import HEADER_SEARCH_REGEX
 
+MIN_SECTION_COUNT = 10
 section_df = pd.read_csv('../preprocess/data/mimic/section.csv').dropna()
-SECTION_NAMES = list(sorted(section_df.nlargest(100, columns=['count'])['section'].tolist()))
-SECTION_NAMES_LOWER = list(set(list(map(lambda x: x.lower(), SECTION_NAMES))))
-SECTION_REGEX = r'\b({})\b:'.format('|'.join(SECTION_NAMES_LOWER))
+ALL_SECTION_NAMES = section_df['section'].tolist()
+SECTION_NAMES = list(set(list(sorted(section_df[section_df['count'] >= MIN_SECTION_COUNT]['section'].tolist()))))
+print('Considering {} out of {} extracted section headers.'.format(len(SECTION_NAMES), len(ALL_SECTION_NAMES)))
 
 nlp = spacy.load('en_core_sci_sm')
 
@@ -29,6 +31,26 @@ swords = set(stopwords.words('english')).union(
 with open('../preprocess/data/prepositions.txt', 'r') as fd:
     prepositions = set(map(lambda x: x.strip(), fd.readlines()))
 STOPWORDS = swords - prepositions
+
+
+def pattern_repl(matchobj):
+    """
+    Return a replacement string to be used for match object
+    """
+    return ' '.rjust(len(matchobj.group(0)))
+
+
+def clean_text(text):
+    """
+    Clean text
+    """
+    # Replace [**Patterns**] with spaces and lowercase.
+    text = re.sub(r'\[\*\*.*?\*\*\]', pattern_repl, text)
+    # Replace `_` with spaces.
+    text = re.sub(r'[_*?/()]+', ' ', text)
+    text = re.sub(r'\b(-)?[\d.,]+(-)?\b', ' DIGITPARSED ', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text
 
 
 def create_section_token(section):
@@ -70,14 +92,23 @@ def preprocess_mimic(input):
     4. lowercase
     """
     category, text = input
+
     tokenized_text = []
-    sectioned_text = list(filter(lambda x: len(x) > 0 and not x == ' ', re.split(SECTION_REGEX, text)))
+    sectioned_text = list(filter(lambda x: len(x.strip()) > 0, re.split(HEADER_SEARCH_REGEX, text, flags=re.M)))
+    is_header_arr = list(map(lambda x: re.match(HEADER_SEARCH_REGEX, x, re.M) is not None, sectioned_text))
     for tok_idx, toks in enumerate(sectioned_text):
-        if len(toks) == 0:
+        is_header = is_header_arr[tok_idx]
+        is_next_header = tok_idx + 1 == len(is_header_arr) or is_header_arr[tok_idx + 1]
+
+        if is_header and is_next_header:
             continue
-        elif toks in SECTION_NAMES_LOWER:
-            if tok_idx + 1 == len(sectioned_text) or not sectioned_text[tok_idx + 1] in SECTION_NAMES_LOWER:
-                tokenized_text += [create_section_token(toks)]
+        if is_header:
+            header_stripped = toks.strip().strip(':').upper()
+            if header_stripped in SECTION_NAMES:
+                tokenized_text += [create_section_token(header_stripped)]
+            else:
+                toks = clean_text(toks)
+                tokenized_text += tokenize_str(toks)
         else:
             if args.split_sentences:
                 for sentence in nlp(toks).sents:
@@ -85,8 +116,10 @@ def preprocess_mimic(input):
                     if len(tokens) > 1:
                         tokenized_text += [create_section_token('SENTENCE')] + tokens
             else:
+                toks = clean_text(toks)
                 tokenized_text += tokenize_str(toks)
     doc_boundary = [create_document_token(category)]
+
     return ' '.join(doc_boundary + tokenized_text)
 
 
@@ -109,7 +142,7 @@ if __name__ == '__main__':
     debug_str = '_mini' if args.debug else ''
     phrase_str = '_phrase' if args.combine_phrases else ''
     sentence_str = '_sentence' if args.split_sentences else ''
-    df = pd.read_csv('{}{}{}.csv'.format(args.mimic_fp, '_clean', debug_str))
+    df = pd.read_csv('{}{}.csv'.format(args.mimic_fp, debug_str))
 
     print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
     categories = df['CATEGORY'].tolist()
@@ -125,7 +158,8 @@ if __name__ == '__main__':
     for doc_idx, doc in enumerate(parsed_docs):
         for token in doc.split():
             token_cts[token] += 1
-            token_cts['__ALL__'] += 1
+            if not 'header=' in token and not 'document=' in token:
+                token_cts['__ALL__'] += 1
     debug_str = '_mini' if args.debug else ''
     with open(args.mimic_fp + '_tokenized{}{}{}.json'.format(debug_str, phrase_str, sentence_str), 'w') as fd:
         json.dump(parsed_docs, fd)

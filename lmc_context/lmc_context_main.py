@@ -86,11 +86,12 @@ if __name__ == '__main__':
         ids, metadata_pos_idxs, token_vocab, metadata_vocab)
 
     token_metadata_samples = {}
-    for k, (sids, sp) in token_metadata_counts.items():
-        size = min(len(sp) * 10, 250)
-        rand_sids = np.random.choice(sids, size=size, replace=True, p=sp)
-        start_idx = 0
-        token_metadata_samples[k] = [start_idx, rand_sids]
+    if args.sample_metadata:
+        for k, (sids, sp) in token_metadata_counts.items():
+            size = min(len(sp) * 10, 250)
+            rand_sids = np.random.choice(sids, size=size, replace=True, p=sp)
+            start_idx = 0
+            token_metadata_samples[k] = [start_idx, rand_sids]
 
     token_vocab.truncate(token_vocab.section_start_vocab_id)
     ids[all_metadata_pos_idxs] = -1

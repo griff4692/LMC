@@ -53,16 +53,18 @@ def render_stats():
 
 def get_lf_contexts(row, window=20):
     doc_id, doc_category, doc_string = row['ROW_ID'], row['CATEGORY'], row['TEXT']
-    contexts, doc_ids, forms = [], [], []
-    config = {'type': ContextType.WORD, 'size': 20}
+    contexts, doc_ids, forms, actual_lfs = [], [], [], []
+    config = {'type': ContextType.WORD, 'size': window}
     for lf in LFS:
-        c = CONTEXT_EXTRACTOR.get_contexts_for_long_form(
+        result = CONTEXT_EXTRACTOR.get_contexts_for_long_form(
             lf, doc_string, config, allow_inflections=False, ignore_case=True)
-        forms += [lf] * len(c)
-        contexts += c
+        for actual_lf, c in result:
+            forms.append(lf)
+            contexts.append(c)
+            actual_lfs.append(actual_lf)
     doc_ids += [doc_id] * len(contexts)
     doc_categories = [doc_category] * len(contexts)
-    return list(zip(forms, doc_ids, doc_categories, contexts))
+    return list(zip(forms, actual_lfs, doc_ids, doc_categories, contexts))
 
 
 def extract_mimic_contexts(chunk, chunksize, debug):
@@ -93,7 +95,7 @@ def extract_mimic_contexts(chunk, chunksize, debug):
         for y in x:
             contexts_flat.append(y)
 
-    df = pd.DataFrame(contexts_flat, columns=['lf', 'doc_id', 'category', 'context'])
+    df = pd.DataFrame(contexts_flat, columns=['lf', 'lf_match', 'doc_id', 'category', 'context'])
     df.to_csv('data/mimic_context_batches/{}{}.csv'.format(chunk, debug_str), index=False)
 
 

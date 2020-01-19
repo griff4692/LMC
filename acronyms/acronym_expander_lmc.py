@@ -7,8 +7,6 @@ import torch.nn as nn
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from compute_utils import compute_kl, mask_2D
-from lmc_context_encoder import LMCContextEncoder
-from lmc_context_decoder import LMCDecoder
 
 
 class AcronymExpanderLMC(nn.Module):
@@ -52,14 +50,16 @@ class AcronymExpanderLMC(nn.Module):
         return mu, sigma + 1e-3
 
     def forward(self, sf_ids, metadata_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
-                global_token_ct, lf_metadata_p, num_outputs, use_att=False, att_style=None, compute_marginal=False):
+                global_token_ct, lf_metadata_p, num_outputs, num_contexts, use_att=False, att_style=None,
+                compute_marginal=False):
         batch_size, max_output_size, max_lf_ngram = lf_ids.size()
         _, num_context_ids = context_ids.size()
 
         # Compute SF contexts
-        # TODO actually mask padded context ids
-        mask = torch.BoolTensor(torch.Size([batch_size, num_context_ids]))
-        mask.fill_(0)
+        # Mask padded context ids
+        mask_size = torch.Size([batch_size, num_context_ids])
+        device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
+        mask = mask_2D(mask_size, num_contexts).to(device_str)
         sf_mu, sf_sigma = self.encoder(sf_ids, metadata_ids, context_ids, mask)
 
         # Tile SFs across each LF and flatten both SFs and LFs

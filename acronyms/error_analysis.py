@@ -18,7 +18,7 @@ from model_utils import tensor_to_np
 
 
 def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window, full_context, row_idx,
-                    global_tokens=None, top_global_weights=None):
+                    global_tokens=None, top_global_weights=None, metadata=None):
     str = 'SF={}.\nTarget LF={} ({}).\nPredicted LF={}.\n'.format(sf, target_lf, converted_target_lf, pred_lf)
     str += 'Example ID={}\n'.format(row_idx)
     str += 'Context Window: {}\n'.format(context_window)
@@ -39,11 +39,12 @@ def _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, correct_str, errors
         target_lf_idx = row['used_target_lf_idx']
         pred_lf_idx = pred_lf_idxs[batch_idx]
         pred_lf = lf_map[pred_lf_idx]
+        metadata = row['metadata'] if 'metadata' in row else None
         global_weights = top_global_weights[batch_idx, :] if top_global_weights is not None else None
         example_str = _render_example(sf, target_lf, lf_map[target_lf_idx], pred_lf,
                                       row['trimmed_tokens'], row['tokenized_context'], row['row_idx'],
                                       global_tokens=row['tokenized_context_unique'],
-                                      top_global_weights=global_weights)
+                                      top_global_weights=global_weights, metadata=metadata)
         if target_lf_idx == pred_lf_idx:
             id_map['correct'].append(row['row_idx'])
             correct_str[sf] += example_str
