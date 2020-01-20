@@ -23,7 +23,7 @@ class LMCDecoder(nn.Module):
         :return: mu (batch_size, latent_dim), var (batch_size, 1)
         """
         center_embedding = self.token_embeddings(center_ids)
-        if len(center_embedding.size()) == 3:
+        if len(center_ids.size()) > len(metadata_ids.size()):
             center_embedding = center_embedding.sum(1) / normalizer
 
         metadata_embedding = self.metadata_embeddings(metadata_ids)

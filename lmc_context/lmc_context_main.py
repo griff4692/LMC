@@ -70,11 +70,6 @@ if __name__ == '__main__':
         token_vocab = pickle.load(fd)
     print('Loaded vocabulary of size={}...'.format(token_vocab.section_start_vocab_id))
 
-    metadata_counts = pd.read_csv('../preprocess/data/mimic/{}.csv'.format(args.metadata))
-    header_prefix = 'header=' if args.metadata == 'section' else 'document='
-    metadata_counts['header'] = metadata_counts[args.metadata].apply(lambda x: header_prefix + re.sub(r'\s+', '', x.upper()))
-    metadata_counts_dict = metadata_counts.set_index('header').to_dict()['count']
-
     print('Collecting metadata information for {}...'.format(args.metadata))
     assert token_vocab.section_start_vocab_id <= token_vocab.category_start_vocab_id
     start_id = token_vocab.section_start_vocab_id if args.metadata == 'section' else token_vocab.category_start_vocab_id
@@ -86,7 +81,7 @@ if __name__ == '__main__':
     metadata_vocab = Vocab()
     for id in metadata_id_range:
         name = token_vocab.get_token(id)
-        metadata_vocab.add_token(name, token_support=int(metadata_counts_dict[name]))
+        metadata_vocab.add_token(name)
     full_metadata_ids, token_metadata_counts = enumerate_metadata_ids_lmc(
         ids, metadata_pos_idxs, token_vocab, metadata_vocab)
 
