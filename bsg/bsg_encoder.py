@@ -12,15 +12,13 @@ from compute_utils import compute_att
 class BSGEncoder(nn.Module):
     def __init__(self, args, vocab_size):
         super(BSGEncoder, self).__init__()
-        self.embeddings = nn.Embedding(vocab_size, args.encoder_input_dim, padding_idx=0)
+        self.embeddings = nn.Embedding(vocab_size, args.input_dim, padding_idx=0)
         self.dropout = nn.Dropout(0.2)
-        self.f = nn.Linear(args.encoder_input_dim * 2, args.encoder_hidden_dim, bias=True)
-        self.att = nn.Linear(args.encoder_hidden_dim, 1, bias=True)
-        self.u = nn.Linear(args.encoder_hidden_dim, args.latent_dim, bias=True)
-        self.v = nn.Linear(args.encoder_hidden_dim, 1, bias=True)
+        self.f = nn.Linear(args.input_dim * 2, args.hidden_dim, bias=True)
+        self.att = nn.Linear(args.hidden_dim, 1, bias=True)
+        self.u = nn.Linear(args.hidden_dim, args.input_dim, bias=True)
+        self.v = nn.Linear(args.hidden_dim, 1, bias=True)
 
-        self.use_att = args.encoder_att
-        
     def forward(self, center_ids, context_ids, mask):
         """
         :param center_ids: LongTensor of batch_size
@@ -37,29 +35,21 @@ class BSGEncoder(nn.Module):
         merged_embeds = self.dropout(merged_embeds)
 
         h_reps = self.dropout(F.relu(self.f(merged_embeds)))
-        if self.use_att:
-            h = compute_att(h_reps, mask, self.att)
-        else:
-            # Simple sum
-            mask_tiled = mask.unsqueeze(-1).repeat(1, 1, h_reps.size()[-1])
-            h_reps.masked_fill_(mask_tiled, 0)
-            h = h_reps.sum(1)
+        h = compute_att(h_reps, mask, self.att)
         return self.u(h), self.v(h).exp()
 
 
 class BSGEncoderLSTM(nn.Module):
     def __init__(self, args, vocab_size):
         super(BSGEncoderLSTM, self).__init__()
-        self.embeddings = nn.Embedding(vocab_size, args.encoder_input_dim, padding_idx=0)
+        self.embeddings = nn.Embedding(vocab_size, args.input_dim, padding_idx=0)
         self.dropout = nn.Dropout(0.2)
-        self.lstm = nn.LSTM(
-            args.encoder_input_dim * 2, args.encoder_hidden_dim, bidirectional=True, batch_first=True)
-        self.att = nn.Linear(args.encoder_hidden_dim * 2, 1, bias=True)
-        self.u = nn.Linear(args.encoder_hidden_dim * 2, args.latent_dim, bias=True)
-        self.v = nn.Linear(args.encoder_hidden_dim * 2, 1, bias=True)
-        self.use_att = args.encoder_att
+        self.lstm = nn.LSTM(args.input_dim * 2, args.hidden_dim, bidirectional=True, batch_first=True)
+        self.att = nn.Linear(args.hidden_dim * 2, 1, bias=True)
+        self.u = nn.Linear(args.hidden_dim * 2, args.input_dim, bias=True)
+        self.v = nn.Linear(args.hidden_dim * 2, 1, bias=True)
 
-    def forward(self, center_ids, context_ids, mask):
+    def forward(self, center_ids, context_ids, mask, token_mask_p=0.2):
         """
         :param center_ids: LongTensor of batch_size
         :param context_ids: LongTensor of batch_size x 2 * context_window
@@ -69,6 +59,11 @@ class BSGEncoderLSTM(nn.Module):
         batch_size, num_context_ids = context_ids.shape
 
         center_embedding = self.embeddings(center_ids)
+
+        if token_mask_p is not None:
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            context_mask = torch.FloatTensor(batch_size, num_context_ids).uniform_().to(device) < token_mask_p
+            context_ids.masked_fill_(context_mask, 0)
         context_embedding = self.embeddings(context_ids)
 
         center_embedding_tiled = center_embedding.unsqueeze(1).repeat(1, num_context_ids, 1)
@@ -78,9 +73,5 @@ class BSGEncoderLSTM(nn.Module):
         merged_embeds.masked_fill_(mask_tiled, 0)
 
         h_reps, (h, _) = self.lstm(merged_embeds)
-
-        if self.use_att:
-            h_sum = compute_att(h_reps, mask, self.att)
-        else:
-            h_sum = h.transpose(1, 0).contiguous().view(batch_size, -1)
+        h_sum = self.dropout(compute_att(h_reps, mask, self.att))
         return self.u(h_sum), self.v(h_sum).exp()

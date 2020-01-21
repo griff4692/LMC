@@ -12,6 +12,7 @@ from tqdm import tqdm
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+from compute_sections import enumerate_metadata_ids_multi_bsg
 from bsg_batcher import SkipGramBatchLoader
 from bsg_model import BSG
 from bsg_utils import restore_model, save_checkpoint
@@ -23,7 +24,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Main script for Bayesian Skip Gram Model')
 
     # Functional Arguments
-    parser.add_argument('-cpu', action='store_true', default=False)
     parser.add_argument('-debug', action='store_true', default=False)
     parser.add_argument('--data_dir', default='../preprocess/data/')
     parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
@@ -38,12 +38,12 @@ if __name__ == '__main__':
     parser.add_argument('-cache_windows', default=False, action='store_true')
 
     # Model Hyperparameters
-    parser.add_argument('--encoder_hidden_dim', default=64, type=int, help='hidden dimension for encoder')
-    parser.add_argument('--encoder_input_dim', default=64, type=int, help='embedding dimemsions for encoder')
+    parser.add_argument('--hidden_dim', default=64, type=int, help='hidden dimension for encoder')
+    parser.add_argument('--input_dim', default=100, type=int, help='embedding dimemsions for encoder')
     parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
-    parser.add_argument('--latent_dim', default=100, type=int, help='z dimension')
-    parser.add_argument('-encoder_lstm', default=False, action='store_true')
-    parser.add_argument('-encoder_att', default=False, action='store_true')
+    parser.add_argument('-multi_bsg', default=False, action='store_true')
+    parser.add_argument('--multi_weights', default='0.7,0.2,0.1')
+    parser.add_argument('-mask_p', default=None, type=float)
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()
@@ -59,25 +59,38 @@ if __name__ == '__main__':
         ids = np.load(fd)
 
     # Load Vocabulary
-    vocab_infile = '../preprocess/data/vocab{}{}.pk'.format(debug_str, phrase_str)
+    vocab_infile = os.path.join(args.data_dir, 'vocab{}{}.pk'.format(debug_str, phrase_str))
     print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
     print('Loaded vocabulary of size={}...'.format(vocab.section_start_vocab_id))
 
-    print('Collecting document/section information...')
-    metadata_start_id = min(vocab.section_start_vocab_id, vocab.category_start_vocab_id)
-    metadata_pos_idxs = np.where(ids >= metadata_start_id)[0]
+    print('Collecting metadata information')
+    assert vocab.section_start_vocab_id <= vocab.category_start_vocab_id
+    sec_id_range = np.arange(vocab.section_start_vocab_id, vocab.category_start_vocab_id)
+    cat_id_range = np.arange(vocab.category_start_vocab_id, vocab.size())
+
+    sec_pos_idxs = np.where(np.isin(ids, sec_id_range))[0]
+    cat_pos_idxs = np.where(np.isin(ids, cat_id_range))[0]
+
+    sec_ids, cat_ids = enumerate_metadata_ids_multi_bsg(ids, sec_pos_idxs, cat_pos_idxs)
+
+    print('Snippet from beginning of data...')
+    for ct, (sid, cid, tid) in enumerate(zip(sec_ids, cat_ids, ids)):
+        print('\t', vocab.get_tokens([sid, cid, tid]))
+        if ct >= 10:
+            break
+
+    all_metadata_pos_idxs = np.concatenate([sec_pos_idxs, cat_pos_idxs])
     # Demarcates boundary tokens
-    ids[metadata_pos_idxs] = -1
+    ids[all_metadata_pos_idxs] = -1
 
     device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
-    args.device = torch.device(device_str)
     print('Training on {}...'.format(device_str))
 
-    batcher = SkipGramBatchLoader(len(ids), metadata_pos_idxs, batch_size=args.batch_size)
+    batcher = SkipGramBatchLoader(len(ids), all_metadata_pos_idxs, batch_size=args.batch_size)
 
-    model = BSG(args, vocab.size()).to(args.device)
+    model = BSG(args, vocab.size()).to(device_str)
     if args.restore_experiment is not None:
         prev_args, model, vocab, optimizer_state = restore_model(args.restore_experiment)
 
@@ -106,14 +119,10 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            center_ids, context_ids, num_contexts = batcher.next(ids, args.window, use_cache=args.cache_windows)
-            center_ids_tens = torch.LongTensor(center_ids).to(args.device)
-            context_ids_tens = torch.LongTensor(context_ids).to(args.device)
+            batch_ids = batcher.next(ids, sec_ids, cat_ids, vocab, args.window)
+            batch_ids = list(map(lambda x: torch.LongTensor(x).to(device_str), batch_ids))
 
-            neg_ids = vocab.neg_sample(size=context_ids.shape)
-            neg_ids_tens = torch.LongTensor(neg_ids).to(args.device)
-
-            kl_loss, recon_loss = model(center_ids_tens, context_ids_tens, neg_ids_tens, num_contexts)
+            kl_loss, recon_loss = kl_loss, recon_loss = model(*batch_ids)
             joint_loss = kl_loss + recon_loss
             joint_loss.backward()  # backpropagate loss
 

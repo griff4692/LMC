@@ -55,7 +55,8 @@ class AcronymBatcherLoader:
         self.batch_ct += 1
         batch_size = batch.shape[0]
         sf_ids = np.zeros([batch_size, ], dtype=int)
-        metadata_ids = np.zeros([batch_size, ], dtype=int)
+        section_ids = np.zeros([batch_size, ], dtype=int)
+        category_ids = np.zeros([batch_size, ], dtype=int)
         num_contexts = np.zeros([batch_size, ], dtype=int)
         target_lf_ids = np.zeros([batch_size, ], dtype=int)
         max_context_len = max([len(tt.split()) for tt in batch['trimmed_tokens'].tolist()])
@@ -80,11 +81,16 @@ class AcronymBatcherLoader:
             context_ids[batch_idx, :num_context] = context_id_seq
             num_contexts[batch_idx] = num_context
             candidate_lfs = sf_tokenized_lf_map[row['sf']]
-            if 'metadata' in row and metadata_vocab is not None:
-                metadata_ids[batch_idx] = metadata_vocab.get_id(row['metadata'])
-                if metadata_ids[batch_idx] < 0:
-                    metadata_ids[batch_idx] = 0
-                    print('Not found={}'.format(row['metadata']))
+            if 'section' in row:
+                section_ids[batch_idx] = token_vocab.get_id(row['section'])
+                if section_ids[batch_idx] < 0:
+                    section_ids[batch_idx] = 0
+                    print('Not found={}'.format(row['section']))
+            if 'category' in row:
+                category_ids[batch_idx] = token_vocab.get_id(row['category'])
+                if category_ids[batch_idx] < 0:
+                    category_ids[batch_idx] = 0
+                    print('Not found={}'.format(row['category']))
 
             global_id_seq = token_vocab.get_ids(row['tokenized_context_unique'])
             num_global_ids = len(global_id_seq)
@@ -108,7 +114,7 @@ class AcronymBatcherLoader:
                             total_p += p
                     lf_metadata_p[batch_idx, lf_idx, :] /= total_p
 
-        return (sf_ids, metadata_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
+        return (sf_ids, section_ids, category_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
                 global_token_ct), [lf_metadata_p], [num_outputs, num_contexts]
 
     def reset(self, shuffle=True):

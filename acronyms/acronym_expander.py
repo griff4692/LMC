@@ -58,7 +58,7 @@ class AcronymExpander(nn.Module):
         device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
         mask = mask_2D(mask_size, num_contexts).to(device_str)
 
-        sf_mu, sf_sigma = self.encoder(sf_ids, context_ids, mask)
+        sf_mu, sf_sigma = self.encoder(sf_ids, context_ids, mask, token_mask_p=None)
         top_global_weights = None
         if use_att:
             global_mu, global_sigma = self._compute_priors(global_ids)
@@ -98,7 +98,7 @@ class AcronymExpander(nn.Module):
                 sf_mu, sf_sigma = self.encoder(sf_ids, addl_context_ids, full_mask)
         return sf_mu, sf_sigma, top_global_weights
 
-    def forward(self, sf_ids, metadata_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
+    def forward(self, sf_ids, section_ids, category_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
                 global_token_ct, num_outputs, num_contexts, use_att=False, att_style='weighted', compute_marginal=None):
         """
         :param sf_ids: batch_size
@@ -120,8 +120,29 @@ class AcronymExpander(nn.Module):
         lf_mu_sum, lf_sigma_sum = lf_mu.sum(-2) / normalizer, lf_sigma.sum(-2) / normalizer
 
         # Encode SFs in context (use attention or simply pass through Encoder)
-        sf_mu, sf_sigma, top_global_weights = self.encode_context(
+        sf_mu_tokens, sf_sigma_tokens, _ = self.encode_context(
             sf_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=use_att, att_style=att_style)
+
+        sf_mu_sec, sf_sigma_sec, _ = self.encode_context(
+            section_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=use_att, att_style=att_style)
+
+        sf_mu_cat, sf_sigma_cat, top_global_weights = self.encode_context(
+            category_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=use_att, att_style=att_style)
+
+        combined_mu = torch.cat([
+            sf_mu_tokens.unsqueeze(1),
+            sf_mu_sec.unsqueeze(1),
+            sf_mu_cat.unsqueeze(1),
+        ], axis=1)
+
+        combined_sigma = torch.cat([
+            sf_sigma_tokens,
+            sf_sigma_sec,
+            sf_sigma_cat
+        ], axis=1)
+
+        sf_mu = combined_mu.mean(1)
+        sf_sigma = combined_sigma.mean(1)
 
         # Tile SFs across each LF and flatten both SFs and LFs
         sf_mu_flat = sf_mu.unsqueeze(1).repeat(1, max_output_size, 1).view(batch_size * max_output_size, -1)

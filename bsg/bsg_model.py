@@ -5,23 +5,32 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
-from bsg_encoder import BSGEncoder, BSGEncoderLSTM
+from bsg_encoder import BSGEncoderLSTM
 from compute_utils import compute_kl, mask_2D
 
 
 class BSG(nn.Module):
     def __init__(self, args, vocab_size):
         super(BSG, self).__init__()
-        self.device = args.device
-        self.encoder = BSGEncoderLSTM(args, vocab_size) if args.encoder_lstm else BSGEncoder(args, vocab_size)
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.encoder = BSGEncoderLSTM(args, vocab_size)
         self.margin = args.hinge_loss_margin or 1.0
 
         # The output representations of words(used in KL regularization and max_margin).
-        self.embeddings_mu = nn.Embedding(vocab_size, args.latent_dim, padding_idx=0)
+        self.embeddings_mu = nn.Embedding(vocab_size, args.input_dim, padding_idx=0)
 
         self.embeddings_log_sigma = nn.Embedding(vocab_size, 1, padding_idx=0)
         log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
         self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
+
+        self.multi_bsg = args.multi_bsg
+        self.mask_p = args.mask_p
+        if args.multi_bsg:
+            if hasattr(args, 'multi_weights'):
+                weights = np.array(list(map(float, args.multi_weights.split(','))))
+            else:
+                weights = np.array([0.7, 0.2, 0.1])
+            self.input_weights = torch.from_numpy(weights).to(self.device)
 
     def _max_margin(self, mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p, mask):
         """
@@ -55,7 +64,7 @@ class BSG(nn.Module):
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
-    def forward(self, center_ids, context_ids, neg_context_ids, num_contexts):
+    def forward(self, token_ids, sec_ids, cat_ids, context_ids, neg_context_ids, num_contexts):
         """
         :param center_ids: batch_size
         :param context_ids: batch_size, 2 * context_window
@@ -68,9 +77,18 @@ class BSG(nn.Module):
         mask_size = torch.Size([batch_size, num_context_ids])
         mask = mask_2D(mask_size, num_contexts).to(self.device)
 
-        mu_q, sigma_q = self.encoder(center_ids, context_ids, mask)
+        center_ids = token_ids
+        if self.multi_bsg:
+            center_id_candidates = torch.cat([
+                token_ids.unsqueeze(0),
+                sec_ids.unsqueeze(0),
+                cat_ids.unsqueeze(0)
+            ])
+            input_sample = torch.multinomial(self.input_weights, batch_size, replacement=True).to(self.device)
+            center_ids = center_id_candidates.gather(0, input_sample.unsqueeze(0)).squeeze(0)
 
-        mu_p, sigma_p = self._compute_priors(center_ids)
+        mu_q, sigma_q = self.encoder(center_ids, context_ids, mask, token_mask_p=self.mask_p)
+        mu_p, sigma_p = self._compute_priors(token_ids)
 
         pos_mu_p, pos_sigma_p = self._compute_priors(context_ids)
         neg_mu_p, neg_sigma_p = self._compute_priors(neg_context_ids)

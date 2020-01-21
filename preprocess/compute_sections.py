@@ -12,6 +12,61 @@ import pandas as pd
 HEADER_SEARCH_REGEX = r'(?:^|\s{4,}|\n)[\d.#]{0,4}\s*([A-Z][A-z0-9/ ]+[A-z]:)'
 
 
+def enumerate_metadata_ids_multi_bsg(ids, sec_pos_idxs, cat_pos_idxs):
+    sec_ids = []
+    cat_ids = []
+
+    sec_pointer = 0
+    cat_pointer = 0
+    N = len(ids)
+
+    num_sec = len(sec_pos_idxs)
+    num_cat = len(cat_pos_idxs)
+
+    curr_cat_id = 0
+    while sec_pointer < num_sec and cat_pointer < num_cat:
+        sec_pos_idx = sec_pos_idxs[sec_pointer]
+        cat_pos_idx = cat_pos_idxs[cat_pointer]
+
+        next_sec_pos_idx = sec_pos_idxs[sec_pointer + 1] if sec_pointer + 1 < num_sec else N
+        next_cat_pos_idx = cat_pos_idxs[cat_pointer + 1] if cat_pointer + 1 < num_cat else N
+
+        min_pos_idx = min(sec_pos_idx, cat_pos_idx)
+        max_pos_idx = max(sec_pos_idx, cat_pos_idx)
+
+        metadata_len = min(max_pos_idx, next_sec_pos_idx, next_cat_pos_idx) - min_pos_idx
+        id = ids[min_pos_idx]
+        if sec_pos_idx < cat_pos_idx:  # We are processing a section
+            sec_pointer += 1
+            curr_sec_id = id
+        else:  # We are processing the document category
+            cat_pointer += 1
+            curr_sec_id = 0
+            curr_cat_id = id
+
+        sec_ids += [curr_sec_id] * metadata_len
+        cat_ids += [curr_cat_id] * metadata_len
+
+    for remaining_sec_pointer in range(sec_pointer, num_sec):
+        next_sec_pos_idx = sec_pos_idxs[remaining_sec_pointer + 1] if remaining_sec_pointer + 1 < num_sec else N
+        sec_pos_idx = sec_pos_idxs[remaining_sec_pointer]
+        metadata_len = next_sec_pos_idx - sec_pos_idx
+        curr_sec_id = ids[sec_pos_idx]
+        sec_ids += [curr_sec_id] * metadata_len
+        cat_ids += [curr_cat_id] * metadata_len
+
+    for remaining_cat_pointer in range(cat_pointer, num_cat):
+        next_cat_pos_idx = cat_pos_idxs[remaining_cat_pointer + 1] if remaining_cat_pointer + 1 < num_cat else N
+        cat_pos_idx = cat_pos_idxs[remaining_cat_pointer]
+        metadata_len = next_cat_pos_idx - cat_pos_idx
+        curr_cat_id = ids[cat_pos_idx]
+        sec_ids += [0] * metadata_len
+        cat_ids += [curr_cat_id] * metadata_len
+
+    assert len(sec_ids) == len(cat_ids) == N
+    return sec_ids, cat_ids
+
+
 def enumerate_metadata_ids_lmc(ids, metadata_pos_idxs, token_vocab, metadata_vocab):
     """
     :param ids: List of token ids.

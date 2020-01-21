@@ -65,19 +65,26 @@ class SkipGramBatchLoader:
         full_context = np.concatenate([left_context, right_context])
         return full_context
 
-    def next(self, ids, window_size, use_cache=False):
+    def next(self, ids, full_sec_ids, full_cat_ids, vocab, window_size, use_cache=False):
         batch_idxs = self.batches[self.batch_ct]
         center_ids = ids[batch_idxs]
         context_ids = np.zeros([self.batch_size, (window_size * 2)], dtype=int)
-        actual_window_sizes = []
+        window_sizes = []
+
+        neg_ids = vocab.neg_sample(size=(self.batch_size, (window_size * 2)))
+        sec_ids = np.zeros([self.batch_size,], dtype=int)
+        cat_ids = np.zeros([self.batch_size,], dtype=int)
+
         extractor = self.extract_cached_context_ids if use_cache else self.extract_context_ids
         for batch_idx, center_idx in enumerate(batch_idxs):
+            sec_ids[batch_idx] = full_sec_ids[center_idx]
+            cat_ids[batch_idx] = full_cat_ids[center_idx]
             example_context_ids = extractor(ids, center_idx, window_size)
             actual_window_size = len(example_context_ids)
             context_ids[batch_idx, :actual_window_size] = example_context_ids
-            actual_window_sizes.append(actual_window_size)
+            window_sizes.append(actual_window_size)
         self.batch_ct += 1
-        return center_ids, context_ids, actual_window_sizes
+        return center_ids, sec_ids, cat_ids, context_ids, neg_ids, window_sizes
 
     def reset(self):
         batch_idxs = np.array(list(set(np.arange(self.N)) - set(self.metadata_idxs)))

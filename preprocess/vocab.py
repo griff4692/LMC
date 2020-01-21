@@ -59,5 +59,8 @@ class Vocab:
     def get_token(self, id):
         return self.i2w[id]
 
+    def get_tokens(self, ids):
+        return list(map(self.get_token, ids))
+
     def size(self):
         return len(self.i2w)

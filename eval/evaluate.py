@@ -7,7 +7,8 @@ sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from fine_tune import acronyms_finetune, load_casi, load_mimic
-from bsg_utils import restore_model
+from bsg_utils import restore_model, save_checkpoint
+from acronym_expander import AcronymExpander
 from word_similarity import evaluate_word_similarity
 
 
@@ -24,7 +25,7 @@ def evaluate(args):
 
     print('\nEvaluations...')
     evaluate_word_similarity(model, vocab, combine_phrases=prev_args.combine_phrases)
-    args.bsg_experiment = prev_args.experiment  # Tell which model to pull from
+    args.lm_experiment = prev_args.experiment  # Tell which model to pull from
     # TODO integrate these better
     args.epochs = 5
     args.batch_size = 32
@@ -34,10 +35,12 @@ def evaluate(args):
     args.random_encoder = False
     args.use_att = False
     args.att_style = None
+    args.lm_type = 'bsg'
+    args.metadata_marginal = False
     print('Fine Tuning on CASI')
-    acronyms_finetune(args, load_casi)
+    acronyms_finetune(args, AcronymExpander, load_casi, restore_model, save_checkpoint)
     print('Fine Tuning on MIMIC Reverse Substitution')
-    acronyms_finetune(args, load_mimic)
+    acronyms_finetune(args, AcronymExpander, load_mimic, restore_model, save_checkpoint)
 
 
 if __name__ == '__main__':
