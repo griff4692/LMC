@@ -12,8 +12,9 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, 'D:/ClinicalBayesianSkipGram/preprocess/')
+sys.path.insert(0, 'D:/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, 'D:/ClinicalBayesianSkipGram/')
 from compute_sections import enumerate_metadata_ids_lmc
 from lmc_context_batcher import LMCContextSkipGramBatchLoader
 from lmc_context_model import LMCC
@@ -28,7 +29,7 @@ if __name__ == '__main__':
     # Functional Arguments
     parser.add_argument('-cpu', action='store_true', default=False)
     parser.add_argument('-debug', action='store_true', default=False)
-    parser.add_argument('--data_dir', default='../preprocess/data/')
+    parser.add_argument('--data_dir', default='data/')
     parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
 
     # Training Hyperparameters
@@ -58,13 +59,13 @@ if __name__ == '__main__':
     debug_str = '_mini' if args.debug else ''
     phrase_str = '_phrase' if args.combine_phrases else ''
 
-    ids_infile = os.path.join(args.data_dir, 'ids{}{}.npy'.format(debug_str, phrase_str))
+    ids_infile = sys.path[0] + os.path.join(args.data_dir, 'ids{}{}.npy'.format(debug_str, phrase_str))
     print('Loading data from {}...'.format(ids_infile))
     with open(ids_infile, 'rb') as fd:
         ids = np.load(fd)
 
     # Load Vocabulary
-    vocab_infile = '../preprocess/data/vocab{}{}.pk'.format(debug_str, phrase_str)
+    vocab_infile = sys.path[0] + 'data/vocab{}{}.pk'.format(debug_str, phrase_str)
     print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         token_vocab = pickle.load(fd)
@@ -73,7 +74,7 @@ if __name__ == '__main__':
     print('Collecting metadata information for {}...'.format(args.metadata))
     assert token_vocab.section_start_vocab_id <= token_vocab.category_start_vocab_id
     start_id = token_vocab.section_start_vocab_id if args.metadata == 'section' else token_vocab.category_start_vocab_id
-    end_id = token_vocab.category_start_vocab_id if args.metadata == 'section' else token_vocab.size()
+    end_id = token_vocab.size()
     metadata_id_range = np.arange(start_id, end_id)
     is_metadata = np.isin(ids, metadata_id_range)
     metadata_pos_idxs = np.where(is_metadata)[0]

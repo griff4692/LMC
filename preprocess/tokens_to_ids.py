@@ -6,19 +6,24 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
+import sys
+
 
 def tokens_to_ids(args, token_infile=None):
     debug_str = '_mini' if args.debug else ''
     phrase_str = '_phrase' if args.combine_phrases else ''
     sentence_str = '_sentence' if args.split_sentences else ''
+    
+    sys.path.insert(0, 'D:/ClinicalBayesianSkipGram/')
 
+    
     if token_infile is None:
         token_infile = '{}{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str, sentence_str)
     with open(token_infile, 'r') as fd:
         tokens = json.load(fd)
 
     # Load Vocabulary
-    vocab_infile = 'data/vocab{}{}{}.pk'.format(debug_str, phrase_str, sentence_str)
+    vocab_infile =  sys.path[0] + 'data/vocab{}{}{}.pk'.format(debug_str, phrase_str, sentence_str)
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
     ids = []
@@ -29,7 +34,7 @@ def tokens_to_ids(args, token_infile=None):
         ids += doc_ids
 
     print('Saving {} tokens to disc'.format(len(ids)))
-    out_fn = 'data/ids{}{}{}.npy'.format(debug_str, phrase_str, sentence_str)
+    out_fn =  sys.path[0] + 'data/ids{}{}{}.npy'.format(debug_str, phrase_str, sentence_str)
     with open(out_fn, 'wb') as fd:
         np.save(fd, np.array(ids, dtype=int))
     with open(vocab_infile, 'wb') as fd:

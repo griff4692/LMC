@@ -6,15 +6,17 @@ import re
 import argparse
 import numpy as np
 from tqdm import tqdm
-
+import sys
 from tokens_to_ids import tokens_to_ids
 from vocab import Vocab
+
+sys.path.insert(0, 'D:/ClinicalBayesianSkipGram/')
 
 
 if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC (v3) Note Subsampling of Already Tokenized Data.')
-    arguments.add_argument('--tokenized_fp', default='data/mimic/NOTEEVENTS_tokenized')
-    arguments.add_argument('--token_counts_fp', default='data/mimic/NOTEEVENTS_token_counts')
+    arguments.add_argument('--tokenized_fp', default='data/simplewiki/NOTEEVENTS_tokenized')
+    arguments.add_argument('--token_counts_fp', default='data/simplewiki/NOTEEVENTS_token_counts')
 
     arguments.add_argument('-combine_phrases', default=False, action='store_true')
     arguments.add_argument('-debug', default=False, action='store_true')
@@ -26,8 +28,8 @@ if __name__ == '__main__':
     args = arguments.parse_args()
 
     # Expand home path (~) so that pandas knows where to look
-    args.tokenized_fp = os.path.expanduser(args.tokenized_fp)
-    args.token_counts_fp = os.path.expanduser(args.token_counts_fp)
+    args.tokenized_fp = sys.path[0] + args.tokenized_fp
+    args.token_counts_fp = sys.path[0] +  args.token_counts_fp
 
     debug_str = '_mini' if args.debug else ''
     phrase_str = '_phrase' if args.combine_phrases else ''
@@ -49,30 +51,17 @@ if __name__ == '__main__':
     sections = set()
     categories = set()
     for doc_idx in tqdm(range(num_docs)):
-        tokenized_doc_str = tokenized_data[doc_idx]
+        tokenized_doc_str = tokenized_data[doc_idx].split()
         subsampled_doc = []
-        for token in tokenized_doc_str.split():
+        subsampled_doc.append(tokenized_doc_str[0])
+        for token in tokenized_doc_str[1:]:
             wc = token_counts[token]
-            is_section_header = re.match(r'header=[A-Z]+', token)
-            is_doc_header = re.match(r'document=[A-Z]+', token)
-
-            is_phrase = '_' in token
-            if is_section_header:
+            frac = wc / N
+            keep_prob = min((np.sqrt(frac / args.subsample_param) + 1) * (args.subsample_param / frac), 1.0)
+            should_keep = np.random.binomial(1, keep_prob) == 1
+            if should_keep:
                 subsampled_doc.append(token)
-                sections.add(token)
-            elif is_doc_header:
-                subsampled_doc.append(token)
-                categories.add(token)
-            else:
-                threshold = args.min_phrase_count if is_phrase else args.min_token_count
-                if wc < threshold:
-                    continue
-                frac = wc / N
-                keep_prob = min((np.sqrt(frac / args.subsample_param) + 1) * (args.subsample_param / frac), 1.0)
-                should_keep = np.random.binomial(1, keep_prob) == 1
-                if should_keep:
-                    subsampled_doc.append(token)
-                    vocab.add_token(token, token_support=1)
+                vocab.add_token(token, token_support=1)
         tokenized_subsampled_data.append(' '.join(subsampled_doc))
 
     print('Reduced tokens from {} to {}'.format(int(N), sum(vocab.support)))
@@ -80,14 +69,14 @@ if __name__ == '__main__':
     print('Adding {} section headers'.format(len(sections)))
     vocab.add_tokens(sections, token_support=0)
     vocab.category_start_vocab_id = vocab.size()
-    print('Adding {} document categories'.format(len(categories)))
-    vocab.add_tokens(categories)
+    print('Adding {} document categories'.format(num_docs))
+    vocab.add_tokens(set(['document={}'.format(str(i)) for i in range(num_docs)]))
 
-    subsampled_out_fn = '{}_subsampled{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str, sentence_str)
+    subsampled_out_fn =  '{}_subsampled{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str, sentence_str)
     print('Saving subsampled tokens to {}'.format(subsampled_out_fn))
     with open(subsampled_out_fn, 'w') as fd:
         json.dump(tokenized_subsampled_data, fd)
-    vocab_out_fn = 'data/vocab{}{}{}.pk'.format(debug_str, phrase_str, sentence_str)
+    vocab_out_fn = sys.path[0] + 'data/vocab{}{}{}.pk'.format(debug_str, phrase_str, sentence_str)
     print('Saving vocabulary of size {} to {}'.format(vocab.size(), vocab_out_fn))
     with open(vocab_out_fn, 'wb') as fd:
         pickle.dump(vocab, fd)
