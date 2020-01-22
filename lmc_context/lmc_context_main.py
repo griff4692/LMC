@@ -64,7 +64,7 @@ if __name__ == '__main__':
         ids = np.load(fd)
 
     # Load Vocabulary
-    vocab_infile = '../preprocess/data/vocab{}{}.pk'.format(debug_str, phrase_str)
+    vocab_infile = os.path.join(args.data_dir, 'vocab{}{}.pk'.format(debug_str, phrase_str))
     print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         token_vocab = pickle.load(fd)
@@ -153,6 +153,8 @@ if __name__ == '__main__':
             epoch_kl_loss += kl_loss.item()
             epoch_recon_loss += recon_loss.item()
             epoch_joint_loss += joint_loss.item()
+
+            print(kl_loss.item(), recon_loss.item())
             optimizer.step()
         epoch_joint_loss /= float(batcher.num_batches())
         epoch_kl_loss /= float(batcher.num_batches())
