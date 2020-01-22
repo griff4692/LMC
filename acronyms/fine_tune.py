@@ -229,10 +229,6 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
             'test_loss': test_loss
         }
 
-        checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
-        save_func(args, model, optimizer, token_vocab, losses_dict,
-                  checkpoint_fp=checkpoint_fp, metadata_vocab=metadata_vocab)
-
         lowest_test_loss = min(lowest_test_loss, test_loss)
         if lowest_test_loss == test_loss:
             best_weights = model.state_dict()
