@@ -49,12 +49,15 @@ class AcronymExpander(nn.Module):
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
-    def encode_context(self, sf_ids, context_ids, global_ids, global_token_ct, use_att=False, att_style=None,
-                       compute_marginal=False):
+    def encode_context(
+            self, sf_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=False, att_style=None):
         batch_size, num_context_ids = context_ids.size()
-        # First thing is to pass the SF with the context to the encoder
-        mask = torch.BoolTensor(torch.Size([batch_size, num_context_ids]))
-        mask.fill_(0)
+
+        # Mask padded context ids
+        mask_size = torch.Size([batch_size, num_context_ids])
+        device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
+        mask = mask_2D(mask_size, num_contexts).to(device_str)
+
         sf_mu, sf_sigma = self.encoder(sf_ids, context_ids, mask)
         top_global_weights = None
         if use_att:
@@ -96,7 +99,7 @@ class AcronymExpander(nn.Module):
         return sf_mu, sf_sigma, top_global_weights
 
     def forward(self, sf_ids, metadata_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
-                global_token_ct, num_outputs, use_att=False, att_style='weighted', compute_marginal=None):
+                global_token_ct, num_outputs, num_contexts, use_att=False, att_style='weighted', compute_marginal=None):
         """
         :param sf_ids: batch_size
         :param context_ids: batch_size, num_context_ids
@@ -117,8 +120,8 @@ class AcronymExpander(nn.Module):
         lf_mu_sum, lf_sigma_sum = lf_mu.sum(-2) / normalizer, lf_sigma.sum(-2) / normalizer
 
         # Encode SFs in context (use attention or simply pass through Encoder)
-        sf_mu, sf_sigma, top_global_weights = self.encode_context(sf_ids, context_ids, global_ids, global_token_ct,
-                                                                  use_att=use_att, att_style=att_style)
+        sf_mu, sf_sigma, top_global_weights = self.encode_context(
+            sf_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=use_att, att_style=att_style)
 
         # Tile SFs across each LF and flatten both SFs and LFs
         sf_mu_flat = sf_mu.unsqueeze(1).repeat(1, max_output_size, 1).view(batch_size * max_output_size, -1)
