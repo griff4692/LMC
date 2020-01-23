@@ -38,7 +38,7 @@ class AcronymBatcherLoader:
             row = row.to_dict()
             sf = row['sf'].lower()
             # Find target_sf index in sf_lf_map
-            target_lf_ids[batch_idx] = row['used_target_lf_idx']
+            target_lf_ids[batch_idx] = row['target_lf_idx']
             context_tokens = row['trimmed_tokens'].split()
             sf_idxs[batch_idx] = np.where(np.array(context_tokens) == sf)[0][0]
             context_id_seq = self.elmo_tokenize(context_tokens, vocab, indexer)
@@ -71,23 +71,24 @@ class AcronymBatcherLoader:
         max_num_metadata = metadata_vocab.size() if metadata_vocab is not None and metadata_marginal else 1
         lf_metadata_p = np.zeros([batch_size, max_output_length, max_num_metadata])
         global_token_ct = np.zeros([batch_size])
+        m_vocab = metadata_vocab or token_vocab
         for batch_idx, (_, row) in enumerate(batch.iterrows()):
             row = row.to_dict()
             sf_ids[batch_idx] = token_vocab.get_id(row['sf'].lower())
             # Find target_sf index in sf_lf_map
-            target_lf_ids[batch_idx] = row['used_target_lf_idx']
+            target_lf_ids[batch_idx] = row['target_lf_idx']
             context_id_seq = token_vocab.get_ids(row['trimmed_tokens'].split())
             num_context = len(context_id_seq)
             context_ids[batch_idx, :num_context] = context_id_seq
             num_contexts[batch_idx] = num_context
             candidate_lfs = sf_tokenized_lf_map[row['sf']]
             if 'section' in row:
-                section_ids[batch_idx] = token_vocab.get_id(row['section'])
+                section_ids[batch_idx] = m_vocab.get_id(row['section'])
                 if section_ids[batch_idx] < 0:
                     section_ids[batch_idx] = 0
                     # print('Not found={}'.format(row['section']))
             if 'category' in row:
-                category_ids[batch_idx] = token_vocab.get_id(row['category'])
+                category_ids[batch_idx] = m_vocab.get_id(row['category'])
                 if category_ids[batch_idx] < 0:
                     category_ids[batch_idx] = 0
                     # print('Not found={}'.format(row['category']))

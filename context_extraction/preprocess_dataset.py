@@ -123,8 +123,8 @@ def unpack_section_names():
 
 
 def preprocess_mimic_rs(window=10):
-    with open('data/sf_lf_map.json', 'r') as fd:
-        used_sf_lf_map = json.load(fd)
+    with open('../eval/eval_data/minnesota/sf_lf_map.json', 'r') as fd:
+        sf_lf_map = json.load(fd)
 
     mimic_df = pd.read_csv('../preprocess/data/mimic/NOTEEVENTS.csv')
     df = pd.read_csv('data/mimic_rs_dataset.csv')
@@ -200,7 +200,7 @@ def preprocess_mimic_rs(window=10):
         if (row_idx + 1) % 1000 == 0:
             print('Processed {} out of {} examples'.format(row_idx + 1, N))
 
-    df['used_target_lf_idx'] = df['sf'].combine(df['lf_orig'], lambda sf, lf: used_sf_lf_map[sf].index(lf))
+    df['target_lf_idx'] = df['sf'].combine(df['target_lf_sense'], lambda sf, lf: sf_lf_map[sf].index(lf))
     df['row_idx'] = list(range(df.shape[0]))
     df.rename(columns={'lf': 'target_lf'}, inplace=True)
     df['trimmed_tokens'] = trimmed_contexts

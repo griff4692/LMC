@@ -10,14 +10,14 @@ from compute_utils import compute_att
 
 
 class BSGEncoder(nn.Module):
-    def __init__(self, args, vocab_size):
+    def __init__(self, vocab_size, input_dim=100, hidden_dim=64):
         super(BSGEncoder, self).__init__()
-        self.embeddings = nn.Embedding(vocab_size, args.input_dim, padding_idx=0)
+        self.embeddings = nn.Embedding(vocab_size, input_dim, padding_idx=0)
         self.dropout = nn.Dropout(0.2)
-        self.f = nn.Linear(args.input_dim * 2, args.hidden_dim, bias=True)
-        self.att = nn.Linear(args.hidden_dim, 1, bias=True)
-        self.u = nn.Linear(args.hidden_dim, args.input_dim, bias=True)
-        self.v = nn.Linear(args.hidden_dim, 1, bias=True)
+        self.f = nn.Linear(input_dim * 2, hidden_dim, bias=True)
+        self.att = nn.Linear(hidden_dim, 1, bias=True)
+        self.u = nn.Linear(hidden_dim, input_dim, bias=True)
+        self.v = nn.Linear(hidden_dim, 1, bias=True)
 
     def forward(self, center_ids, context_ids, mask):
         """
@@ -40,14 +40,14 @@ class BSGEncoder(nn.Module):
 
 
 class BSGEncoderLSTM(nn.Module):
-    def __init__(self, args, vocab_size):
+    def __init__(self, vocab_size, input_dim=100, hidden_dim=64):
         super(BSGEncoderLSTM, self).__init__()
-        self.embeddings = nn.Embedding(vocab_size, args.input_dim, padding_idx=0)
+        self.embeddings = nn.Embedding(vocab_size, input_dim, padding_idx=0)
         self.dropout = nn.Dropout(0.2)
-        self.lstm = nn.LSTM(args.input_dim * 2, args.hidden_dim, bidirectional=True, batch_first=True)
-        self.att = nn.Linear(args.hidden_dim * 2, 1, bias=True)
-        self.u = nn.Linear(args.hidden_dim * 2, args.input_dim, bias=True)
-        self.v = nn.Linear(args.hidden_dim * 2, 1, bias=True)
+        self.lstm = nn.LSTM(input_dim * 2, hidden_dim, bidirectional=True, batch_first=True)
+        self.att = nn.Linear(hidden_dim * 2, 1, bias=True)
+        self.u = nn.Linear(hidden_dim * 2, input_dim, bias=True)
+        self.v = nn.Linear(hidden_dim * 2, 1, bias=True)
 
     def forward(self, center_ids, context_ids, mask, token_mask_p=0.2):
         """

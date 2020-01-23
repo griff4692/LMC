@@ -32,12 +32,10 @@ class AcronymExpander(nn.Module):
             self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
 
         if args.random_encoder:
-            args.latent_dim, args.encoder_hidden_dim = bsg_model.encoder.u.weight.size()
-            args.encoder_input_dim = args.encoder_hidden_dim
             if type(bsg_model.encoder) == BSGEncoderLSTM:
-                self.encoder = BSGEncoderLSTM(args, vocab_size)
+                self.encoder = BSGEncoderLSTM(vocab_size)
             else:
-                self.encoder = BSGEncoder(args, vocab_size)
+                self.encoder = BSGEncoder(vocab_size)
         else:
             self.encoder = bsg_model.encoder
             encoder_embed_dim = self.encoder.embeddings.weight.size()[-1]
@@ -119,27 +117,31 @@ class AcronymExpander(nn.Module):
         normalizer = lf_token_ct.unsqueeze(-1).clamp_min(1.0)
         lf_mu_sum, lf_sigma_sum = lf_mu.sum(-2) / normalizer, lf_sigma.sum(-2) / normalizer
 
+        combined_mu = []
+        combined_sigma = []
+
         # Encode SFs in context (use attention or simply pass through Encoder)
-        sf_mu_tokens, sf_sigma_tokens, _ = self.encode_context(
+        sf_mu_tokens, sf_sigma_tokens, top_global_weights = self.encode_context(
             sf_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=use_att, att_style=att_style)
+        combined_mu.append(sf_mu_tokens)
+        combined_sigma.append(sf_sigma_tokens)
 
-        sf_mu_sec, sf_sigma_sec, _ = self.encode_context(
-            section_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=use_att, att_style=att_style)
+        if len(section_ids.nonzero()) > 0:
+            sf_mu_sec, sf_sigma_sec, _ = self.encode_context(
+                section_ids, context_ids, global_ids, global_token_ct, num_contexts,
+                use_att=use_att, att_style=att_style)
+            combined_mu.append(sf_mu_sec)
+            combined_sigma.append(sf_sigma_sec)
 
-        sf_mu_cat, sf_sigma_cat, top_global_weights = self.encode_context(
-            category_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=use_att, att_style=att_style)
+        if len(category_ids.nonzero()) > 0:
+            sf_mu_cat, sf_sigma_cat, _ = self.encode_context(
+                category_ids, context_ids, global_ids, global_token_ct, num_contexts,
+                use_att=use_att, att_style=att_style)
+            combined_mu.append(sf_mu_cat)
+            combined_sigma.append(sf_sigma_cat)
 
-        combined_mu = torch.cat([
-            sf_mu_tokens.unsqueeze(1),
-            sf_mu_sec.unsqueeze(1),
-            sf_mu_cat.unsqueeze(1),
-        ], axis=1)
-
-        combined_sigma = torch.cat([
-            sf_sigma_tokens,
-            sf_sigma_sec,
-            sf_sigma_cat
-        ], axis=1)
+        combined_mu = torch.cat(list(map(lambda x: x.unsqueeze(1), combined_mu)), axis=1)
+        combined_sigma = torch.cat(list(map(lambda x: x.unsqueeze(1), combined_sigma)), axis=1)
 
         sf_mu = combined_mu.mean(1)
         sf_sigma = combined_sigma.mean(1)
@@ -151,7 +153,8 @@ class AcronymExpander(nn.Module):
         lf_sigma_flat = lf_sigma_sum.view(batch_size * max_output_size, -1)
 
         output_dim = torch.Size([batch_size, max_output_size])
-        output_mask = mask_2D(output_dim, num_outputs)
+        device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
+        output_mask = mask_2D(output_dim, num_outputs).to(device_str)
 
         kl = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(batch_size, max_output_size)
         score = -kl

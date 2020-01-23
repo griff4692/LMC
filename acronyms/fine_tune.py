@@ -19,7 +19,6 @@ sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from acronym_batcher import AcronymBatcherLoader
 from acronym_expander import AcronymExpander
 from acronym_expander_lmc import AcronymExpanderLMC
-from acronym_expansion import parse_sense_df
 from acronym_utils import process_batch, target_lf_index
 from bsg_utils import restore_model as restore_bsg, save_checkpoint as save_bsg
 from error_analysis import analyze, render_test_statistics
@@ -30,7 +29,7 @@ from model_utils import get_git_revision_hash, render_args
 
 
 def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
-                   used_sf_lf_map, token_metadata_counts, results_dir=None):
+                   sf_lf_map, token_metadata_counts, results_dir=None):
     test_batcher.reset(shuffle=False)
     test_epoch_loss, test_examples, test_correct = 0.0, 0, 0
     model.eval()
@@ -50,7 +49,7 @@ def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_v
     print('Test Loss={}. Accuracy={}'.format(test_loss, test_acc))
     sleep(0.1)
 
-    analyze(args, test_batcher, model, used_sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
             token_metadata_counts, results_dir=results_dir)
 
     return test_loss
@@ -60,6 +59,7 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_voca
                     token_metadata_counts):
     train_batcher.reset(shuffle=True)
     train_epoch_loss, train_examples, train_correct = 0.0, 0, 0
+    model.train()
     for _ in tqdm(range(train_batcher.num_batches())):
         optimizer.zero_grad()
         batch_loss, num_examples, num_correct, _, _ = process_batch(
@@ -86,56 +86,27 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_voca
 def load_casi(prev_args):
     # Load Data
     data_dir = '../eval/eval_data/minnesota/'
-    sense_fp = os.path.join(data_dir, 'sense_inventory_ii')
-    lfs, lf_sf_map, sf_lf_map = parse_sense_df(sense_fp)
     data_fp = os.path.join(data_dir, 'preprocessed_dataset_window_{}.csv'.format(prev_args.window))
     if not os.path.exists(data_fp):
         print('Need to preprocess dataset first...')
         preprocess_minnesota_dataset(window=prev_args.window, combine_phrases=prev_args.combine_phrases)
         print('Saving dataset to {}'.format(data_fp))
     df = pd.read_csv(data_fp)
-    df['target_lf_idx'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_index(lf, sf_lf_map[sf]))
-    prev_N = df.shape[0]
-    df = df[df['target_lf_idx'] > -1]
-    print('Removed {} examples for which the target LF is not exactly in the sense inventory ii'.format(
-        prev_N - df.shape[0]))
     df['tokenized_context_unique'] = df['tokenized_context'].apply(lambda x: list(set(x.split())))
-
-    prev_N = df.shape[0]
-    df.drop_duplicates(subset=['target_lf', 'tokenized_context'], inplace=True)
-    N = df.shape[0]
-    print('Removed {} examples with duplicate context-target LF pairs'.format(prev_N - N))
-
-    sfs = df['sf'].unique().tolist()
-    used_sf_lf_map = defaultdict(list)
-    dominant_sfs = set()
-
-    for sf in sfs:
-        subset_df = df[df['sf'] == sf]
-        used_target_idxs = subset_df['target_lf_idx'].unique()
-        if len(used_target_idxs) == 1:
-            dominant_sfs.add(sf)
-        else:
-            for lf_idx in used_target_idxs:
-                used_sf_lf_map[sf].append(sf_lf_map[sf][lf_idx])
-
-    prev_N = df.shape[0]
-    df = df[~df['sf'].isin(dominant_sfs)]
-    print(('Removing {} examples from {} SF\'s because they have only 1 sense associated with'
-           ' them after preprocessing'.format(prev_N - df.shape[0], len(dominant_sfs))))
-
-    df['used_target_lf_idx'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_index(lf, used_sf_lf_map[sf]))
-
     df['row_idx'] = list(range(df.shape[0]))
+
+    with open(os.path.join(data_dir, 'sf_lf_map.json'), 'r') as fd:
+        sf_lf_map = json.load(fd)
+
     train_df, test_df = train_test_split(df, random_state=1992, test_size=0.2)
     train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
     test_batcher = AcronymBatcherLoader(test_df, batch_size=32)
     assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
-    return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs
+    return train_batcher, test_batcher, train_df, test_df, sf_lf_map
 
 
 def load_mimic(prev_args):
-    with open('../context_extraction/data/sf_lf_map.json', 'r') as fd:
+    with open('../eval/eval_data/minnesota/sf_lf_map.json', 'r') as fd:
         sf_lf_map = json.load(fd)
     used_sf_lf_map = {}
     window = 10
@@ -156,9 +127,7 @@ def load_mimic(prev_args):
     train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
     test_batcher = AcronymBatcherLoader(test_df, batch_size=32)
     assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
-    assert len(set(train_df['tokenized_context'].tolist()).intersection(
-        set(test_df['tokenized_context'].tolist()))) == 0
-    return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs
+    return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
 def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
@@ -172,23 +141,29 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
         prev_args.metadata = None
     else:
         prev_args, lm, token_vocab, metadata_vocab, _, token_metadata_counts = restore_func(args.lm_experiment)
-    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs = loader(prev_args)
+    train_batcher, test_batcher, train_df, test_df, sf_lf_map = loader(prev_args)
+    args.metadata = prev_args.metadata
+
+
+    canonical_lfs = pd.read_csv('../eval/eval_data/minnesota/labeled_sf_lf_map.csv')
+    canonical_sf_lf_map = dict(canonical_lfs.groupby('target_lf_sense')['target_label'].apply(list))
 
     sf_tokenized_lf_map = defaultdict(list)
     prev_vocab_size = token_vocab.size()
-    for sf, lf_list in used_sf_lf_map.items():
+    for sf, lf_list in sf_lf_map.items():
+        token_vocab.add_token(sf.lower())
         for lf in lf_list:
-            tokens = lf_tokenizer(lf, token_vocab)
+            canonical_lf_arr = list(set(canonical_sf_lf_map[lf]))
+            assert len(canonical_lf_arr) == 1
+            canonical_lf = canonical_lf_arr[0]
+            tokens = lf_tokenizer(canonical_lf, token_vocab)
             sf_tokenized_lf_map[sf].append(tokens)
             for t in tokens:
                 token_vocab.add_token(t)
-
-    for t in sfs:
-        token_vocab.add_token(t.lower())
     new_vocab_size = token_vocab.size()
     print('Added {} tokens to vocabulary from LF targets and SFs.'.format(new_vocab_size - prev_vocab_size))
 
-    render_test_statistics(test_df, used_sf_lf_map)
+    render_test_statistics(test_df, sf_lf_map)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join('../acronyms', 'weights', args.experiment)
@@ -200,7 +175,8 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
-    model = acronym_model(args, lm, token_vocab)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = acronym_model(args, lm, token_vocab).to(device)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
@@ -210,11 +186,10 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
     best_weights = model.state_dict()
     best_epoch = 1
     lowest_test_loss = run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab,
-                                      sf_tokenized_lf_map, used_sf_lf_map, token_metadata_counts,
+                                      sf_tokenized_lf_map, sf_lf_map, token_metadata_counts,
                                       results_dir=results_dir)
 
     # Make sure it's calculating gradients
-    model.train()  # just sets .requires_grad = True
     for epoch in range(1, args.epochs + 1):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
         print('Starting Epoch={}'.format(epoch))
@@ -222,7 +197,7 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
         train_loss = run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_vocab, metadata_vocab,
                                      sf_tokenized_lf_map, token_metadata_counts)
         test_loss = run_test_epoch(
-            args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map, used_sf_lf_map,
+            args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map, sf_lf_map,
             token_metadata_counts, results_dir=results_dir)
 
         losses_dict = {
@@ -243,7 +218,7 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
     checkpoint_fp = os.path.join(weights_dir, 'checkpoint_best.pth')
     save_func(args, model, optimizer, token_vocab, losses_dict,
               checkpoint_fp=checkpoint_fp, metadata_vocab=metadata_vocab)
-    analyze(args, test_batcher, model, used_sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
             token_metadata_counts, results_dir=results_dir)
 
 
@@ -259,7 +234,7 @@ if __name__ == '__main__':
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--epochs', default=3, type=int)
+    parser.add_argument('--epochs', default=5, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('-random_encoder', default=False, action='store_true', help='Don\'t use pretrained encoder')
     parser.add_argument('-random_priors', default=False, action='store_true', help='Don\'t use pretrained priors')

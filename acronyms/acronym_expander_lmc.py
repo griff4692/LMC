@@ -18,6 +18,7 @@ class AcronymExpanderLMC(nn.Module):
 
         prev_encoder_token_embeddings = lmc_model.encoder.token_embeddings.weight.detach().numpy()
         self.encoder = lmc_model.encoder
+        self.metadata = args.metadata
         self.encoder.token_embeddings = nn.Embedding(token_vocab_size, encoder_embed_dim, padding_idx=0)
         encoder_init = np.random.normal(0, 1, size=(token_vocab_size, encoder_embed_dim))
         encoder_init[:prev_token_vocab_size, :] = prev_encoder_token_embeddings
@@ -49,7 +50,7 @@ class AcronymExpanderLMC(nn.Module):
         sigma = (metadata_p * sigma_marginal).sum(2)
         return mu, sigma + 1e-3
 
-    def forward(self, sf_ids, metadata_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
+    def forward(self, sf_ids, section_ids, category_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
                 global_token_ct, lf_metadata_p, num_outputs, num_contexts, use_att=False, att_style=None,
                 compute_marginal=False):
         batch_size, max_output_size, max_lf_ngram = lf_ids.size()
@@ -60,7 +61,7 @@ class AcronymExpanderLMC(nn.Module):
         mask_size = torch.Size([batch_size, num_context_ids])
         device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
         mask = mask_2D(mask_size, num_contexts).to(device_str)
-        sf_mu, sf_sigma = self.encoder(sf_ids, metadata_ids, context_ids, mask)
+        sf_mu, sf_sigma = self.encoder(sf_ids, section_ids, context_ids, mask)
 
         # Tile SFs across each LF and flatten both SFs and LFs
         sf_mu_flat = sf_mu.unsqueeze(1).repeat(1, max_output_size, 1).view(batch_size * max_output_size, -1)
@@ -74,13 +75,13 @@ class AcronymExpanderLMC(nn.Module):
             lf_sigma_flat = lf_sigma.view(batch_size * max_output_size, 1)
         else:
             normalizer_flat = normalizer.view(batch_size * max_output_size, 1)
-            metadata_ids_tiled = metadata_ids.unsqueeze(1).repeat(1, max_output_size)
-            metadata_ids_tiled_flat = metadata_ids_tiled.view(batch_size * max_output_size)
+            section_ids_tiled = section_ids.unsqueeze(1).repeat(1, max_output_size)
+            section_ids_tiled_flat = section_ids_tiled.view(batch_size * max_output_size)
             lf_ids_flat = lf_ids.view(batch_size * max_output_size, max_lf_ngram)
-            lf_mu_flat, lf_sigma_flat = self.decoder(lf_ids_flat, metadata_ids_tiled_flat, normalizer=normalizer_flat)
+            lf_mu_flat, lf_sigma_flat = self.decoder(lf_ids_flat, section_ids_tiled_flat, normalizer=normalizer_flat)
 
         output_dim = torch.Size([batch_size, max_output_size])
-        output_mask = mask_2D(output_dim, num_outputs)
+        output_mask = mask_2D(output_dim, num_outputs).to(device_str)
 
         kl = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(batch_size, max_output_size)
         score = -kl

@@ -29,14 +29,14 @@ def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window,
     return str
 
 
-def _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion,
-                   id_map, top_global_weights=None):
+def _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map,
+                   top_global_weights=None):
     for batch_idx, (row_idx, row) in enumerate(batch_data.iterrows()):
         row = row.to_dict()
         sf = row['sf']
-        lf_map = used_sf_lf_map[sf]
+        lf_map = sf_lf_map[sf]
         target_lf = row['target_lf']
-        target_lf_idx = row['used_target_lf_idx']
+        target_lf_idx = row['target_lf_idx']
         pred_lf_idx = pred_lf_idxs[batch_idx]
         pred_lf = lf_map[pred_lf_idx]
         metadata = row['metadata'] if 'metadata' in row else None
@@ -55,7 +55,7 @@ def _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, correct_str, errors
         sf_confusion[sf][1].append(pred_lf_idx)
 
 
-def _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_confusion, id_map):
+def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map):
     correct_fp = os.path.join(results_dir, 'correct.txt')
     reports_fp = os.path.join(results_dir, 'reports.txt')
     errors_fp = os.path.join(results_dir, 'errors.txt')
@@ -86,7 +86,7 @@ def _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_conf
         for k in sorted(errors_str.keys()):
             fd.write(errors_str[k])
     for sf in sf_confusion:
-        labels = used_sf_lf_map[sf]
+        labels = sf_lf_map[sf]
         labels_trunc = list(map(lambda x: x.split(';')[0], labels))
         y_true = sf_confusion[sf][0]
         y_pred = sf_confusion[sf][1]
@@ -155,13 +155,13 @@ def _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_conf
         # print('{},{},{}'.format(t, avg_macro_f1, avg_weighted_f1))
 
 
-def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
             token_metadata_counts, results_dir=None):
     """
     :param args: ArgParse instance
     :param test_batcher: AcronymBatcherLoader instance
     :param model: AcronymExpander instance
-    :param used_sf_lf_map: Short form to LF mappings
+    :param sf_lf_map: Short form to LF mappings
     :param loss_func: PyTorch CrossEntropyLoss instance
     :param vocab: Vocab instance storing tokens and corresponding token ids
     :param sf_tokenized_lf_map: dictionary of SF --> tokenized LFs
@@ -181,18 +181,18 @@ def analyze(args, test_batcher, model, used_sf_lf_map, loss_func, token_vocab, m
                 token_metadata_counts)
         batch_data = test_batcher.get_prev_batch()
         pred_lf_idxs = tensor_to_np(torch.argmax(batch_scores, 1))
-        _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map,
+        _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map,
                        top_global_weights=top_global_weights)
 
-    _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
+    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
 
 
-def elmo_analyze(test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=None):
+def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=None):
     """
     :param args: argparse.ArgumentParser instance
     :param test_batcher: AcronymBatcherLoader instance
     :param model: AcronymExpander instance
-    :param used_sf_lf_map: Short form to LF mappings
+    :param sf_lf_map: Short form to LF mappings
     :param vocab: Vocabulary AllenNLP instance storing tokens and corresponding token ids
     :param indexer: AllenNLP token to id indexer
     :param results_dir: where to write the results files
@@ -212,8 +212,8 @@ def elmo_analyze(test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map
             scores, target = model(*batch_input + [num_outputs])
         pred_lf_idxs = tensor_to_np(torch.argmax(scores, 1))
         batch_data = test_batcher.get_prev_batch()
-        _analyze_batch(batch_data, used_sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map)
-    _analyze_stats(results_dir, used_sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
+        _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map)
+    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
 
 
 def render_test_statistics(df, sf_lf_map):
@@ -224,7 +224,7 @@ def render_test_statistics(df, sf_lf_map):
     dominant_counts = 0
     expected_random_accuracy = 0.0
     for sf in sfs:
-        dominant_counts += df[df['sf'] == sf]['used_target_lf_idx'].value_counts().max()
+        dominant_counts += df[df['sf'] == sf]['target_lf_idx'].value_counts().max()
         expected_random_accuracy += sf_counts[sf] / float(len(sf_lf_map[sf]))
 
     print('Accuracy from choosing dominant class={}'.format(dominant_counts / float(N)))

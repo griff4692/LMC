@@ -5,15 +5,15 @@ import torch.utils.data
 
 
 class LMCDecoder(nn.Module):
-    def __init__(self, args, token_vocab_size, section_vocab_size):
+    def __init__(self, token_vocab_size, section_vocab_size, input_dim=100, hidden_dim=64):
         super(LMCDecoder, self).__init__()
         self.dropout = nn.Dropout(0.2)
-        self.f = nn.Linear(args.input_dim * 2, args.hidden_dim, bias=True)
-        self.u = nn.Linear(args.hidden_dim, args.latent_dim, bias=True)
-        self.v = nn.Linear(args.hidden_dim, 1, bias=True)
+        self.f = nn.Linear(input_dim * 2, hidden_dim, bias=True)
+        self.u = nn.Linear(hidden_dim, input_dim, bias=True)
+        self.v = nn.Linear(hidden_dim, 1, bias=True)
 
-        self.token_embeddings = nn.Embedding(token_vocab_size, args.input_dim, padding_idx=0)
-        self.metadata_embeddings = nn.Embedding(section_vocab_size, args.input_dim, padding_idx=0)
+        self.token_embeddings = nn.Embedding(token_vocab_size, input_dim, padding_idx=0)
+        self.metadata_embeddings = nn.Embedding(section_vocab_size, input_dim, padding_idx=0)
 
     def forward(self, center_ids, metadata_ids, normalizer=None):
         """

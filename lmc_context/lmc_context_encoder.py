@@ -4,14 +4,14 @@ import torch.utils.data
 
 
 class LMCContextEncoder(nn.Module):
-    def __init__(self, args, token_vocab_size, metadata_vocab_size):
+    def __init__(self, token_vocab_size, metadata_vocab_size, input_dim=100, hidden_dim=64):
         super(LMCContextEncoder, self).__init__()
-        self.token_embeddings = nn.Embedding(token_vocab_size, args.input_dim, padding_idx=0)
-        self.metadata_embeddings = nn.Embedding(metadata_vocab_size, args.input_dim, padding_idx=0)
+        self.token_embeddings = nn.Embedding(token_vocab_size, input_dim, padding_idx=0)
+        self.metadata_embeddings = nn.Embedding(metadata_vocab_size, input_dim, padding_idx=0)
         self.dropout = nn.Dropout(0.2)
-        self.lstm = nn.LSTM(args.input_dim * 3, args.hidden_dim, bidirectional=True, batch_first=True)
-        self.u = nn.Linear(args.hidden_dim * 2, args.latent_dim, bias=True)
-        self.v = nn.Linear(args.hidden_dim * 2, 1, bias=True)
+        self.lstm = nn.LSTM(input_dim * 3, hidden_dim, bidirectional=True, batch_first=True)
+        self.u = nn.Linear(hidden_dim * 2, input_dim, bias=True)
+        self.v = nn.Linear(hidden_dim * 2, 1, bias=True)
 
     def forward(self, center_ids, metadata_ids, context_ids, mask):
         """

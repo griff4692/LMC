@@ -33,8 +33,9 @@ def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, 
     batch_input, batch_p, batch_counts = batcher.next(token_vocab, sf_tokenized_lf_map, token_metadata_counts,
                                                      metadata_vocab=metadata_vocab,
                                                      metadata_marginal=args.metadata_marginal)
-    batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0), batch_input))
-    batch_p = list(map(lambda x: torch.FloatTensor(x), batch_p))
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0).to(device), batch_input))
+    batch_p = list(map(lambda x: torch.FloatTensor(x).to(device), batch_p))
     full_input = batch_input + batch_counts if args.lm_type == 'bsg' else batch_input + batch_p + batch_counts
     scores, target, top_global_weights = model(*full_input, use_att=args.use_att, att_style=args.att_style,
                                                compute_marginal=args.metadata_marginal)

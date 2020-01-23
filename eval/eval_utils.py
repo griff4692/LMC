@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+import json
 import re
 import string
 import sys
@@ -9,6 +10,7 @@ from scipy.spatial.distance import cosine
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+from casi_constants import LF_BLACKLIST, LF_MAPPING, SF_BLACKLIST
 from clean_mimic import clean_text
 from mimic_tokenize import STOPWORDS, tokenize_str
 from model_utils import tensor_to_np
@@ -75,27 +77,84 @@ def eval_tokenize(str, unique_only=False, chunker=None, combine_phrases=False):
     return tokens
 
 
-def preprocess_minnesota_dataset(window=5, chunker=None, combine_phrases=False):
+def target_lf_sense(target_lf, sf, sf_lf_map):
+    if 'UNSURED SENSE' in target_lf or 'MISTAKE' in target_lf or 'GENERAL ENGLISH' in target_lf or 'NAME' in target_lf:
+        return None
+
+    target_lf_arr = re.split(r':([a-zA-Z]+)', target_lf)
+    target_lf_arr = list(filter(lambda x: len(x) > 0, target_lf_arr))
+    proposed_sf = sf if len(target_lf_arr) == 1 else target_lf_arr[1].upper()
+    stripped_target_lf = target_lf_arr[0]
+
+    if proposed_sf in sf_lf_map.keys():
+        actual_sf = proposed_sf
+    else:
+        actual_sf = sf
+
+    for full_lf in sf_lf_map[actual_sf]:
+        for lf in full_lf.split(';'):
+            if lf.lower() == stripped_target_lf.lower():
+                return full_lf
+
+    return stripped_target_lf
+
+
+def target_lf_index(target_lf, lfs):
+    for i in range(len(lfs)):
+        lf_tokens = lfs[i].split(';')
+        for lf in lf_tokens:
+            if lf.lower() == target_lf.lower():
+                return i
+    return -1
+
+
+def parse_sense_df(sense_fp):
+    sense_df = pd.read_csv(sense_fp, sep='|')
+    sense_df.dropna(subset=['LF', 'SF'], inplace=True)
+    lfs = sense_df['LF'].unique().tolist()
+    lf_sf_map = {}
+    sf_lf_map = defaultdict(set)
+    for row_idx, row in sense_df.iterrows():
+        row = row.to_dict()
+        lf_sf_map[row['LF']] = row['SF']
+        sf_lf_map[row['SF']].add(row['LF'])
+    for k in sf_lf_map:
+        sf_lf_map[k] = list(sorted(sf_lf_map[k]))
+    return lfs, lf_sf_map, sf_lf_map
+
+
+def preprocess_minnesota_dataset(window=10, chunker=None, combine_phrases=False):
     in_fp = '../eval/eval_data/minnesota/AnonymizedClinicalAbbreviationsAndAcronymsDataSet.txt'
     phrase_str = '_phrase' if combine_phrases else ''
     out_fp = '../eval/eval_data/minnesota/preprocessed_dataset_window_{}{}.csv'.format(window, phrase_str)
     # cols = ['sf', 'target_lf', 'sf_rep', 'start_idx', 'end_idx', 'section', 'context']
     df = pd.read_csv(in_fp, sep='|')
     df.dropna(subset=['sf', 'target_lf', 'context'], inplace=True)
+    N = df.shape[0]
+    print('Dropping SF={}'.format(SF_BLACKLIST))
+    df = df[~df['sf'].isin(SF_BLACKLIST)]
+    print('Removed {} rows'.format(N - df.shape[0]))
+    N = df.shape[0]
+
+    df['lf_in_sf'] = df['sf'].combine(df['target_lf'], lambda sf, lf: sf.lower() in lf.lower().split())
+    df = df[~df['lf_in_sf']]
+    print('Removed {} rows because the LF is contained within the SF'.format(N - df.shape[0]))
+
+    lfs, lf_sf_map, sf_lf_map = parse_sense_df('../eval/eval_data/minnesota/sense_inventory_ii')
+    df['target_lf_sense'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_sense(lf, sf, sf_lf_map))
+    df = df[~df['target_lf_sense'].isin(LF_BLACKLIST) & ~df['target_lf_sense'].isnull()]
+    df['target_lf_sense'] = df['target_lf_sense'].apply(lambda x: LF_MAPPING[x] if x in LF_MAPPING else x)
 
     # Tokenize
     sf_occurrences = []  # When multiple of SF in context, keep track of which one the label is for
     tokenized_contexts = []
 
     valid_rows = []
-    print('Filtering out invalid rows...')
     for row_idx, row in df.iterrows():
         row = row.to_dict()
         sf_idxs = [m.start() for m in re.finditer(r'\b({})\b'.format(row['sf']), row['context'])]
         target_start_idx = int(row['start_idx'])
-
         valid = ' ' in row['context'][target_start_idx + len(row['sf']): target_start_idx + len(row['sf']) + 2]
-
         sf_occurrence_ct = np.where(np.array(sf_idxs) == target_start_idx)[0]
         if not valid or len(sf_occurrence_ct) == 0:
             # print('SF not present in context for row={}'.format(row_idx))
@@ -143,8 +202,34 @@ def preprocess_minnesota_dataset(window=5, chunker=None, combine_phrases=False):
     df = df[df['valid']]
     df.drop(columns='valid', inplace=True)
     print('Issues parsing into tokens for {} out of {} remaining examples'.format(prev_n - df.shape[0], prev_n))
-    print('Finished preprocessing dataset.  Now saving it to {}'.format(out_fp))
+    N = df.shape[0]
+
+    # Remove dominant SFs after parsing
+    df.drop_duplicates(subset=['target_lf', 'tokenized_context'], inplace=True)
+    print('Removed {} examples with duplicate context-target LF pairs'.format(N - df.shape[0]))
+    N = df.shape[0]
+
+    dominant_sfs = set()
+    sfs = df['sf'].unique().tolist()
+    used_sf_lf_map = {}
+    for sf in sfs:
+        unique_senses = list(sorted(df[df['sf'] == sf]['target_lf_sense'].unique().tolist()))
+        if len(unique_senses) == 1:
+            dominant_sfs.add(sf)
+        else:
+            used_sf_lf_map[sf] = unique_senses
+    df = df[~df['sf'].isin(dominant_sfs)]
+    print('Removing {} SFs ({} examples) because they have a dominant sense'.format(len(dominant_sfs), N - df.shape[0]))
+
+    df['target_lf_idx'] = df['sf'].combine(
+        df['target_lf_sense'], lambda sf, lf_sense: used_sf_lf_map[sf].index(lf_sense))
+
+    print('Finished preprocessing dataset of size={}.  Now saving it to {}'.format(df.shape[0], out_fp))
+    df['row_idx'] = list(range(df.shape[0]))
     df.to_csv(out_fp, index=False)
+
+    with open('../eval/eval_data/minnesota/sf_lf_map.json', 'w') as fd:
+        json.dump(used_sf_lf_map, fd)
 
 
 def w2v_point_similarity(model, t1, t2):

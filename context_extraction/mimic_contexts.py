@@ -10,7 +10,7 @@ sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from batch_tokenize import split
 from extract_context_utils import ContextExtractor, ContextType
 
-LFS = pd.read_csv('data/lfs.csv')['lf'].tolist()
+LFS = pd.read_csv('../eval/eval_data/minnesota/labeled_sf_lf_map.csv')['target_label'].unique().tolist()
 CONTEXT_EXTRACTOR = ContextExtractor()
 
 
@@ -19,9 +19,9 @@ def add_counts():
     contexts = pd.read_csv(context_fn)
     lf_counts = dict(contexts['lf'].value_counts())
 
-    lfs = pd.read_csv('data/lfs.csv')
+    lfs = pd.read_csv('../eval/eval_data/minnesota/labeled_sf_lf_map.csv')
     counts = []
-    for lf in lfs['lf'].tolist():
+    for lf in lfs['target_label'].tolist():
         count = 0 if not lf in lf_counts else lf_counts[lf]
         counts.append(count)
     lfs['count'] = counts

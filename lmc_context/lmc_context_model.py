@@ -13,8 +13,8 @@ class LMCC(nn.Module):
     def __init__(self, args, token_vocab_size, section_vocab_size):
         super(LMCC, self).__init__()
         self.device = args.device
-        self.encoder = LMCContextEncoder(args, token_vocab_size, section_vocab_size)
-        self.decoder = LMCDecoder(args, token_vocab_size, section_vocab_size)
+        self.encoder = LMCContextEncoder(token_vocab_size, section_vocab_size)
+        self.decoder = LMCDecoder(token_vocab_size, section_vocab_size)
         self.margin = args.hinge_loss_margin or 1.0
 
     def _compute_marginal(self, ids, metadata_ids, metadata_p):

@@ -10,14 +10,14 @@ from compute_utils import compute_kl, mask_2D
 
 
 class BSG(nn.Module):
-    def __init__(self, args, vocab_size):
+    def __init__(self, args, vocab_size, input_dim=100):
         super(BSG, self).__init__()
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.encoder = BSGEncoderLSTM(args, vocab_size)
+        self.encoder = BSGEncoderLSTM(vocab_size)
         self.margin = args.hinge_loss_margin or 1.0
 
         # The output representations of words(used in KL regularization and max_margin).
-        self.embeddings_mu = nn.Embedding(vocab_size, args.input_dim, padding_idx=0)
+        self.embeddings_mu = nn.Embedding(vocab_size, input_dim, padding_idx=0)
 
         self.embeddings_log_sigma = nn.Embedding(vocab_size, 1, padding_idx=0)
         log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
