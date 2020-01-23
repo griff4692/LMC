@@ -24,7 +24,10 @@ class BSG(nn.Module):
         self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
 
         self.multi_bsg = args.multi_bsg
-        self.mask_p = args.mask_p
+        if hasattr(args, 'mask_p'):
+            self.mask_p = args.mask_p
+        else:
+            self.mask_p = None
         if args.multi_bsg:
             if hasattr(args, 'multi_weights'):
                 weights = np.array(list(map(float, args.multi_weights.split(','))))
