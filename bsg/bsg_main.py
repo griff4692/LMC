@@ -43,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
     parser.add_argument('-multi_bsg', default=False, action='store_true')
     parser.add_argument('--multi_weights', default='0.7,0.2,0.1')
-    parser.add_argument('-mask_p', default=None, type=float)
+    parser.add_argument('--mask_p', default=None, type=float)
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()

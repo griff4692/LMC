@@ -85,12 +85,12 @@ class AcronymBatcherLoader:
                 section_ids[batch_idx] = token_vocab.get_id(row['section'])
                 if section_ids[batch_idx] < 0:
                     section_ids[batch_idx] = 0
-                    print('Not found={}'.format(row['section']))
+                    # print('Not found={}'.format(row['section']))
             if 'category' in row:
                 category_ids[batch_idx] = token_vocab.get_id(row['category'])
                 if category_ids[batch_idx] < 0:
                     category_ids[batch_idx] = 0
-                    print('Not found={}'.format(row['category']))
+                    # print('Not found={}'.format(row['category']))
 
             global_id_seq = token_vocab.get_ids(row['tokenized_context_unique'])
             num_global_ids = len(global_id_seq)

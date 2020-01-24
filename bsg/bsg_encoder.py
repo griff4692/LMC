@@ -63,7 +63,8 @@ class BSGEncoderLSTM(nn.Module):
         if token_mask_p is not None:
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
             context_mask = torch.FloatTensor(batch_size, num_context_ids).uniform_().to(device) < token_mask_p
-            context_ids.masked_fill_(context_mask, 0)
+            mask.masked_fill_(context_mask, True)
+
         context_embedding = self.embeddings(context_ids)
 
         center_embedding_tiled = center_embedding.unsqueeze(1).repeat(1, num_context_ids, 1)
