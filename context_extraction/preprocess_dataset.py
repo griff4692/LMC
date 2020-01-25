@@ -43,7 +43,7 @@ def get_header_from_full_context(mimic_df, context, lf_match, doc_id, header_reg
 
     headers = []
     for tok_idx, toks in enumerate(sectioned_tokens):
-        is_header = _is_header(sectioned_text, tok_idx)
+        is_header = _is_header(sectioned_tokens, tok_idx)
         if is_header:
             header_stripped = toks.strip().strip(':').upper()
             if header_stripped in SECTION_NAMES:

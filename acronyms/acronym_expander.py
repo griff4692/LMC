@@ -47,8 +47,7 @@ class AcronymExpander(nn.Module):
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
-    def encode_context(
-            self, sf_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=False, att_style=None):
+    def encode_context(self, sf_ids, context_ids, num_contexts):
         batch_size, num_context_ids = context_ids.size()
 
         # Mask padded context ids
@@ -57,47 +56,46 @@ class AcronymExpander(nn.Module):
         mask = mask_2D(mask_size, num_contexts).to(device_str)
 
         sf_mu, sf_sigma = self.encoder(sf_ids, context_ids, mask, token_mask_p=None)
-        top_global_weights = None
-        if use_att:
-            global_mu, global_sigma = self._compute_priors(global_ids)
-            max_global_len = global_ids.size()[-1]
-            global_size = torch.Size([batch_size, max_global_len])
-            global_mask = mask_2D(global_size, global_token_ct)
+        # if use_att:
+        #     global_mu, global_sigma = self._compute_priors(global_ids)
+        #     max_global_len = global_ids.size()[-1]
+        #     global_size = torch.Size([batch_size, max_global_len])
+        #     global_mask = mask_2D(global_size, global_token_ct)
+        #
+        #     sf_mu_tiled_flat = sf_mu.unsqueeze(1).repeat(1, max_global_len, 1).view(batch_size *  max_global_len, -1)
+        #     sf_sigma_tiled_flat = sf_sigma.unsqueeze(1).repeat(1, max_global_len, 1).view(batch_size * max_global_len, -1)
+        #
+        #     global_kl = compute_kl(
+        #         sf_mu_tiled_flat,
+        #         sf_sigma_tiled_flat,
+        #         global_mu.view(batch_size * max_global_len, -1),
+        #         global_sigma.view(batch_size * max_global_len, -1)
+        #     ).view(batch_size, max_global_len)
+        #
+        #     global_kl.masked_fill_(global_mask, 1e5)
+        #     global_att = nn.Softmax(-1)(-global_kl)
+        #     k = 5
+        #     top_global_weights = torch.topk(global_att, k=k).indices
+        #
+        #     if att_style == 'weighted':
+        #         global_coeff = global_att.unsqueeze(-1)
+        #         weighted_global_mu = (global_mu * global_coeff).sum(1)
+        #         weighted_global_sigma = (global_sigma * global_coeff).sum(1)
+        #         sf_mu = weighted_global_mu
+        #         sf_sigma = weighted_global_sigma
+        #     elif att_style == 'two_pass':
+        #         addl_context_ids = torch.zeros([batch_size, k]).long()
+        #         for batch_idx in range(batch_size):
+        #             addl_context_ids[batch_idx, :] = global_ids[batch_idx, top_global_weights[batch_idx, :]]
+        #         addl_context_ids = torch.cat([addl_context_ids, context_ids], axis=1)
+        #         addl_mask = torch.BoolTensor(torch.Size([batch_size, k]))
+        #         addl_mask.fill_(0)
+        #         full_mask = torch.cat([addl_mask, mask], axis=1)
+        #         sf_mu, sf_sigma = self.encoder(sf_ids, addl_context_ids, full_mask)
+        return sf_mu, sf_sigma
 
-            sf_mu_tiled_flat = sf_mu.unsqueeze(1).repeat(1, max_global_len, 1).view(batch_size *  max_global_len, -1)
-            sf_sigma_tiled_flat = sf_sigma.unsqueeze(1).repeat(1, max_global_len, 1).view(batch_size * max_global_len, -1)
-
-            global_kl = compute_kl(
-                sf_mu_tiled_flat,
-                sf_sigma_tiled_flat,
-                global_mu.view(batch_size * max_global_len, -1),
-                global_sigma.view(batch_size * max_global_len, -1)
-            ).view(batch_size, max_global_len)
-
-            global_kl.masked_fill_(global_mask, 1e5)
-            global_att = nn.Softmax(-1)(-global_kl)
-            k = 5
-            top_global_weights = torch.topk(global_att, k=k).indices
-
-            if att_style == 'weighted':
-                global_coeff = global_att.unsqueeze(-1)
-                weighted_global_mu = (global_mu * global_coeff).sum(1)
-                weighted_global_sigma = (global_sigma * global_coeff).sum(1)
-                sf_mu = weighted_global_mu
-                sf_sigma = weighted_global_sigma
-            elif att_style == 'two_pass':
-                addl_context_ids = torch.zeros([batch_size, k]).long()
-                for batch_idx in range(batch_size):
-                    addl_context_ids[batch_idx, :] = global_ids[batch_idx, top_global_weights[batch_idx, :]]
-                addl_context_ids = torch.cat([addl_context_ids, context_ids], axis=1)
-                addl_mask = torch.BoolTensor(torch.Size([batch_size, k]))
-                addl_mask.fill_(0)
-                full_mask = torch.cat([addl_mask, mask], axis=1)
-                sf_mu, sf_sigma = self.encoder(sf_ids, addl_context_ids, full_mask)
-        return sf_mu, sf_sigma, top_global_weights
-
-    def forward(self, sf_ids, section_ids, category_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct, global_ids,
-                global_token_ct, num_outputs, num_contexts, use_att=False, att_style='weighted', compute_marginal=None):
+    def forward(self, sf_ids, section_ids, category_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct,
+                lf_metadata_ids, num_outputs, num_contexts):
         """
         :param sf_ids: batch_size
         :param context_ids: batch_size, num_context_ids
@@ -121,24 +119,19 @@ class AcronymExpander(nn.Module):
         combined_sigma = []
 
         # Encode SFs in context (use attention or simply pass through Encoder)
-        sf_mu_tokens, sf_sigma_tokens, top_global_weights = self.encode_context(
-            sf_ids, context_ids, global_ids, global_token_ct, num_contexts, use_att=use_att, att_style=att_style)
+        sf_mu_tokens, sf_sigma_tokens = self.encode_context(sf_ids, context_ids, num_contexts)
         combined_mu.append(sf_mu_tokens)
         combined_sigma.append(sf_sigma_tokens)
 
-        if len(section_ids.nonzero()) > 0:
-            sf_mu_sec, sf_sigma_sec, _ = self.encode_context(
-                section_ids, context_ids, global_ids, global_token_ct, num_contexts,
-                use_att=use_att, att_style=att_style)
-            combined_mu.append(sf_mu_sec)
-            combined_sigma.append(sf_sigma_sec)
-
-        if len(category_ids.nonzero()) > 0:
-            sf_mu_cat, sf_sigma_cat, _ = self.encode_context(
-                category_ids, context_ids, global_ids, global_token_ct, num_contexts,
-                use_att=use_att, att_style=att_style)
-            combined_mu.append(sf_mu_cat)
-            combined_sigma.append(sf_sigma_cat)
+        # if len(section_ids.nonzero()) > 0:
+        #     sf_mu_sec, sf_sigma_sec = self.encode_context(section_ids, context_ids, num_contexts)
+        #     combined_mu.append(sf_mu_sec)
+        #     combined_sigma.append(sf_sigma_sec)
+        #
+        # if len(category_ids.nonzero()) > 0:
+        #     sf_mu_cat, sf_sigma_cat = self.encode_context(category_ids, context_ids, num_contexts)
+        #     combined_mu.append(sf_mu_cat)
+        #     combined_sigma.append(sf_sigma_cat)
 
         combined_mu = torch.cat(list(map(lambda x: x.unsqueeze(1), combined_mu)), axis=1)
         combined_sigma = torch.cat(list(map(lambda x: x.unsqueeze(1), combined_sigma)), axis=1)
@@ -159,4 +152,4 @@ class AcronymExpander(nn.Module):
         kl = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(batch_size, max_output_size)
         score = -kl
         score.masked_fill_(output_mask, float('-inf'))
-        return score, target_lf_ids, top_global_weights
+        return score, target_lf_ids, None

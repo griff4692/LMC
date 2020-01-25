@@ -94,7 +94,6 @@ def enumerate_metadata_ids_lmc(ids, metadata_pos_idxs, token_vocab, metadata_voc
         for key in keys:
             freqs.append(tf[key])
         freqs = np.array(freqs, dtype=float)
-        freqs /= freqs.sum()
         token_metadata_counts[k] = (keys, freqs)
     return metadata_ids, token_metadata_counts
 

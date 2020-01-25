@@ -177,7 +177,7 @@ def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metada
     for _ in range(test_batcher.num_batches()):
         with torch.no_grad():
             _, _, _, batch_scores, top_global_weights = process_batch(
-                args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+                args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
                 token_metadata_counts)
         batch_data = test_batcher.get_prev_batch()
         pred_lf_idxs = tensor_to_np(torch.argmax(batch_scores, 1))

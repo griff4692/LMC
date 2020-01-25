@@ -36,7 +36,6 @@ def evaluate(args):
     args.use_att = False
     args.att_style = None
     args.lm_type = 'bsg'
-    args.metadata_marginal = False
     print('Fine Tuning on CASI')
     acronyms_finetune(args, AcronymExpander, load_casi, restore_model, save_checkpoint)
     print('Fine Tuning on MIMIC Reverse Substitution')

@@ -25,37 +25,48 @@ if __name__ == '__main__':
     model.eval()
     model.to(args.device)
 
+    # center_word = ['parking']
+    # headers = ['header=SOCIALHISTORY', 'header=HPI', 'header=FAMILYHISTORY', 'header=CAMPUS',]
+    # compare_words = ['car', 'garage', 'lot', 'field', 'cancer', 'history']
+
     # center_word = ['cavity']
-    # headers = ['header=ECHOCARDIOGRAM', 'header=ECG', 'header=ECHO', 'header=FAMILYHISTORY',
+    # headers = ['<pad>', 'header=ECHOCARDIOGRAM', 'header=ECG', 'header=ECHO', 'header=FAMILYHISTORY',
     #            'header=HISTORYOFPRESENTILLNESS', 'header=CARDIOVASCULAR', 'header=LEFTATRIUM', 'header=CHIEFCOMPLAINT',
     #            'header=LEFTVENTRICLE', 'header=SOCIALHISTORY'
     #            ]
     # compare_words = ['doppler', 'history', 'aorta', 'atrium', 'chamber', 'ventricular', 'lv', 'echocardiogram',
     #                  'cardiogram']
 
-    # center_word = ['pleural']
-    # headers = ['header=LEFTVENTRICLE', 'header=SKIN', 'header=CHIEFCOMPLAINT', 'header=SOCIALHISTORY',
+    # center_word = ['atrium']
+    # headers = ['<pad>', 'header=LEFTVENTRICLE', 'header=CHIEFCOMPLAINT', 'header=SOCIALHISTORY',
     #            'header=FAMILYHISTORY', 'header=ECHO', 'header=LEFTATRIUM', 'header=RIGHTVENTRICLE',
     #            'header=HISTORYOFPRESENTILLNESS', 'header=IMPRESSION', 'header=DISCHARGEMEDICATIONS']
-    # compare_words = ['cancer', 'effusion', 'history', 'skin', 'cavity', 'chest', 'atrium', 'advil']
-    #
-    # center_word = ['left']
-    # headers = ['header=LEFTVENTRICLE', 'header=CHIEFCOMPLAINT', 'header=DISCHARGEMEDICATIONS', 'header=IMPRESSION']
-    # compare_words = ['ventricular', 'right', 'mg', 'prilosec', 'pain', 'side']
+    # compare_words = ['ventricular', 'history', 'skin', 'cavity', 'chest', 'atria', 'advil', 'mg']
 
-    # center_word = ['cancer']
-    # headers = ['header=SOCIALHISTORY', 'header=HPI', 'header=PASTMEDICALHISTORY', 'header=HODGKINSLYMPHOMA',
-    #            'header=CHIEFCOMPLAINT', 'header=HISTORYOFPRESENTILLNESS']
-    # compare_words = ['melanoma', 'glioblastoma', 'lymphoma', 'nsclc', 'colectomy', 'adenocarcinoma', 'hodgkins']
+    # center_word = ['pain']
+    # headers = ['header=HISTORYPRESENTILLNESS', 'header=DISCHARGEDATE', 'header=CHIEFCOMPLAINT', 'header=DISCHARGEMEDICATIONS', 'header=IMPRESSION']
+    # compare_words = ['mg', 'heart', 'smoking', 'meds']
+
+    center_word = ['tumor']
+    headers = ['header=SOCIALHISTORY', 'header=HPI', 'header=PASTMEDICALHISTORY', 'header=HODGKINSLYMPHOMA',
+               'header=CHIEFCOMPLAINT', 'header=HISTORYOFPRESENTILLNESS']
+    compare_words = ['melanoma', 'glioblastoma', 'lesion', 'lymphoma', 'nsclc', 'colectomy', 'adenocarcinoma',
+                     'hodgkins', 'family']
+    #
+    # center_word = ['history']
+    # headers = ['<pad>', 'header=SKIN', 'header=CHIEFCOMPLAINT', 'header=SOCIALHISTORY',
+    #            'header=FAMILYHISTORY', 'header=ECHO', 'header=LEFTATRIUM', 'header=RIGHTVENTRICLE',
+    #            'header=HISTORYOFPRESENTILLNESS', 'header=IMPRESSION', 'header=DISCHARGEMEDICATIONS']
+    # compare_words = ['illness', 'pain', 'smoking']
 
     # center_word = ['history']
-    # headers = ['header=SOCIALHISTORY', 'header=HPI', 'header=PASTMEDICALHISTORY', 'header=FAMILYHISTORY',
+    # headers = ['<pad>', 'header=SOCIALHISTORY', 'header=HPI', 'header=PASTMEDICALHISTORY', 'header=FAMILYHISTORY',
     #            'header=CHIEFCOMPLAINT', 'header=HISTORYOFPRESENTILLNESS', 'header=LEFTVENTRICLE']
-    # compare_words = ['pain', 'smoking', 'cancer', 'heart']
+    # compare_words = ['pain', 'smoking', 'cancer', 'heart', 'past']
 
-    center_word = ['lv']
-    headers = metadata_vocab.i2w[1:]
-    compare_words = ['ventricle', 'left', 'prothrombin']
+    # center_word = ['history']
+    # headers = metadata_vocab.i2w[1:]
+    # compare_words = ['pain', 'smoking', 'cancer', 'heart']
 
     center_word_tens = torch.LongTensor([token_vocab.get_id(center_word[0])])
     header_ids = list(map(lambda x: metadata_vocab.get_id(x), headers))
@@ -63,76 +74,35 @@ if __name__ == '__main__':
     pad_context = torch.zeros([1,]).long()
 
     compare_tens = torch.LongTensor(compare_ids)
-    mu_compare, sigma_compare = model.decoder(
-        compare_tens, pad_context.repeat(len(compare_words)))  #, center_mask_p=None, metadata_mask_p=None)
+    mu_compare, sigma_compare = model.decoder(compare_tens, pad_context.repeat(len(compare_words)))
 
     mask = mask_2D(torch.Size([1, 1]), [1])
     for i, header_id in enumerate(header_ids):
         header_tens = torch.LongTensor([header_id])
-        mu_q, sigma_q = model.encoder(center_word_tens, header_tens, pad_context.unsqueeze(0), mask)
-                                      # center_mask_p=None, metadata_mask_p=None, context_mask_p=None)
-        # mu_q2, sigma_q2 = model.encoder(center_word_tens, pad_context, pad_context.unsqueeze(0), mask,
-        #                               center_mask_p=None, metadata_mask_p=None, context_mask_p=None)
+        with torch.no_grad():
+            mu_q, sigma_q, weights = model.encoder(center_word_tens, header_tens, pad_context.unsqueeze(0), mask,
+                                          center_mask_p=None, context_mask_p=None)
+            m2, s2, w2 = model.encoder(center_word_tens, pad_context, pad_context.unsqueeze(0), mask,
+                                          center_mask_p=None, context_mask_p=None)
+
+            diff = torch.abs(mu_q - m2)
+            print(diff.mean().item(), diff.max().item())
+            print(weights, w2)
         kl = tensor_to_np(compute_kl(mu_q, sigma_q, mu_compare, sigma_compare).squeeze(1))
         order = np.argsort(kl)
         print(headers[i])
         for i in order:
             print('\t{} --> {}'.format(compare_words[i], kl[i]))
 
-    # top_n = min(10000, token_vocab.size())
-    # top_word_ids = list(range(top_n))
-    # section_ids = np.zeros([top_n,  metadata_vocab.size()])
-    # section_p = np.zeros([top_n, metadata_vocab.size()])
-    # for i in top_word_ids:
-    #     if i > 0:
-    #         sids, sp = token_section_counts[i]
-    #         section_ids[i, :len(sids)] = sids
-    #         section_p[i, :len(sp)] = sp
-    #
-    # center_ids_tens = torch.LongTensor(top_word_ids).unsqueeze(-1).to(args.device)
-    # section_ids_tens = torch.LongTensor(section_ids).to(args.device)
-    # section_p_tens = torch.FloatTensor(section_p).to(args.device)
-    # print('Computing marginals...')
-    # with torch.no_grad():
-    #     token_embeddings, _ = model._compute_marginal(
-    #         center_ids_tens, section_ids_tens.unsqueeze(1), section_p_tens.unsqueeze(1))
-    #
-    # token_embeddings = token_embeddings.squeeze(1)
-    # center_words = [
-    #     'cancer', 'patient', 'parking', 'advil', 'tylenol', 'pain', 'brain', 'daily', 'mri', 'x-ray', 'pleural',
-    #     'systolic', 'nerve',
-    # ]
-    #
-    # str = []
-    # print('Computing similarity with respect to {}'.format(','.join(center_words)))
-    # for center_word in center_words:
-    #     center_id = token_vocab.get_id(center_word)
-    #     mu = token_embeddings[center_id, :]
-    #     sim = torch.nn.CosineSimilarity()(token_embeddings, mu.unsqueeze(0))
-    #     top_word_ids = sim.topk(10).indices.cpu().numpy()
-    #     top_tokens = [token_vocab.get_token(id) for id in top_word_ids]
-    #     str.append('Closest words {} --> {}'.format(center_word, ', '.join(top_tokens)))
-    #
-    # results_dir = 'weights/{}/results'.format(args.experiment)
-    # if not os.path.exists(results_dir):
-    #     os.mkdir(results_dir)
-    # # fp = os.path.join(results_dir, 'token_sim.txt')
-    # # print('Saving token results to {}'.format(fp))
-    # # with open(fp, 'w') as fd:
-    # #     fd.write('\n'.join(str))
-    #
-    # metadata_embeddings = model.decoder.metadata_embeddings.weight
-    # metadata = metadata_vocab.i2w[1:]
-    # str = []
-    # for section in metadata:
-    #     sid = metadata_vocab.get_id(section)
-    #     mu = metadata_embeddings[sid, :]
-    #     sim = torch.nn.CosineSimilarity()(metadata_embeddings, mu.unsqueeze(0))
-    #     top_section_ids = sim.topk(5).indices.cpu().numpy()
-    #     top_sections = [metadata_vocab.get_token(id) for id in top_section_ids[1:]]
-    #     str.append('Closest sections {} --> {}'.format(section, ', '.join(top_sections)))
-    #
-    # fp = os.path.join(results_dir, 'section_sim.txt')
-    # print('Saving section results to {}'.format(fp))
-    # with open(fp, 'w') as fd:
-    #     fd.write('\n'.join(str))
+    metadata_embeddings = model.decoder.metadata_embeddings.weight
+    metadata = ['header=HISTORYOFPRESENTILLNESS', 'header=DISCHARGEMEDICATIONS', 'header=CHIEFCOMPLAINT',
+                'header=ECHO', 'header=LEFTVENTRICLE',
+                'header=HPI', 'header=GENERAL', 'header=FAMILYHISTORY', 'header=IMPRESSION']
+    str = []
+    for section in metadata:
+        sid = metadata_vocab.get_id(section)
+        mu = metadata_embeddings[sid, :]
+        sim = torch.nn.CosineSimilarity()(metadata_embeddings, mu.unsqueeze(0))
+        top_section_ids = sim.topk(5).indices.cpu().numpy()
+        top_sections = [metadata_vocab.get_token(id) for id in top_section_ids[1:]]
+        print('Closest sections {} --> {}'.format(section, ', '.join(top_sections)))
