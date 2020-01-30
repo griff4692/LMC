@@ -123,15 +123,15 @@ class AcronymExpander(nn.Module):
         combined_mu.append(sf_mu_tokens)
         combined_sigma.append(sf_sigma_tokens)
 
-        # if len(section_ids.nonzero()) > 0:
-        #     sf_mu_sec, sf_sigma_sec = self.encode_context(section_ids, context_ids, num_contexts)
-        #     combined_mu.append(sf_mu_sec)
-        #     combined_sigma.append(sf_sigma_sec)
-        #
-        # if len(category_ids.nonzero()) > 0:
-        #     sf_mu_cat, sf_sigma_cat = self.encode_context(category_ids, context_ids, num_contexts)
-        #     combined_mu.append(sf_mu_cat)
-        #     combined_sigma.append(sf_sigma_cat)
+        if len(section_ids.nonzero()) > 0:
+            sf_mu_sec, sf_sigma_sec = self.encode_context(section_ids, context_ids, num_contexts)
+            combined_mu.append(sf_mu_sec)
+            combined_sigma.append(sf_sigma_sec)
+
+        if len(category_ids.nonzero()) > 0:
+            sf_mu_cat, sf_sigma_cat = self.encode_context(category_ids, context_ids, num_contexts)
+            combined_mu.append(sf_mu_cat)
+            combined_sigma.append(sf_sigma_cat)
 
         combined_mu = torch.cat(list(map(lambda x: x.unsqueeze(1), combined_mu)), axis=1)
         combined_sigma = torch.cat(list(map(lambda x: x.unsqueeze(1), combined_sigma)), axis=1)
