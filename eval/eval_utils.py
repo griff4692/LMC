@@ -8,8 +8,10 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cosine
 
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+from bsg_model import BSG
 from casi_constants import LF_BLACKLIST, LF_MAPPING, SF_BLACKLIST
 from clean_mimic import clean_text
 from mimic_tokenize import STOPWORDS, tokenize_str
@@ -27,7 +29,10 @@ def point_similarity(model, vocab, tokens_a, tokens_b):
     if len(ids_a) == 0 or len(ids_b) == 0:
         return 0.0
 
-    embeddings = tensor_to_np(model.embeddings_mu.weight)
+    if type(model) == BSG:
+        embeddings = tensor_to_np(model.embeddings_mu.weight)
+    else:
+        embeddings = tensor_to_np(model.decoder.token_embeddings.weight)
 
     rep_a = embeddings[ids_a, :].mean(0)
     rep_b = embeddings[ids_b, :].mean(0)
