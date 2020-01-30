@@ -43,6 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
     parser.add_argument('--metadata', default='section',
                         help='sections or category. What to define latent variable over.')
+    parser.add_argument('--recon_coeff', default=1.0, type=float)
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()
@@ -137,6 +138,7 @@ if __name__ == '__main__':
             if len(recon_loss.size()) > 0:
                 recon_loss = recon_loss.mean(0)
             joint_loss = kl_loss + recon_loss
+            joint_adj_loss = kl_loss + args.recon_coeff * recon_loss
             joint_loss.backward()  # backpropagate loss
             optimizer.step()
 
