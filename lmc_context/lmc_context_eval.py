@@ -81,9 +81,9 @@ if __name__ == '__main__':
         header_tens = torch.LongTensor([header_id])
         with torch.no_grad():
             mu_q, sigma_q, weights = model.encoder(center_word_tens, header_tens, pad_context.unsqueeze(0), mask,
-                                          center_mask_p=None, context_mask_p=None)
+                                          center_mask_p=None, context_mask_p=None, metadata_mask_p=None)
             m2, s2, w2 = model.encoder(center_word_tens, pad_context, pad_context.unsqueeze(0), mask,
-                                          center_mask_p=None, context_mask_p=None)
+                                          center_mask_p=None, context_mask_p=None, metadata_mask_p=None)
 
             diff = torch.abs(mu_q - m2)
             print(diff.mean().item(), diff.max().item())

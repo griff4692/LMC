@@ -33,14 +33,19 @@ def restore_model(restore_name, weights_path='weights'):
     for k, v in checkpoint_state['args'].items():
         print('{}={}'.format(k, v))
         setattr(args, k, v)
-    lmc_model = LMCC(args, token_vocab.size(), metadata_vocab.size())
     new_state_dict = OrderedDict()
     for k, v in checkpoint_state['model_state_dict'].items():
         name = k
         if k[:7] == 'module.':
             name = k[7:]  # remove `module.`
         new_state_dict[name] = v
-    lmc_model.load_state_dict(new_state_dict)
+    try:
+        lmc_model = LMCC(args, token_vocab.size(), metadata_vocab.size())
+        lmc_model.load_state_dict(new_state_dict)
+    except:
+        print('Backward compatibility for old LMCContextEncoder')
+        lmc_model = LMCC(args, token_vocab.size(), metadata_vocab.size(), old_encoder=True)
+        lmc_model.load_state_dict(new_state_dict)
     optimizer_state = checkpoint_state['optimizer_state_dict']
     token_metadata_counts = checkpoint_state['token_metadata_counts']
     return args, lmc_model, token_vocab, metadata_vocab, optimizer_state, token_metadata_counts
