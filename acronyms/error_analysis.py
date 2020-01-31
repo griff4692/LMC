@@ -17,20 +17,16 @@ from acronym_utils import process_batch
 from model_utils import tensor_to_np
 
 
-def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window, full_context, row_idx,
-                    global_tokens=None, top_global_weights=None, metadata=None):
+def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window, full_context, row_idx):
     str = 'SF={}.\nTarget LF={} ({}).\nPredicted LF={}.\n'.format(sf, target_lf, converted_target_lf, pred_lf)
     str += 'Example ID={}\n'.format(row_idx)
     str += 'Context Window: {}\n'.format(context_window)
     str += 'Full Context: {}\n'.format(full_context)
-    if top_global_weights is not None:
-        str += 'Top Global Words: {}\n'.format(', '.join([global_tokens[i] for i in top_global_weights]))
     str += '\n\n'
     return str
 
 
-def _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map,
-                   top_global_weights=None):
+def _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map):
     for batch_idx, (row_idx, row) in enumerate(batch_data.iterrows()):
         row = row.to_dict()
         sf = row['sf']
@@ -39,12 +35,8 @@ def _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str,
         target_lf_idx = row['target_lf_idx']
         pred_lf_idx = pred_lf_idxs[batch_idx]
         pred_lf = lf_map[pred_lf_idx]
-        metadata = row['metadata'] if 'metadata' in row else None
-        global_weights = top_global_weights[batch_idx, :] if top_global_weights is not None else None
         example_str = _render_example(sf, target_lf, lf_map[target_lf_idx], pred_lf,
-                                      row['trimmed_tokens'], row['tokenized_context'], row['row_idx'],
-                                      global_tokens=row['tokenized_context_unique'],
-                                      top_global_weights=global_weights, metadata=metadata)
+                                      row['trimmed_tokens'], row['tokenized_context'], row['row_idx'])
         if target_lf_idx == pred_lf_idx:
             id_map['correct'].append(row['row_idx'])
             correct_str[sf] += example_str
@@ -176,13 +168,12 @@ def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metada
     errors_str, correct_str = defaultdict(str), defaultdict(str)
     for _ in range(test_batcher.num_batches()):
         with torch.no_grad():
-            _, _, _, batch_scores, top_global_weights = process_batch(
+            _, _, _, batch_scores = process_batch(
                 args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
                 token_metadata_counts)
         batch_data = test_batcher.get_prev_batch()
         pred_lf_idxs = tensor_to_np(torch.argmax(batch_scores, 1))
-        _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map,
-                       top_global_weights=top_global_weights)
+        _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map)
 
     _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
 

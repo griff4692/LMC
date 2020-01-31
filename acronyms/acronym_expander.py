@@ -152,4 +152,4 @@ class AcronymExpander(nn.Module):
         kl = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(batch_size, max_output_size)
         score = -kl
         score.masked_fill_(output_mask, float('-inf'))
-        return score, target_lf_ids, None
+        return score, target_lf_ids
