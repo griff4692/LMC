@@ -32,7 +32,7 @@ class LMCContextEncoder(nn.Module):
         e.masked_fill_(mask, 0.0)
 
     def forward(self, center_ids, metadata_ids, context_ids, mask, center_mask_p=0.2, context_mask_p=0.2,
-                metadata_mask_p=None):
+                metadata_mask_p=None, rel_weights=None):
         """
         :param center_ids: LongTensor of batch_size
         :param metadata_ids: LongTensor of batch_size
@@ -68,14 +68,15 @@ class LMCContextEncoder(nn.Module):
         att_weights = self.softmax(att_scores)
         h_sum = (att_weights.unsqueeze(-1) * h_reps).sum(1)
 
-        rel_weights = self.softmax(
-            self.tanh(self.combine_att(self.dropout(torch.cat([h_sum, metadata_embedding], axis=1)))))
+        if rel_weights is None:
+            rel_weights = self.softmax(
+                self.tanh(self.combine_att(self.dropout(torch.cat([h_sum, metadata_embedding], axis=1)))))
 
         met_weight = rel_weights[:, 0].unsqueeze(1)
         token_weight = rel_weights[:, 1].unsqueeze(1)
         summary = self.dropout((met_weight * metadata_embedding + token_weight * h_sum))
 
-        return self.u(summary), self.v(summary).exp()
+        return self.u(summary), self.v(summary).exp(), rel_weights
 
 
 class LMCContextEncoderOld(nn.Module):
@@ -129,4 +130,4 @@ class LMCContextEncoderOld(nn.Module):
 
         h_reps, (h, _) = self.lstm(merged_embeds)
         h_sum = self.dropout(compute_att(h_reps, mask, self.att))
-        return self.u(h_sum), self.v(h_sum).exp()
+        return self.u(h_sum), self.v(h_sum).exp(), None
