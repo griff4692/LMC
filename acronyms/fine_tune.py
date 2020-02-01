@@ -35,7 +35,7 @@ def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_v
     model.eval()
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
-            batch_loss, num_examples, num_correct, _, top_global_weights = process_batch(
+            batch_loss, num_examples, num_correct, _ = process_batch(
                 args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
                 token_metadata_counts)
         test_correct += num_correct
@@ -62,7 +62,7 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_voca
     model.train()
     for _ in tqdm(range(train_batcher.num_batches())):
         optimizer.zero_grad()
-        batch_loss, num_examples, num_correct, _, _ = process_batch(
+        batch_loss, num_examples, num_correct, _ = process_batch(
             args, train_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
             token_metadata_counts)
         batch_loss.backward()

@@ -36,8 +36,8 @@ def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, 
     batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0).to(device), batch_input))
     batch_p = list(map(lambda x: torch.FloatTensor(x).to(device), batch_p))
     full_input = batch_input + batch_counts if args.lm_type == 'bsg' else batch_input + batch_p + batch_counts
-    scores, target, top_global_weights = model(*full_input)
+    scores, target = model(*full_input)
     num_correct = len(np.where(tensor_to_np(torch.argmax(scores, 1)) == tensor_to_np(target))[0])
     num_examples = len(batch_counts[0])
     batch_loss = loss_func.forward(scores, target)
-    return batch_loss, num_examples, num_correct, scores, top_global_weights
+    return batch_loss, num_examples, num_correct, scores
