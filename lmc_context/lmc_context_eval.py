@@ -107,7 +107,7 @@ if __name__ == '__main__':
         header_tens = torch.LongTensor([header_id])
         print(headers[i])
         for p in np.arange(0, 1.25, 0.25):
-            rw =  [p, 1.0 - p]
+            rw = [p, 1.0 - p]
             rel_weights = torch.FloatTensor([
                 rw
             ])
