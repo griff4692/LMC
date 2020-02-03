@@ -51,7 +51,8 @@ def run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, los
 
 
 def elmo_finetune(args, loader):
-    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map, sfs = loader(args)
+    args.metadata = None
+    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map = loader(args)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join('../acronyms', 'weights', args.experiment)

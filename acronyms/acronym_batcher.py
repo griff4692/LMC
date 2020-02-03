@@ -33,14 +33,12 @@ class AcronymBatcherLoader:
         max_output_length = max(num_outputs)
         max_lf_len = 5
         lf_ids = np.zeros([batch_size, max_output_length, max_lf_len, 50], dtype=int)
-        sf_idxs = np.zeros([batch_size])
         for batch_idx, (_, row) in enumerate(batch.iterrows()):
             row = row.to_dict()
             sf = row['sf'].lower()
             # Find target_sf index in sf_lf_map
             target_lf_ids[batch_idx] = row['target_lf_idx']
             context_tokens = row['trimmed_tokens'].split()
-            sf_idxs[batch_idx] = np.where(np.array(context_tokens) == sf)[0][0]
             context_id_seq = self.elmo_tokenize(context_tokens, vocab, indexer)
             context_ids[batch_idx, :len(context_id_seq), :] = context_id_seq
             candidate_lfs = sf_tokenized_lf_map[row['sf']]
@@ -48,7 +46,7 @@ class AcronymBatcherLoader:
                 lf_id_seq = self.elmo_tokenize(lf_toks, vocab, indexer)
                 lf_ids[batch_idx, lf_idx, :len(lf_id_seq), :] = lf_id_seq
 
-        return (context_ids, lf_ids, target_lf_ids, sf_idxs), num_outputs
+        return (context_ids, lf_ids, target_lf_ids), num_outputs
 
     def next(self, token_vocab, sf_lf_map, sf_tokenized_lf_map, lf_metadata_counts, metadata_vocab=None):
         batch = self.batches[self.batch_ct]
@@ -86,7 +84,7 @@ class AcronymBatcherLoader:
                 section_ids[batch_idx] = m_vocab.get_id(row['section'])
                 if section_ids[batch_idx] < 0:
                     section_ids[batch_idx] = 0
-                    print('Not found={}'.format(row['section']))
+                    # print('Not found={}'.format(row['section']))
             if 'category' in row:
                 category_ids[batch_idx] = m_vocab.get_id(row['category'])
                 if category_ids[batch_idx] < 0:
