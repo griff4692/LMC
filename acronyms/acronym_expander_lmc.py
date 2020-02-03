@@ -60,7 +60,7 @@ class AcronymExpanderLMC(nn.Module):
         mask_size = torch.Size([batch_size, num_context_ids])
         device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
         mask = mask_2D(mask_size, num_contexts).to(device_str)
-        sf_mu, sf_sigma, _ = self.encoder(
+        sf_mu, sf_sigma, rel_weights = self.encoder(
             sf_ids, section_ids, context_ids, mask, center_mask_p=None, context_mask_p=None)
 
         # Tile SFs across each LF and flatten both SFs and LFs
@@ -80,4 +80,4 @@ class AcronymExpanderLMC(nn.Module):
         score = -kl
         score.masked_fill_(output_mask, float('-inf'))
 
-        return score, target_lf_ids
+        return score, target_lf_ids, rel_weights

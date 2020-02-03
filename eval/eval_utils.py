@@ -144,10 +144,13 @@ def preprocess_minnesota_dataset(window=10, chunker=None, combine_phrases=False)
     df['lf_in_sf'] = df['sf'].combine(df['target_lf'], lambda sf, lf: sf.lower() in lf.lower().split())
     df = df[~df['lf_in_sf']]
     print('Removed {} rows because the LF is contained within the SF'.format(N - df.shape[0]))
+    N = df.shape[0]
 
     lfs, lf_sf_map, sf_lf_map = parse_sense_df('../eval/eval_data/minnesota/sense_inventory_ii')
     df['target_lf_sense'] = df['sf'].combine(df['target_lf'], lambda sf, lf: target_lf_sense(lf, sf, sf_lf_map))
     df = df[~df['target_lf_sense'].isin(LF_BLACKLIST) & ~df['target_lf_sense'].isnull()]
+    print('Removing {} tokens because LF is in LF_BLACKLIST'.format(N - df.shape[0]))
+    N = df.shape[0]
     df['target_lf_sense'] = df['target_lf_sense'].apply(lambda x: LF_MAPPING[x] if x in LF_MAPPING else x)
 
     # Tokenize

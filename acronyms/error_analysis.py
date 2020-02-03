@@ -5,6 +5,7 @@ import sys
 
 
 import argparse
+import numpy as np
 from pycm import ConfusionMatrix
 import pandas as pd
 from sklearn.metrics import classification_report
@@ -17,16 +18,18 @@ from acronym_utils import process_batch
 from model_utils import tensor_to_np
 
 
-def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window, full_context, row_idx):
+def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window, full_context, row_idx, rel_weight):
     str = 'SF={}.\nTarget LF={} ({}).\nPredicted LF={}.\n'.format(sf, target_lf, converted_target_lf, pred_lf)
     str += 'Example ID={}\n'.format(row_idx)
+    if rel_weight is not None:
+        str += 'Metadata Weight={}.  Context Word Weight={}\n'.format(rel_weight[0], rel_weight[1])
     str += 'Context Window: {}\n'.format(context_window)
     str += 'Full Context: {}\n'.format(full_context)
     str += '\n\n'
     return str
 
 
-def _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map):
+def _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, rel_weights):
     for batch_idx, (row_idx, row) in enumerate(batch_data.iterrows()):
         row = row.to_dict()
         sf = row['sf']
@@ -35,8 +38,9 @@ def _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str,
         target_lf_idx = row['target_lf_idx']
         pred_lf_idx = pred_lf_idxs[batch_idx]
         pred_lf = lf_map[pred_lf_idx]
+        rel_weight = rel_weights[batch_idx] if rel_weights is not None else None
         example_str = _render_example(sf, target_lf, lf_map[target_lf_idx], pred_lf,
-                                      row['trimmed_tokens'], row['tokenized_context'], row['row_idx'])
+                                      row['trimmed_tokens'], row['tokenized_context'], row['row_idx'], rel_weight)
         if target_lf_idx == pred_lf_idx:
             id_map['correct'].append(row['row_idx'])
             correct_str[sf] += example_str
@@ -168,12 +172,14 @@ def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metada
     errors_str, correct_str = defaultdict(str), defaultdict(str)
     for _ in range(test_batcher.num_batches()):
         with torch.no_grad():
-            _, _, _, batch_scores = process_batch(
+            _, _, _, batch_scores, rel_weights = process_batch(
                 args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
                 token_metadata_counts)
         batch_data = test_batcher.get_prev_batch()
         pred_lf_idxs = tensor_to_np(torch.argmax(batch_scores, 1))
-        _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map)
+        if rel_weights is not None:
+            rel_weights = tensor_to_np(rel_weights)
+        _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, rel_weights)
 
     _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
 
