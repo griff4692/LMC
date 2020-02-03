@@ -42,8 +42,8 @@ class AcronymExpanderLMC(nn.Module):
             decoder_init[:prev_token_vocab_size, :] = prev_decoder_token_embeddings
             self.decoder.token_embeddings.load_state_dict({'weight': torch.from_numpy(decoder_init)})
 
-    def _compute_marginal(self, ids, metadata_ids, metadata_p, normalizer=None):
-        batch_size, max_output, num_metadata = metadata_p.size()
+    def _compute_marginal(self, ids, metadata_ids, normalizer=None):
+        batch_size, max_output, num_metadata = metadata_ids.size()
         max_lf_ngram = ids.size()[-1]
         normalizer_tiled_flat = normalizer.unsqueeze(2).repeat(1, 1, num_metadata, 1).view(
             batch_size * max_output * num_metadata, 1)
@@ -54,10 +54,11 @@ class AcronymExpanderLMC(nn.Module):
             ids_tiled_flat, metadata_ids_flat, normalizer=normalizer_tiled_flat)
         mu_marginal = mu_marginal_flat.view(batch_size, max_output, num_metadata, -1)
         sigma_marginal = sigma_marginal_flat.view(batch_size, max_output, num_metadata, -1)
-        metadata_p = metadata_p.unsqueeze(-1)
-        mu = (metadata_p * mu_marginal).sum(2)
-        sigma = (metadata_p * sigma_marginal).sum(2)
-        return mu, sigma + 1e-3
+        return mu_marginal, sigma_marginal
+        # metadata_p = metadata_p.unsqueeze(-1)
+        # mu = (metadata_p * mu_marginal).sum(2)
+        # sigma = (metadata_p * sigma_marginal).sum(2)
+        # return mu, sigma + 1e-3
 
     def forward(self, sf_ids, section_ids, category_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct,
                 lf_metadata_ids, lf_metadata_p, num_outputs, num_contexts):
@@ -72,21 +73,27 @@ class AcronymExpanderLMC(nn.Module):
         sf_mu, sf_sigma, rel_weights = self.encoder(
             sf_ids, section_ids, context_ids, mask, center_mask_p=None, context_mask_p=None)
 
+        num_metadata = lf_metadata_ids.size()[-1]
+
         # Tile SFs across each LF and flatten both SFs and LFs
-        sf_mu_flat = sf_mu.unsqueeze(1).repeat(1, max_output_size, 1).view(batch_size * max_output_size, -1)
-        sf_sigma_flat = sf_sigma.unsqueeze(1).repeat(1, max_output_size, 1).view(batch_size * max_output_size, -1)
+        sf_mu_flat = sf_mu.unsqueeze(1).repeat(1, max_output_size * num_metadata, 1).view(
+            batch_size * max_output_size * num_metadata, -1)
+        sf_sigma_flat = sf_sigma.unsqueeze(1).repeat(1, max_output_size * num_metadata, 1).view(
+            batch_size * max_output_size * num_metadata, -1)
 
         # Compute E[LF]
         normalizer = lf_token_ct.unsqueeze(-1).clamp_min(1.0)
-        lf_mu, lf_sigma = self._compute_marginal(lf_ids, lf_metadata_ids, lf_metadata_p, normalizer=normalizer)
-        lf_mu_flat = lf_mu.view(batch_size * max_output_size, -1)
-        lf_sigma_flat = lf_sigma.view(batch_size * max_output_size, 1)
-
+        lf_mu, lf_sigma = self._compute_marginal(lf_ids, lf_metadata_ids, normalizer=normalizer)
+        lf_mu_flat = lf_mu.view(batch_size * max_output_size * num_metadata, -1)
+        lf_sigma_flat = lf_sigma.view(batch_size * max_output_size * num_metadata, 1)
         output_dim = torch.Size([batch_size, max_output_size])
         output_mask = mask_2D(output_dim, num_outputs).to(device_str)
 
-        kl = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(batch_size, max_output_size)
+        kl_marginal = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(
+            batch_size, max_output_size, num_metadata)
+        kl = (kl_marginal * lf_metadata_p).sum(2)
         score = -kl
+
         score.masked_fill_(output_mask, float('-inf'))
 
         return score, target_lf_ids, rel_weights
