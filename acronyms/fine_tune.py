@@ -204,7 +204,7 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = acronym_model(args, lm, token_vocab).to(device)
+    model = acronym_model(args, lm, token_vocab, metadata_vocab).to(device)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
@@ -269,7 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('-random_encoder', default=False, action='store_true', help='Don\'t use pretrained encoder')
-    parser.add_argument('-random_priors', default=False, action='store_true', help='Don\'t use pretrained priors')
+    parser.add_argument('-random_decoder', default=False, action='store_true', help='Don\'t use pretrained decoder')
 
     args = parser.parse_args()
     args.experiment += '_{}'.format(args.dataset)
