@@ -35,7 +35,7 @@ def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_v
     model.eval()
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
-            batch_loss, num_examples, num_correct, _ = process_batch(
+            batch_loss, num_examples, num_correct, _, _ = process_batch(
                 args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
                 token_metadata_counts)
         test_correct += num_correct
@@ -62,7 +62,7 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_voca
     model.train()
     for _ in tqdm(range(train_batcher.num_batches())):
         optimizer.zero_grad()
-        batch_loss, num_examples, num_correct, _ = process_batch(
+        batch_loss, num_examples, num_correct, _, _ = process_batch(
             args, train_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
             token_metadata_counts)
         batch_loss.backward()
@@ -100,8 +100,8 @@ def load_casi(prev_args):
 
     train_df, test_df = train_test_split(df, random_state=1992, test_size=0.2)
     train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-    test_batcher = AcronymBatcherLoader(test_df, batch_size=32)
-    assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
+    test_batcher = AcronymBatcherLoader(df, batch_size=128)
+    # assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
     return train_batcher, test_batcher, train_df, test_df, sf_lf_map
 
 
@@ -122,10 +122,10 @@ def load_mimic(prev_args):
     for sf in sfs:
         used_sf_lf_map[sf] = sf_lf_map[sf]
     train_df = df[df['is_train']]
-    test_df = df[~df['is_train']]
+    test_df = df
     train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-    test_batcher = AcronymBatcherLoader(test_df, batch_size=32)
-    assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
+    test_batcher = AcronymBatcherLoader(test_df, batch_size=128)
+    # assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
@@ -217,6 +217,11 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
                                       sf_tokenized_lf_map, sf_lf_map, lf_metadata_counts,
                                       results_dir=results_dir)
 
+    losses_dict = {
+        'train': None,
+        'test_loss': lowest_test_loss
+    }
+
     # Make sure it's calculating gradients
     for epoch in range(1, args.epochs + 1):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
@@ -261,7 +266,7 @@ if __name__ == '__main__':
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--epochs', default=5, type=int)
+    parser.add_argument('--epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('-random_encoder', default=False, action='store_true', help='Don\'t use pretrained encoder')
     parser.add_argument('-random_priors', default=False, action='store_true', help='Don\'t use pretrained priors')
