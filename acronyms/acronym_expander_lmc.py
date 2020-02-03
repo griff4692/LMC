@@ -7,31 +7,40 @@ import torch.nn as nn
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from compute_utils import compute_kl, mask_2D
+from lmc_context_decoder import LMCDecoder
+from lmc_context_encoder import LMCContextEncoder
 
 
 class AcronymExpanderLMC(nn.Module):
-    def __init__(self, args, lmc_model, token_vocab):
+    def __init__(self, args, lmc_model, token_vocab, metadata_vocab):
         super(AcronymExpanderLMC, self).__init__()
 
         token_vocab_size = token_vocab.size()
+        metadata_vocab_size = metadata_vocab.size()
         prev_token_vocab_size, encoder_embed_dim = lmc_model.encoder.token_embeddings.weight.size()
-
-        prev_encoder_token_embeddings = lmc_model.encoder.token_embeddings.weight.detach().numpy()
-        self.encoder = lmc_model.encoder
         self.metadata = args.metadata
-        self.encoder.token_embeddings = nn.Embedding(token_vocab_size, encoder_embed_dim, padding_idx=0)
-        encoder_init = np.random.normal(0, 1, size=(token_vocab_size, encoder_embed_dim))
-        encoder_init[:prev_token_vocab_size, :] = prev_encoder_token_embeddings
-        self.encoder.token_embeddings.load_state_dict({'weight': torch.from_numpy(encoder_init)})
 
-        prev_token_vocab_size_decoder, decoder_embed_dim = lmc_model.decoder.token_embeddings.weight.size()
-        assert prev_token_vocab_size == prev_token_vocab_size_decoder
-        prev_decoder_token_embeddings = lmc_model.decoder.token_embeddings.weight.detach().numpy()
-        self.decoder = lmc_model.decoder
-        self.decoder.token_embeddings = nn.Embedding(token_vocab_size, decoder_embed_dim, padding_idx=0)
-        decoder_init = np.random.normal(0, 1, size=(token_vocab_size, decoder_embed_dim))
-        decoder_init[:prev_token_vocab_size, :] = prev_decoder_token_embeddings
-        self.decoder.token_embeddings.load_state_dict({'weight': torch.from_numpy(decoder_init)})
+        if args.random_encoder:
+            self.encoder = LMCContextEncoder(token_vocab_size, metadata_vocab_size)
+        else:
+            prev_encoder_token_embeddings = lmc_model.encoder.token_embeddings.weight.detach().numpy()
+            self.encoder = lmc_model.encoder
+            self.encoder.token_embeddings = nn.Embedding(token_vocab_size, encoder_embed_dim, padding_idx=0)
+            encoder_init = np.random.normal(0, 1, size=(token_vocab_size, encoder_embed_dim))
+            encoder_init[:prev_token_vocab_size, :] = prev_encoder_token_embeddings
+            self.encoder.token_embeddings.load_state_dict({'weight': torch.from_numpy(encoder_init)})
+
+        if args.random_decoder:
+            self.decoder = LMCDecoder(token_vocab_size, metadata_vocab_size)
+        else:
+            prev_token_vocab_size_decoder, decoder_embed_dim = lmc_model.decoder.token_embeddings.weight.size()
+            assert prev_token_vocab_size == prev_token_vocab_size_decoder
+            prev_decoder_token_embeddings = lmc_model.decoder.token_embeddings.weight.detach().numpy()
+            self.decoder = lmc_model.decoder
+            self.decoder.token_embeddings = nn.Embedding(token_vocab_size, decoder_embed_dim, padding_idx=0)
+            decoder_init = np.random.normal(0, 1, size=(token_vocab_size, decoder_embed_dim))
+            decoder_init[:prev_token_vocab_size, :] = prev_decoder_token_embeddings
+            self.decoder.token_embeddings.load_state_dict({'weight': torch.from_numpy(decoder_init)})
 
     def _compute_marginal(self, ids, metadata_ids, metadata_p, normalizer=None):
         batch_size, max_output, num_metadata = metadata_p.size()

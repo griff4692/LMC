@@ -11,7 +11,7 @@ from bsg_encoder import BSGEncoder, BSGEncoderLSTM
 
 
 class AcronymExpander(nn.Module):
-    def __init__(self, args, bsg_model, vocab):
+    def __init__(self, args, bsg_model, vocab, metadata_vocab):
         super(AcronymExpander, self).__init__()
 
         vocab_size = vocab.size()
