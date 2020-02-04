@@ -269,6 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('-random_encoder', default=False, action='store_true', help='Don\'t use pretrained encoder')
+    parser.add_argument('-random_priors', default=False, action='store_true', help='Don\'t use pretrained priors')
     parser.add_argument('-random_decoder', default=False, action='store_true', help='Don\'t use pretrained decoder')
 
     args = parser.parse_args()
