@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from compute_utils import compute_kl, mask_2D
 from lmc_context_utils import restore_model
 from model_utils import tensor_to_np
@@ -90,27 +91,27 @@ if __name__ == '__main__':
     # headers = metadata_vocab.i2w[1:]
     # compare_words = ['pain', 'smoking', 'cancer', 'heart']
 
-    center_word_tens = torch.LongTensor([token_vocab.get_id(center_word[0])])
+    center_word_tens = torch.LongTensor([token_vocab.get_id(center_word[0])]).to(device_str)
     header_ids = list(map(lambda x: metadata_vocab.get_id(x), headers))
     compare_ids = list(map(lambda x: token_vocab.get_id(x), compare_words))
-    pad_context = torch.zeros([1,]).long()
+    pad_context = torch.zeros([1,]).long().to(device_str)
     context_ids = list(map(lambda x: token_vocab.get_id(x), context_words))
 
-    compare_tens = torch.LongTensor(compare_ids)
-    context_tens = torch.LongTensor(context_ids).unsqueeze(0)
+    compare_tens = torch.LongTensor(compare_ids).to(device_str)
+    context_tens = torch.LongTensor(context_ids).unsqueeze(0).to(device_str)
     mu_compare, sigma_compare = model.decoder(compare_tens, pad_context.repeat(len(compare_words)))
 
-    mask = mask_2D(torch.Size([1, len(context_ids)]), [len(context_ids)])
+    mask = mask_2D(torch.Size([1, len(context_ids)]), [len(context_ids)]).to(device_str)
 
     print('Interpolation between word={} and headers={}'.format(center_word, ', '.join(headers)))
     for i, header_id in enumerate(header_ids):
-        header_tens = torch.LongTensor([header_id])
+        header_tens = torch.LongTensor([header_id]).to(device_str)
         print(headers[i])
         for p in np.arange(0, 1.25, 0.25):
             rw = [p, 1.0 - p]
             rel_weights = torch.FloatTensor([
                 rw
-            ])
+            ]).to(device_str)
 
             with torch.no_grad():
                 mu_q, sigma_q, weights = model.encoder(center_word_tens, header_tens, context_tens, mask,
@@ -140,16 +141,16 @@ if __name__ == '__main__':
     #     for i in order[:min(10, len(order))]:
     #         print('\t{} --> {}'.format(compare_words[i], kl[i]))
 
-    # section_df = pd.read_csv('../preprocess/data/mimic/section.csv').dropna()
-    # section_names = list(sorted(set(list(section_df.nlargest(100, columns='count')['section'].tolist()))))
-    # section_keys = list(map(create_section_token, section_names))
-    # section_ids = metadata_vocab.get_ids(section_keys)
-    # metadata_embeddings = model.encoder.metadata_embeddings.weight[section_ids, :]
-    #
-    # str = []
-    # for i, section_name in enumerate(section_names):
-    #     mu = metadata_embeddings[i, :]
-    #     sim = torch.nn.CosineSimilarity()(metadata_embeddings, mu.unsqueeze(0))
-    #     top_section_ids = sim.topk(6).indices.cpu().numpy()
-    #     top_sections = [section_names[i] for i in top_section_ids[1:]]
-    #     print('Closest sections {} --> {}'.format(section_name, ', '.join(top_sections)))
+    section_df = pd.read_csv('../preprocess/data/mimic/section.csv').dropna()
+    section_names = list(sorted(set(list(section_df.nlargest(100, columns='count')['section'].tolist()))))
+    section_keys = list(map(create_section_token, section_names))
+    section_ids = metadata_vocab.get_ids(section_keys)
+    metadata_embeddings = model.encoder.metadata_embeddings.weight[section_ids, :]
+
+    str = []
+    for i, section_name in enumerate(section_names):
+        mu = metadata_embeddings[i, :]
+        sim = torch.nn.CosineSimilarity()(metadata_embeddings, mu.unsqueeze(0))
+        top_section_ids = sim.topk(6).indices.cpu().numpy()
+        top_sections = [section_names[i] for i in top_section_ids[1:]]
+        print('Closest sections {} --> {}'.format(section_name, ', '.join(top_sections)))

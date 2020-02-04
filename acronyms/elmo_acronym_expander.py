@@ -12,7 +12,7 @@ class ELMoAcronymExpander(nn.Module):
         super(ELMoAcronymExpander, self).__init__()
         self.elmo = elmo
 
-    def forward(self, context_ids, lf_ids, target_lf_ids, sf_idxs, num_outputs):
+    def forward(self, context_ids, lf_ids, target_lf_ids, num_outputs):
         """
         :param sf_ids: batch_size
         :param context_ids: batch_size, num_context_ids, 50
@@ -27,7 +27,7 @@ class ELMoAcronymExpander(nn.Module):
 
         output_dim = torch.Size([batch_size, max_output_size])
         output_mask = mask_2D(output_dim, num_outputs).to('cuda')
-        encoded_context = self.elmo(context_ids).mean(axis=1)  # [0, sf_idxs, :]
+        encoded_context = self.elmo(context_ids).mean(axis=1)
         encoded_lfs = self.elmo(lf_ids.view(batch_size * max_output_size, 5, 50)).view(
             batch_size, max_output_size, 5, -1).mean(axis=2)
         encoded_context_tiled = encoded_context.unsqueeze(1).repeat(1, max_output_size, 1)
