@@ -51,7 +51,7 @@ class LMCC(nn.Module):
         m_samples = 10
 
         # Compute center words
-        mu_center_q, sigma_center_q = self.encoder(center_ids, center_metadata_ids, context_ids, mask)
+        mu_center_q, sigma_center_q, _ = self.encoder(center_ids, center_metadata_ids, context_ids, mask)
         mu_center_tiled_q = mu_center_q.unsqueeze(1).repeat(1, num_context_ids * m_samples, 1)
         sigma_center_tiled_q = sigma_center_q.unsqueeze(1).repeat(1, num_context_ids * m_samples, 1)
         mu_center_flat_q = mu_center_tiled_q.view(batch_size * num_context_ids * m_samples, -1)

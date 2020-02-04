@@ -111,9 +111,10 @@ class AcronymBatcherLoader:
                         lf_metadata_p[batch_idx, lf_idx, :num_m] = lf_m_p
                         lf_metadata_ids[batch_idx, lf_idx, :num_m] = metadata_ids
                     else:
-                        raise Exception('Cant find {} in lf metadata counts'.format(lf_sense))
-                        # lf_metadata_p[batch_idx, lf_idx, 0] = 1
+                        # raise Exception('Cant find {} in lf metadata counts'.format(lf_sense))
+                        lf_metadata_p[batch_idx, lf_idx, 0] = 1
 
+        actual_max_num_metadata = max(1, actual_max_num_metadata)
         lf_metadata_ids = lf_metadata_ids[:, :, :actual_max_num_metadata]
         lf_metadata_p = lf_metadata_p[:, :, :actual_max_num_metadata]
 

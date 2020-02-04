@@ -83,7 +83,7 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_voca
     return train_loss
 
 
-def load_casi(prev_args):
+def load_casi(prev_args, train_frac=1.0):
     # Load Data
     data_dir = '../eval/eval_data/minnesota/'
     data_fp = os.path.join(data_dir, 'preprocessed_dataset_window_{}.csv'.format(prev_args.window))
@@ -92,26 +92,38 @@ def load_casi(prev_args):
         preprocess_minnesota_dataset(window=prev_args.window, combine_phrases=prev_args.combine_phrases)
         print('Saving dataset to {}'.format(data_fp))
     df = pd.read_csv(data_fp)
-    df['tokenized_context_unique'] = df['tokenized_context'].apply(lambda x: list(set(x.split())))
+    df['section'] = df['section_mapped']
     df['row_idx'] = list(range(df.shape[0]))
 
     with open(os.path.join(data_dir, 'sf_lf_map.json'), 'r') as fd:
         sf_lf_map = json.load(fd)
 
-    train_df, test_df = train_test_split(df, random_state=1992, test_size=0.2)
-    train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-    test_batcher = AcronymBatcherLoader(df, batch_size=128)
+    mimic_df = pd.read_csv('../context_extraction/data/mimic_rs_dataset_preprocessed_window_10.csv')
+    mimics_sfs = mimic_df['sf'].unique().tolist()
+    used_sf_lf_map = {}
+    for sf in mimics_sfs:
+        used_sf_lf_map[sf] = sf_lf_map[sf]
+    df = df[df['sf'].isin(mimics_sfs)]
+
+    if train_frac == 1.0 or train_frac == 0.0:
+        train_batcher = AcronymBatcherLoader(df, batch_size=32)
+        test_batcher = AcronymBatcherLoader(df, batch_size=128)
+        train_df = df
+        test_df = df
+    else:
+        train_df, test_df = train_test_split(df, random_state=1992, test_size=1.0 - train_frac)
+        train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=128)
     # assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
-    return train_batcher, test_batcher, train_df, test_df, sf_lf_map
+    return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
-def load_mimic(prev_args):
+def load_mimic(prev_args, train_frac=1.0):
     with open('../eval/eval_data/minnesota/sf_lf_map.json', 'r') as fd:
         sf_lf_map = json.load(fd)
     used_sf_lf_map = {}
     window = 10
     df = pd.read_csv('../context_extraction/data/mimic_rs_dataset_preprocessed_window_{}.csv'.format(window))
-    df['tokenized_context_unique'] = df['tokenized_context'].apply(lambda x: list(set(x.split())))
     df['category'] = df['category'].apply(create_document_token)
     if prev_args.metadata == 'category':
         df['metadata'] = df['category']
@@ -122,24 +134,32 @@ def load_mimic(prev_args):
     for sf in sfs:
         used_sf_lf_map[sf] = sf_lf_map[sf]
     train_df = df[df['is_train']]
-    test_df = df
-    train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-    test_batcher = AcronymBatcherLoader(test_df, batch_size=128)
+    test_df = df[~df['is_train']]
+
+    if train_frac == 1.0 or train_frac == 0.0:
+        train_batcher = AcronymBatcherLoader(df, batch_size=32)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=128)
+    else:
+        train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=128)
     # assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
-def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
+def acronyms_finetune(args, acronym_model, loader, restore_func, save_func, train_frac=1.0, use_existing=False):
     args.git_hash = get_git_revision_hash()
     render_args(args)
 
+    weights_path = '../acronyms/weights/' if use_existing else None
+    lm_str = args.experiment if use_existing else args.lm_experiment
+
     if args.lm_type == 'bsg':
-        prev_args, lm, token_vocab, _ = restore_func(args.lm_experiment)
+        prev_args, lm, token_vocab, _ = restore_func(lm_str, weights_path=weights_path)
         metadata_vocab = None
         prev_args.metadata = None
     else:
-        prev_args, lm, token_vocab, metadata_vocab, _, _ = restore_func(args.lm_experiment)
-    train_batcher, test_batcher, train_df, test_df, sf_lf_map = loader(prev_args)
+        prev_args, lm, token_vocab, metadata_vocab, _, _ = restore_func(lm_str, weights_path=weights_path)
+    train_batcher, test_batcher, train_df, test_df, sf_lf_map = loader(prev_args, train_frac=train_frac)
     args.metadata = prev_args.metadata
 
     lf_metadata_counts = None
@@ -147,10 +167,10 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
         metadata_file = '../context_extraction/data/{}_marginals.json'.format(args.metadata)
         with open(metadata_file, 'r') as fd:
             lf_metadata_counts = json.load(fd)
-            for sf, lfs in sf_lf_map.items():
-                for lf in lfs:
-                    if lf not in lf_metadata_counts:
-                        raise Exception('No metadata counts for {}'.format(lf))
+        #     for sf, lfs in sf_lf_map.items():
+        #         for lf in lfs:
+        #             if lf not in lf_metadata_counts:
+        #                 raise Exception('No metadata counts for {}'.format(lf))
 
         for lf, counts in lf_metadata_counts.items():
             names = counts[args.metadata]
@@ -248,7 +268,7 @@ def acronyms_finetune(args, acronym_model, loader, restore_func, save_func):
     model.load_state_dict(best_weights)
     losses_dict['test_loss'] = lowest_test_loss
     checkpoint_fp = os.path.join(weights_dir, 'checkpoint_best.pth')
-    save_func(args, model, optimizer, token_vocab, losses_dict,
+    save_func(args, model, optimizer, token_vocab, {'losses': losses_dict},
               checkpoint_fp=checkpoint_fp, metadata_vocab=metadata_vocab)
     analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
             lf_metadata_counts, results_dir=results_dir)
@@ -272,10 +292,23 @@ if __name__ == '__main__':
     parser.add_argument('-random_priors', default=False, action='store_true', help='Don\'t use pretrained priors')
     parser.add_argument('-random_decoder', default=False, action='store_true', help='Don\'t use pretrained decoder')
 
+    parser.add_argument('-two_step', default=False, action='store_true')
+
     args = parser.parse_args()
     args.experiment += '_{}'.format(args.dataset)
-    loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
     restore_func = restore_bsg if args.lm_type == 'bsg' else lmc_context_restore
     save_func = save_bsg if args.lm_type == 'bsg' else lmc_context_save
     acronym_model = AcronymExpander if args.lm_type == 'bsg' else AcronymExpanderLMC
-    acronyms_finetune(args, acronym_model, loader, restore_func, save_func)
+    args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    args.hinge_loss_margin = 1.0
+    args.multi_bsg = False
+    args.window = 10
+
+    if args.two_step:
+        args.epochs = 3
+        acronyms_finetune(args, acronym_model, load_mimic, restore_func, save_func, train_frac=0.8)
+        args.epochs = 0
+        acronyms_finetune(args, acronym_model, load_casi, restore_func, save_func, use_existing=True, train_frac=0.0)
+    else:
+        loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
+        acronyms_finetune(args, acronym_model, loader, restore_func, save_func)

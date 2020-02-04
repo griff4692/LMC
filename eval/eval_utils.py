@@ -1,6 +1,7 @@
 from collections import Counter, defaultdict
 import json
 import re
+from string import punctuation
 import string
 import sys
 
@@ -14,7 +15,7 @@ sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from bsg_model import BSG
 from casi_constants import LF_BLACKLIST, LF_MAPPING, SF_BLACKLIST
 from clean_mimic import clean_text
-from mimic_tokenize import STOPWORDS, tokenize_str
+from mimic_tokenize import create_section_token, STOPWORDS, tokenize_str
 from model_utils import tensor_to_np
 
 
@@ -126,6 +127,38 @@ def parse_sense_df(sense_fp):
     for k in sf_lf_map:
         sf_lf_map[k] = list(sorted(sf_lf_map[k]))
     return lfs, lf_sf_map, sf_lf_map
+
+
+def add_section_headers_to_casi():
+    in_fp = '../eval/eval_data/minnesota/preprocessed_dataset_window_10.csv'
+    df = pd.read_csv(in_fp)
+
+    freq_sections = pd.read_csv('../preprocess/data/mimic/section_freq.csv')['section'].tolist()
+
+    section_map = pd.read_csv('../eval/eval_data/minnesota/casi_mimic_section_map.csv')
+    section_map = section_map.set_index('casi_section')['mimic_section'].to_dict()
+
+    headers = []
+    for casi_section in df['section'].tolist():
+        if type(casi_section) == float or len(casi_section) == 0:
+            headers.append('<pad>')
+            continue
+        casi_stripped = re.sub(r'\s+', ' ', casi_section).strip(punctuation).strip().upper()
+
+        if casi_stripped in freq_sections:
+            new_section = create_section_token(casi_stripped)
+        elif casi_stripped in section_map:
+            mapped = section_map[casi_stripped]
+            if type(mapped) == float or len(mapped) == 0:
+                new_section = '<pad>'
+            else:
+                new_section = create_section_token(mapped)
+        else:
+            raise Exception('Unaccounted for section!')
+
+        headers.append(new_section)
+    df['section_mapped'] = headers
+    df.to_csv(in_fp, index=False)
 
 
 def preprocess_minnesota_dataset(window=10, chunker=None, combine_phrases=False):

@@ -6,8 +6,11 @@ import torch
 from bsg_model import BSG
 
 
-def restore_model(restore_name):
-    checkpoint_dir = os.path.join('../bsg/weights', restore_name)
+def restore_model(restore_name, weights_path=None):
+    if weights_path is None:
+        checkpoint_dir = os.path.join('../bsg/weights', restore_name)
+    else:
+        checkpoint_dir = os.path.join(weights_path, restore_name)
     checkpoint_fns = os.listdir(checkpoint_dir)
     checkpoint_fns = list(filter(lambda x: 'results' not in x, checkpoint_fns))
     max_checkpoint_epoch, latest_checkpoint_idx = -1, -1

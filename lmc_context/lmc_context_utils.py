@@ -9,12 +9,18 @@ sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from lmc_context_model import LMCC
 
 
-def restore_model(restore_name, weights_path='weights'):
-    checkpoint_dir = os.path.join('../lmc_context', weights_path, restore_name)
+def restore_model(restore_name, weights_path=None):
+    if weights_path is None:
+        checkpoint_dir = os.path.join('../lmc_context/weights', restore_name)
+    else:
+        checkpoint_dir = os.path.join(weights_path, restore_name)
     checkpoint_fns = os.listdir(checkpoint_dir)
     checkpoint_fns = list(filter(lambda x: 'results' not in x, checkpoint_fns))
     max_checkpoint_epoch, latest_checkpoint_idx = -1, -1
     for cidx, checkpoint_fn in enumerate(checkpoint_fns):
+        if 'best' in checkpoint_fn:
+            latest_checkpoint_idx = cidx
+            break
         checkpoint_epoch = int(checkpoint_fn.split('_')[-1].split('.')[0])
         max_checkpoint_epoch = max(max_checkpoint_epoch, checkpoint_epoch)
         if checkpoint_epoch == max_checkpoint_epoch:
