@@ -15,9 +15,27 @@ sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from compute_sections import enumerate_metadata_ids_lmc
 from lmc_context_batcher import LMCContextSkipGramBatchLoader
 from lmc_context_model import LMCC
-from lmc_context_utils import save_checkpoint
+from lmc_context_utils import restore_model, save_checkpoint
 from model_utils import get_git_revision_hash, render_args
 from vocab import Vocab
+
+
+def generate_metadata_samples(token_metadata_counts, metadata_vocab, token_vocab):
+    token_metadata_samples = {}
+    smooth_counts = np.zeros([metadata_vocab.size()])
+    all_metadata_ids = np.arange(metadata_vocab.size())
+    for k, (sids, sp) in token_metadata_counts.items():
+        size = [min(len(sp) * 100, 10000), 10]
+        # Add smoothing
+        smooth_counts.fill(1.0)
+        smooth_counts[sids] += sp
+        smooth_p = smooth_counts / smooth_counts.sum()
+        rand_sids = np.random.choice(all_metadata_ids, size=size, replace=True, p=smooth_p)
+        start_idx = 0
+        token_metadata_samples[k] = [start_idx, rand_sids]
+
+    token_vocab.truncate(token_vocab.section_start_vocab_id)
+    return token_metadata_samples
 
 
 if __name__ == '__main__':
@@ -44,6 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('--metadata', default='section',
                         help='sections or category. What to define latent variable over.')
     parser.add_argument('--recon_coeff', default=1.0, type=float)
+    parser.add_argument('-restore', default=False, action='store_true')
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()
@@ -57,6 +76,10 @@ if __name__ == '__main__':
     print('Loading data from {}...'.format(ids_infile))
     with open(ids_infile, 'rb') as fd:
         ids = np.load(fd)
+
+    device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
+    args.device = torch.device(device_str)
+    print('Training on {}...'.format(device_str))
 
     # Load Vocabulary
     vocab_infile = os.path.join(args.data_dir, 'vocab{}{}.pk'.format(debug_str, phrase_str))
@@ -79,28 +102,16 @@ if __name__ == '__main__':
         metadata_vocab.add_token(name)
     full_metadata_ids, token_metadata_counts = enumerate_metadata_ids_lmc(
         ids, metadata_pos_idxs, token_vocab, metadata_vocab)
-
-    token_metadata_samples = {}
-    smooth_counts = np.zeros([metadata_vocab.size()])
-    all_metadata_ids = np.arange(metadata_vocab.size())
-    for k, (sids, sp) in token_metadata_counts.items():
-        size = [min(len(sp) * 100, 10000), 10]
-        # Add smoothing
-        smooth_counts.fill(1.0)
-        smooth_counts[sids] += sp
-        smooth_p = smooth_counts / smooth_counts.sum()
-        rand_sids = np.random.choice(all_metadata_ids, size=size, replace=True, p=smooth_p)
-        start_idx = 0
-        token_metadata_samples[k] = [start_idx, rand_sids]
-
-    token_vocab.truncate(token_vocab.section_start_vocab_id)
     ids[all_metadata_pos_idxs] = -1
 
-    device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
-    args.device = torch.device(device_str)
-    print('Training on {}...'.format(device_str))
+    if args.restore:
+        _, model, token_vocab, metadata_vocab, optimizer_state, token_metadata_counts = restore_model(args.experiment)
+        token_metadata_samples = generate_metadata_samples(token_metadata_counts, metadata_vocab, token_vocab)
+    else:
+        token_metadata_samples = generate_metadata_samples(token_metadata_counts, metadata_vocab, token_vocab)
+        model = LMCC(args, token_vocab.size(), metadata_vocab.size()).to(args.device)
+        optimizer_state = None
 
-    model = LMCC(args, token_vocab.size(), metadata_vocab.size()).to(args.device)
     if args.multi_gpu and torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         model = nn.DataParallel(model)
@@ -110,6 +121,8 @@ if __name__ == '__main__':
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
     optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
+    if optimizer_state is not None:
+        optimizer.load_state_dict(optimizer_state)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join('weights', args.experiment)
@@ -120,6 +133,7 @@ if __name__ == '__main__':
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
+    epoch = 3 if args.restore else 1
     for epoch in range(1, args.epochs + 1):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
         print('Starting Epoch={}'.format(epoch))
