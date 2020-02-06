@@ -138,7 +138,7 @@ def load_mimic(prev_args, train_frac=1.0):
 
     if train_frac == 1.0 or train_frac == 0.0:
         train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=128)
+        test_batcher = AcronymBatcherLoader(df, batch_size=128)
     else:
         train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
         test_batcher = AcronymBatcherLoader(test_df, batch_size=128)
@@ -311,4 +311,4 @@ if __name__ == '__main__':
         acronyms_finetune(args, acronym_model, load_casi, restore_func, save_func, use_existing=True, train_frac=0.0)
     else:
         loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
-        acronyms_finetune(args, acronym_model, loader, restore_func, save_func)
+        acronyms_finetune(args, acronym_model, loader, restore_func, save_func, train_frac=0.0)
