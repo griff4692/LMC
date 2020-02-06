@@ -126,7 +126,7 @@ if __name__ == '__main__':
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join('weights', args.experiment)
-    if os.path.exists(weights_dir):
+    if os.path.exists(weights_dir) and not args.restore:
         print('Clearing out previous weights in {}'.format(weights_dir))
         rmtree(weights_dir)
     os.mkdir(weights_dir)
