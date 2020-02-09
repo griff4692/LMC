@@ -118,9 +118,10 @@ class LMCContextSkipGramBatchLoader:
         context_ids = np.zeros([self.batch_size, (window_size * 2)], dtype=int)
         neg_ids = token_vocab.neg_sample(size=(self.batch_size, (window_size * 2)))
 
+        num_metadata = token_metadata_samples[1][1].shape[1]
         center_metadata_ids = np.zeros([self.batch_size, ], dtype=int)
-        context_metadata_ids = np.zeros([self.batch_size, (window_size * 2), 10], dtype=int)
-        neg_metadata_ids = np.zeros([self.batch_size, (window_size * 2), 10], dtype=int)
+        context_metadata_ids = np.zeros([self.batch_size, (window_size * 2), num_metadata], dtype=int)
+        neg_metadata_ids = np.zeros([self.batch_size, (window_size * 2), num_metadata], dtype=int)
 
         window_sizes = []
         for batch_idx, center_idx in enumerate(batch_idxs):

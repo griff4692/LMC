@@ -20,12 +20,12 @@ from model_utils import get_git_revision_hash, render_args
 from vocab import Vocab
 
 
-def generate_metadata_samples(token_metadata_counts, metadata_vocab, token_vocab):
+def generate_metadata_samples(token_metadata_counts, metadata_vocab, token_vocab, sample=10):
     token_metadata_samples = {}
     smooth_counts = np.zeros([metadata_vocab.size()])
     all_metadata_ids = np.arange(metadata_vocab.size())
     for k, (sids, sp) in token_metadata_counts.items():
-        size = [min(len(sp) * 100, 10000), 10]
+        size = [min(len(sp) * 100, 10000), sample]
         # Add smoothing
         smooth_counts.fill(1.0)
         smooth_counts[sids] += sp
@@ -56,6 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--window', default=10, type=int)
 
     # Model Hyperparameters
+    parser.add_argument('--metadata_samples', default=10, type=int)
     parser.add_argument('--hidden_dim', default=64, type=int, help='hidden dimension for encoder')
     parser.add_argument('--input_dim', default=100, type=int, help='embedding dimemsions for encoder')
     parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
@@ -106,9 +107,11 @@ if __name__ == '__main__':
 
     if args.restore:
         _, model, token_vocab, metadata_vocab, optimizer_state, token_metadata_counts = restore_model(args.experiment)
-        token_metadata_samples = generate_metadata_samples(token_metadata_counts, metadata_vocab, token_vocab)
+        token_metadata_samples = generate_metadata_samples(
+            token_metadata_counts, metadata_vocab, token_vocab, sample=args.metadata_samples)
     else:
-        token_metadata_samples = generate_metadata_samples(token_metadata_counts, metadata_vocab, token_vocab)
+        token_metadata_samples = generate_metadata_samples(
+            token_metadata_counts, metadata_vocab, token_vocab, sample=args.metadata_samples)
         model = LMCC(args, token_vocab.size(), metadata_vocab.size()).to(args.device)
         optimizer_state = None
 
@@ -129,7 +132,8 @@ if __name__ == '__main__':
     if os.path.exists(weights_dir) and not args.restore:
         print('Clearing out previous weights in {}'.format(weights_dir))
         rmtree(weights_dir)
-    os.mkdir(weights_dir)
+    if not os.path.exists(weights_dir):
+        os.mkdir(weights_dir)
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
