@@ -42,7 +42,7 @@ class LMCC(nn.Module):
         mask_size = torch.Size([batch_size, num_context_ids])
         mask = mask_2D(mask_size, num_contexts).to(self.device)
 
-        m_samples = 10
+        m_samples = context_metadata_ids.size()[-1]
 
         # Compute center words
         mu_center_q, sigma_center_q, _ = self.encoder(center_ids, center_metadata_ids, context_ids, mask)
