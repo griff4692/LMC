@@ -116,7 +116,7 @@ if __name__ == '__main__':
     p = Pool()
     wikis = []
     categories = []
-    for wiki, category in tqdm(p.map(workers.multiprocess_wiki)): #run first x examples for experimenting
+    for wiki, category in tqdm(p.map(workers.multiprocess_wiki, match)): #run first x examples for experimenting
         wikis.append(wiki)
         categories.append(category)
     p.close()
