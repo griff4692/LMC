@@ -12,7 +12,7 @@ from  gensim.scripts import segment_wiki
 import gzip
 import re
 import string
-import time
+from time import time
 import pandas as pd
 import csv
 from multiprocessing import Pool
@@ -45,31 +45,35 @@ class get_categories:
 
 def clean_text(text):
     remove = string.punctuation.replace(".","")+"\\"
-    text = bytes(text.encode()).decode("unicode_escape")
+    text = bytes(text.encode()).decode('utf-8','ignore')
     return ' '.join(''.join([t for t in text.replace('\n'," ").replace('\\n'," ") if t not in remove]).split()).lower()
 
 def capitalize(title):
      return ' '.join([string.capwords(s, ' ') if s.lower() not in ["the","of"] else s for s in title.split()])
 
 def wiki_mimicize(wikis,categories,mimicize_path):
-    wikis.to_csv( mimicize_path + 'NOTEEVENTS.csv',index=False)
+    wikis.to_csv(mimicize_path + 'NOTEEVENTS.csv',index=False)
     with open(mimicize_path + 'CATEGORIES.csv', "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(categories)
 
-def multiprocess_wiki(match):
-    wiki = dict()
-    message = "Ambiguation occured on: {}.There are several articles named as such or name mismatch."
-    wiki["TITLE"] = bytes(re.search(r'"title": "(.*?)", "', match).group(1).encode()).decode("unicode_escape")
-    wiki["TEXT"] = match.split('"section_texts": ["')[-1].replace('"]',"")
-    wiki["TEXT"] = clean_text(wiki["TEXT"])
-    try:
-        time.sleep(0.001)
-        wiki["CATEGORY"] = wiki_categories.extract_categories(wiki["TITLE"])
-    except:
-        print(message.format(wiki["TITLE"]))
-        wiki["CATEGORY"] = None
-    return [wiki["TITLE"],wiki["TEXT"]],wiki["CATEGORY"]
+class wiki_workers:
+    def __init__(self,URL):
+        self.URL = URL
+        
+    def multiprocess_wiki(self,match):
+        wiki = dict()
+        wiki_categories = get_categories(self.URL) #Open new sessions
+        message = "Ambiguation occured on: {}.There are several articles named as such or name mismatch."
+        wiki["TITLE"] = bytes(re.search(r'"title": "(.*?)", "', match).group(1).encode()).decode("unicode_escape")
+        wiki["TEXT"] = match.split('"section_texts": ["')[-1].replace('"]',"")
+        wiki["TEXT"] = clean_text(wiki["TEXT"])
+        try:
+            wiki["CATEGORY"] = clean_text(wiki_categories.extract_categories(wiki["TITLE"]))
+        except:
+            print(message.format(wiki["TITLE"]))
+            wiki["CATEGORY"] = "None"
+        return [wiki["TITLE"],wiki["TEXT"]],wiki["CATEGORY"]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Wiki category generator')
@@ -99,24 +103,27 @@ if __name__ == '__main__':
         wikipedia = segment_wiki
         wikipedia.segment_and_write_all_articles(args.bz2_path,JSON)    
         
-    wiki_categories = get_categories(URL) 
     with gzip.GzipFile(JSON, 'r') as fin: 
         json_bytes = fin.read()
         
-    json_str = json_bytes.decode('utf-8')            
+    json_str = json_bytes.decode('utf-8')
     pat = r'.*?\{(.*)}.*'
     match = re.findall(pat, json_str)
-    
+
+    workers = wiki_workers(URL)
+
+    start_time = time()
     p = Pool()
     wikis = []
     categories = []
-    for wiki, category in tqdm(p.map(multiprocess_wiki, match[:10])): #run firt 10 example for experimenting
+    for wiki, category in tqdm(p.map(workers.multiprocess_wiki)): #run first x examples for experimenting
         wikis.append(wiki)
         categories.append(category)
     p.close()
-        
-    wikis = pd.DataFrame(wikis, columns = ["TITLE","TEXT"])
+    end_time = time()
+    print('Took {} seconds'.format(end_time - start_time))
     
-    #wiki_mimicize(wikis,categories,args.mimicize_path)
-    multiprocess_wiki(match[0])[1] #it works outside pooling...
+    wikis = pd.DataFrame(wikis, columns = ["TITLE","TEXT"])
+
+    wiki_mimicize(wikis,categories,args.mimicize_path)
 
