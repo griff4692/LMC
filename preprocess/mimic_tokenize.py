@@ -12,10 +12,10 @@ from nltk.corpus import stopwords
 import pandas as pd
 import spacy
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, 'D:/git_codes/ClinicalBayesianSkipGram/utils')
 from model_utils import render_args
 from compute_sections import HEADER_SEARCH_REGEX
-
+'''
 MIN_SECTION_COUNT = 10
 section_df = pd.read_csv('../preprocess/data/mimic/section.csv').dropna()
 ALL_SECTION_NAMES = section_df['section'].tolist()
@@ -31,7 +31,7 @@ swords = set(stopwords.words('english')).union(
 with open('../preprocess/data/prepositions.txt', 'r') as fd:
     prepositions = set(map(lambda x: x.strip(), fd.readlines()))
 STOPWORDS = swords - prepositions
-
+'''
 
 def pattern_repl(matchobj):
     """

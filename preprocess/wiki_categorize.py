@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Feb  9 21:16:21 2020
-
 @author: Mert Ketenci
 """
 import argparse
@@ -69,7 +68,7 @@ class wiki_workers:
         wiki["TEXT"] = match.split('"section_texts": ["')[-1].replace('"]',"")
         wiki["TEXT"] = clean_text(wiki["TEXT"])
         try:
-            wiki["CATEGORY"] = clean_text(wiki_categories.extract_categories(wiki["TITLE"]))
+            wiki["CATEGORY"] = [clean_text(x) for x in wiki_categories.extract_categories(wiki["TITLE"])]
         except:
             print(message.format(wiki["TITLE"]))
             wiki["CATEGORY"] = "None"
@@ -116,7 +115,7 @@ if __name__ == '__main__':
     p = Pool()
     wikis = []
     categories = []
-    for wiki, category in tqdm(p.map(workers.multiprocess_wiki, match)): #run first x examples for experimenting
+    for wiki, category in tqdm(p.map(workers.multiprocess_wiki, match[:1000])): #run first x examples for experimenting
         wikis.append(wiki)
         categories.append(category)
     p.close()
@@ -126,4 +125,6 @@ if __name__ == '__main__':
     wikis = pd.DataFrame(wikis, columns = ["TITLE","TEXT"])
 
     wiki_mimicize(wikis,categories,args.mimicize_path)
-
+    
+    workers.multiprocess_wiki(match[0])
+    
