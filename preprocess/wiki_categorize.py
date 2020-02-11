@@ -15,6 +15,7 @@ import string
 import time
 import pandas as pd
 import csv
+from multiprocessing import Pool
 sys.path.insert(0, "D:/Latent Meaning Cells/")
 
 class get_categories:
@@ -43,6 +44,7 @@ class get_categories:
         return categories
 
 def clean_text(text):
+    remove = string.punctuation.replace(".","")+"\\"
     text = bytes(text.encode()).decode("unicode_escape")
     return ' '.join(''.join([t for t in text.replace('\n'," ").replace('\\n'," ") if t not in remove]).split()).lower()
 
@@ -54,6 +56,20 @@ def wiki_mimicize(wikis,categories,mimicize_path):
     with open(mimicize_path + 'CATEGORIES.csv', "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(categories)
+
+def multiprocess_wiki(match):
+    wiki = dict()
+    message = "Ambiguation occured on: {}.There are several articles named as such or name mismatch."
+    wiki["TITLE"] = bytes(re.search(r'"title": "(.*?)", "', match).group(1).encode()).decode("unicode_escape")
+    wiki["TEXT"] = match.split('"section_texts": ["')[-1].replace('"]',"")
+    wiki["TEXT"] = clean_text(wiki["TEXT"])
+    try:
+        time.sleep(0.001)
+        wiki["CATEGORY"] = wiki_categories.extract_categories(wiki["TITLE"])
+    except:
+        print(message.format(wiki["TITLE"]))
+        wiki["CATEGORY"] = None
+    return [wiki["TITLE"],wiki["TEXT"]],wiki["CATEGORY"]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Wiki category generator')
@@ -91,33 +107,16 @@ if __name__ == '__main__':
     pat = r'.*?\{(.*)}.*'
     match = re.findall(pat, json_str)
     
-    remove = string.punctuation.replace(".","")+"\\"
-    message = "Ambiguation occured on: {}.There are several articles named as such or name mismatch."
+    p = Pool()
     wikis = []
     categories = []
-    NO_CATEGORY = []
-    i = 0
-    for m in tqdm(match, position=0, leave=True):
-        wiki = dict()
-        wiki["TITLE"] = bytes(re.search(r'"title": "(.*?)", "', m).group(1).encode()).decode("unicode_escape")
-        wiki["TEXT"] = m.split('"section_texts": ["')[-1].replace('"]',"")
-        wiki["TEXT"] = clean_text(wiki["TEXT"])
-        try:
-            time.sleep(0.001)
-            wiki["CATEGORY"] = wiki_categories.extract_categories(wiki["TITLE"])
-        except:
-            print(message.format(wiki["TITLE"]))
-            wiki["CATEGORY"] = "-"
-            NO_CATEGORY.append(wiki["TITLE"])
-        wikis.append([wiki["TITLE"],wiki["TEXT"]])
-        categories.append(wiki["CATEGORY"])
-        i+=1
-        if i == 100:
-            break
+    for wiki, category in tqdm(p.map(multiprocess_wiki, match[:10])): #run firt 10 example for experimenting
+        wikis.append(wiki)
+        categories.append(category)
+    p.close()
         
     wikis = pd.DataFrame(wikis, columns = ["TITLE","TEXT"])
-    wiki_mimicize(wikis,categories,args.mimicize_path)
-
-
-
+    
+    #wiki_mimicize(wikis,categories,args.mimicize_path)
+    multiprocess_wiki(match[0])[1] #it works outside pooling...
 
