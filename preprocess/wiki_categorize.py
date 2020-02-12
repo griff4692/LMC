@@ -1,4 +1,5 @@
 import csv
+import os
 import sys
 from time import time
 
@@ -12,8 +13,7 @@ import requests
 import string
 from tqdm import tqdm
 
-
-sys.path.insert(0, '~/ClinicalBayesianSkipGram/wiki/data/')  # "D:/git_codes/ClinicalBayesianSkipGram/")
+sys.path.insert(0, os.path.expanduser('~/ClinicalBayesianSkipGram/wiki/data/'))
 
 
 class CategoryExtractor:
