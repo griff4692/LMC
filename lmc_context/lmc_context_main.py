@@ -9,16 +9,18 @@ import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, 'D:/git_codes/ClinicalBayesianSkipGram/preprocess/')
+sys.path.insert(0, 'D:/git_codes/ClinicalBayesianSkipGram/utils/')
 from compute_sections import enumerate_metadata_ids_lmc
 from lmc_context_batcher import LMCContextSkipGramBatchLoader
 from lmc_context_model import LMCC
 from lmc_context_utils import restore_model, save_checkpoint
 from model_utils import get_git_revision_hash, render_args
 from vocab import Vocab
-
+from category_vocab import category_Vocab
+import csv
+from categorize import categorize_token_metadata_counts
+sys.path.insert(0, 'D:/git_codes/ClinicalBayesianSkipGram/')
 
 def generate_metadata_samples(token_metadata_counts, metadata_vocab, token_vocab, sample=10):
     token_metadata_samples = {}
@@ -37,18 +39,18 @@ def generate_metadata_samples(token_metadata_counts, metadata_vocab, token_vocab
     token_vocab.truncate(token_vocab.section_start_vocab_id)
     return token_metadata_samples
 
-
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Main script for Bayesian Skip Gram Model')
 
     # Functional Arguments
     parser.add_argument('-cpu', action='store_true', default=False)
     parser.add_argument('-debug', action='store_true', default=False)
-    parser.add_argument('--data_dir', default='../preprocess/data/')
+    parser.add_argument('--data_dir', default=sys.path[0])
     parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
 
     # Training Hyperparameters
-    parser.add_argument('--batch_size', default=1024, type=int)
+    parser.add_argument('--batch_size', default=256, type=int)
     parser.add_argument('-combine_phrases', default=False, action='store_true')
     parser.add_argument('--epochs', default=5, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
@@ -91,8 +93,8 @@ if __name__ == '__main__':
 
     print('Collecting metadata information for {}...'.format(args.metadata))
     assert token_vocab.section_start_vocab_id <= token_vocab.category_start_vocab_id
-    start_id = token_vocab.section_start_vocab_id if args.metadata == 'section' else token_vocab.category_start_vocab_id
-    end_id = token_vocab.category_start_vocab_id if args.metadata == 'section' else token_vocab.size()
+    start_id = token_vocab.category_start_vocab_id
+    end_id = token_vocab.size()
     metadata_id_range = np.arange(start_id, end_id)
     is_metadata = np.isin(ids, metadata_id_range)
     metadata_pos_idxs = np.where(is_metadata)[0]
@@ -105,14 +107,28 @@ if __name__ == '__main__':
         ids, metadata_pos_idxs, token_vocab, metadata_vocab)
     ids[all_metadata_pos_idxs] = -1
 
+    categories_path = sys.path[0] + 'CATEGORIES.csv'
+    with open(categories_path, "r") as f:
+        reader = csv.reader(f)
+        categories_list = list(reader)
+        
+    category_vocab = category_Vocab()
+    category_vocab.store_categories(categories_list)
+    category_dict = dict()
+    for i in range(len(categories_list)):
+        category_dict['document={}'.format(i)] = [category_vocab.get_ids(x) for x in categories_list[i]]
+    print("Tokenized {} number of distinct categories".format(category_vocab.size()))
+    
+    categorize_token_metadata_counts(token_metadata_counts,metadata_vocab,category_dict);
+
     if args.restore:
         _, model, token_vocab, metadata_vocab, optimizer_state, token_metadata_counts = restore_model(args.experiment)
         token_metadata_samples = generate_metadata_samples(
-            token_metadata_counts, metadata_vocab, token_vocab, sample=args.metadata_samples)
+            token_metadata_counts, category_vocab, token_vocab, sample=args.metadata_samples)
     else:
         token_metadata_samples = generate_metadata_samples(
-            token_metadata_counts, metadata_vocab, token_vocab, sample=args.metadata_samples)
-        model = LMCC(args, token_vocab.size(), metadata_vocab.size()).to(args.device)
+            token_metadata_counts, category_vocab, token_vocab, sample=args.metadata_samples)
+        model = LMCC(args, token_vocab.size(), category_vocab.size()).to(args.device)
         optimizer_state = None
 
     if args.multi_gpu and torch.cuda.device_count() > 1:
@@ -134,7 +150,8 @@ if __name__ == '__main__':
         rmtree(weights_dir)
     if not os.path.exists(weights_dir):
         os.mkdir(weights_dir)
-
+    
+    
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
     epoch = 3 if args.restore else 1

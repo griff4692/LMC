@@ -15,7 +15,7 @@ from time import time
 import pandas as pd
 import csv
 from multiprocessing import Pool
-sys.path.insert(0, "D:/Latent Meaning Cells/")
+sys.path.insert(0, "D:/git_codes/ClinicalBayesianSkipGram/")
 
 class get_categories:
     
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     parser.add_argument('--json_path', default= sys.path[0] + 'enwiki-latest.json.gz')
     parser.add_argument('--simple_wiki_URL', default= 'https://simple.wikipedia.org/w/api.php')
     parser.add_argument('--wiki_URL', default= 'https://en.wikipedia.org/w/api.php')
-    parser.add_argument('--run_gensim', default= False)
+    parser.add_argument('--run_gensim', default= True)
     parser.add_argument('--simple_wiki', default= True)
     args = parser.parse_args()
     
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     if args.run_gensim:
         print("Loading data")
         wikipedia = segment_wiki
-        wikipedia.segment_and_write_all_articles(args.bz2_path,JSON)    
+        wikipedia.segment_and_write_all_articles(BZ2,JSON) 
         
     with gzip.GzipFile(JSON, 'r') as fin: 
         json_bytes = fin.read()
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     p = Pool()
     wikis = []
     categories = []
-    for wiki, category in tqdm(p.map(workers.multiprocess_wiki, match[:1000])): #run first x examples for experimenting
+    for wiki, category in tqdm(p.map(workers.multiprocess_wiki, match[:100])): #run first x examples for experimenting
         wikis.append(wiki)
         categories.append(category)
     p.close()
