@@ -147,7 +147,7 @@ if __name__ == '__main__':
     data_fp = os.path.join(data_dir, 'preprocessed_dataset_window_{}.csv'.format(10))
     if not os.path.exists(data_fp):
         print('Need to preprocess dataset first...')
-        preprocess_minnesota_dataset(window=10, combine_phrases=False)
+        preprocess_minnesota_dataset(window=10)
         print('Saving dataset to {}'.format(data_fp))
 
     args.experiment += '_{}'.format(args.dataset)

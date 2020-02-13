@@ -7,6 +7,7 @@ from time import time
 import argparse
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 
 HEADER_SEARCH_REGEX = r'(?:^|\s{4,}|\n)[\d.#]{0,4}\s*([A-Z][A-z0-9/ ]+[A-z]:)'
@@ -75,7 +76,7 @@ def enumerate_metadata_ids_lmc(ids, metadata_pos_idxs, token_vocab, metadata_voc
     """
     metadata_ids = [0] * metadata_pos_idxs[0]
     token_metadata_counts = defaultdict(list)
-    for metadata_num, metadata_pos_idx in enumerate(metadata_pos_idxs):
+    for metadata_num, metadata_pos_idx in tqdm(enumerate(metadata_pos_idxs), total=len(metadata_pos_idxs)):
         token_metadata_id = ids[metadata_pos_idx]
         # Make an adjustment to find the appropriate id in the new metadata vocabulary
         metadata_id = metadata_vocab.get_id(token_vocab.get_token(token_metadata_id))

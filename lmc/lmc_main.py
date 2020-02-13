@@ -6,12 +6,15 @@ from time import sleep
 import argparse
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 from tqdm import tqdm
+from torch.nn.utils import clip_grad_norm_
+from transformers import BertTokenizer, AdamW
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
-from lmc_model import LMC
-from lmc_prebatch import precompute
+from lmc_model import LMC, LMCBERT
+from lmc_prebatch import DistributedDataset, precompute
 from lmc_utils import restore_model, save_checkpoint
 from model_utils import get_git_revision_hash, render_args
 
@@ -26,46 +29,54 @@ if __name__ == '__main__':
     parser.add_argument('--experiment', default='default', help='Save path in weights/ for experiment.')
 
     # Training Hyperparameters
-    parser.add_argument('--batch_size', default=1024, type=int)
     parser.add_argument('--epochs', default=5, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('-multi_gpu', default=False, action='store_true')
-    parser.add_argument('--window', default=10, type=int)
 
     # Model Hyperparameters
-    parser.add_argument('--metadata_samples', default=5, type=int)
-    parser.add_argument('--hidden_dim', default=64, type=int, help='hidden dimension for encoder')
-    parser.add_argument('--input_dim', default=100, type=int, help='embedding dimemsions for encoder')
-    parser.add_argument('--hinge_loss_margin', default=1.0, type=float, help='reconstruction margin')
+    parser.add_argument('--metadata_samples', default=3, type=int)
     parser.add_argument('--metadata', default='section',
                         help='sections or category. What to define latent variable over.')
-    parser.add_argument('--recon_coeff', default=1.0, type=float)
     parser.add_argument('-restore', default=False, action='store_true')
+    parser.add_argument('-bert', default=False, action='store_true')
+    parser.add_argument('--window', default=10, type=int)
 
     args = parser.parse_args()
+    args.window = 10  # Fixed for now
     args.git_hash = get_git_revision_hash()
     render_args(args)
 
     # Load Data
     debug_str = '_mini' if args.debug else ''
+    bert_str = '_bert' if args.bert else ''
+    model_prototype = LMCBERT if args.bert else LMC
 
     device_str = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     args.device = torch.device(device_str)
     print('Training on {}...'.format(device_str))
 
-    cached_file = '../preprocess/data/batches{}.pth'.format(debug_str)
+    data_chunk_cache_dir = '../preprocess/data/pre/chunks{}{}'.format(bert_str, debug_str)
+    cached_file = '../preprocess/data/pre/batch_info{}{}.pth'.format(bert_str, debug_str)
     if not os.path.exists(cached_file):
         precompute(args)
     batch_data = torch.load(cached_file)
     token_vocab = batch_data['token_vocab']
     metadata_vocab = batch_data['metadata_vocab']
-    data_loader = batch_data['data_loader']
+    if args.bert:
+        tokenizer = batch_data['tokenizer']
+        token_vocab_size = max(tokenizer.vocab_size, max(tokenizer.all_special_ids) + 1)
+    else:
+        tokenizer = None
+        token_vocab_size = token_vocab.size()
+    metadata_vocab_size = metadata_vocab.size()
     token_metadata_counts = batch_data['token_metadata_counts']
+    dataset = DistributedDataset(data_chunk_cache_dir)
+    data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
     if args.restore:
         _, model, token_vocab, metadata_vocab, optimizer_state, token_metadata_counts = restore_model(args.experiment)
     else:
-        model = LMC(args, token_vocab.size(), metadata_vocab.size()).to(args.device)
+        model = model_prototype(args, token_vocab_size, metadata_vocab_size=metadata_vocab_size).to(args.device)
         optimizer_state = None
 
     if args.multi_gpu and torch.cuda.device_count() > 1:
@@ -75,7 +86,7 @@ if __name__ == '__main__':
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
-    optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
+    optimizer = torch.optim.Adam(trainable_params, lr=args.lr)  # AdamW(trainable_params, lr=args.lr)
     if optimizer_state is not None:
         optimizer.load_state_dict(optimizer_state)
 
@@ -98,15 +109,16 @@ if __name__ == '__main__':
         for i, batch_ids in tqdm(enumerate(data_loader), total=num_batches):
             # Reset gradients
             optimizer.zero_grad()
-            batch_ids = list(map(lambda x: x.to(args.device), batch_ids))
-            kl_loss, recon_loss = model(*batch_ids)
+            batch_ids = list(map(lambda x: x[0].to(args.device), batch_ids))
+            kl_loss, recon_loss = model(*batch_ids, num_metadata_samples=args.metadata_samples)
             if len(kl_loss.size()) > 0:
                 kl_loss = kl_loss.mean(0)
             if len(recon_loss.size()) > 0:
                 recon_loss = recon_loss.mean(0)
             joint_loss = kl_loss + recon_loss
-            joint_adj_loss = kl_loss + args.recon_coeff * recon_loss
+            joint_adj_loss = kl_loss + recon_loss
             joint_loss.backward()  # backpropagate loss
+            # clip_grad_norm_(trainable_params, 1.0)
             optimizer.step()
 
             epoch_kl_loss += kl_loss.item()

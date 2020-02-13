@@ -32,7 +32,7 @@ def evaluate(args):
     model.eval()  # just sets .requires_grad = False
 
     print('\nEvaluations...')
-    evaluate_word_similarity(model, token_vocab, combine_phrases=prev_args.combine_phrases)
+    evaluate_word_similarity(model, token_vocab)
     args.lm_experiment = prev_args.experiment  # Tell which model to pull from
     # TODO integrate these better
     args.epochs = 5

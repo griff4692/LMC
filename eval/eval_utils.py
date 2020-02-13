@@ -46,12 +46,12 @@ TOKEN_BLACKLIST = set(string.punctuation).union(STOPWORDS).union(set(['digitpars
 UMLS_BLACKLIST = TOKEN_BLACKLIST.union(set(['unidentified', 'otherwise', 'specified', 'nos', 'procedure']))
 
 
-def lf_tokenizer(str, vocab=None, chunker=None, combine_phrases=False, max_lf_len=5):
+def lf_tokenizer(str, vocab=None, max_lf_len=5):
     tokens_sep = str.split(';')
     token_bag = set()
     token_counts = defaultdict(int)
     for token_str in tokens_sep:
-        tokens = tokenize_str(token_str, combine_phrases=combine_phrases, chunker=chunker)
+        tokens = tokenize_str(token_str)
         for t in tokens:
             token_bag.add(t)
     token_counts[t] += 1
@@ -72,10 +72,10 @@ def lf_tokenizer(str, vocab=None, chunker=None, combine_phrases=False, max_lf_le
     return tokens
 
 
-def eval_tokenize(str, unique_only=False, chunker=None, combine_phrases=False):
+def eval_tokenize(str, unique_only=False):
     str = re.sub(r'_%#(\S+)#%_', r'\1', str)
     str = clean_text(str)
-    tokens = tokenize_str(str, combine_phrases=combine_phrases, chunker=chunker)
+    tokens = tokenize_str(str)
     tokens = list(filter(lambda t: t not in TOKEN_BLACKLIST, tokens))
 
     if unique_only:
@@ -161,10 +161,9 @@ def add_section_headers_to_casi():
     df.to_csv(in_fp, index=False)
 
 
-def preprocess_minnesota_dataset(window=10, chunker=None, combine_phrases=False):
+def preprocess_minnesota_dataset(window=10):
     in_fp = '../eval/eval_data/minnesota/AnonymizedClinicalAbbreviationsAndAcronymsDataSet.txt'
-    phrase_str = '_phrase' if combine_phrases else ''
-    out_fp = '../eval/eval_data/minnesota/preprocessed_dataset_window_{}{}.csv'.format(window, phrase_str)
+    out_fp = '../eval/eval_data/minnesota/preprocessed_dataset_window_{}.csv'.format(window)
     # cols = ['sf', 'target_lf', 'sf_rep', 'start_idx', 'end_idx', 'section', 'context']
     df = pd.read_csv(in_fp, sep='|')
     df.dropna(subset=['sf', 'target_lf', 'context'], inplace=True)
@@ -206,7 +205,7 @@ def preprocess_minnesota_dataset(window=10, chunker=None, combine_phrases=False)
             assert len(sf_occurrence_ct) == 1
             valid_rows.append(True)
             sf_occurrences.append(sf_occurrence_ct[0])
-            tokens = eval_tokenize(row['context'], combine_phrases=combine_phrases, chunker=chunker)
+            tokens = eval_tokenize(row['context'])
             tokenized_contexts.append(' '.join(tokens))
 
     df['valid'] = valid_rows

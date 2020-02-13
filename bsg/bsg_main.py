@@ -31,7 +31,6 @@ if __name__ == '__main__':
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=1024, type=int)
-    parser.add_argument('-combine_phrases', default=False, action='store_true')
     parser.add_argument('--epochs', default=4, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=10, type=int)
@@ -51,15 +50,14 @@ if __name__ == '__main__':
 
     # Load Data
     debug_str = '_mini' if args.debug else ''
-    phrase_str = '_phrase' if args.combine_phrases else ''
 
-    ids_infile = os.path.join(args.data_dir, 'ids{}{}.npy'.format(debug_str, phrase_str))
+    ids_infile = os.path.join(args.data_dir, 'ids{}.npy'.format(debug_str))
     print('Loading data from {}...'.format(ids_infile))
     with open(ids_infile, 'rb') as fd:
         ids = np.load(fd)
 
     # Load Vocabulary
-    vocab_infile = os.path.join(args.data_dir, 'vocab{}{}.pk'.format(debug_str, phrase_str))
+    vocab_infile = os.path.join(args.data_dir, 'vocab{}.pk'.format(debug_str))
     print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)

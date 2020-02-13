@@ -12,13 +12,11 @@ if __name__ == '__main__':
 
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
-    parser.add_argument('-combine_phrases', default=False, action='store_true')
 
     args = parser.parse_args()
     # Load Data
     debug_str = '_mini' if args.debug else ''
-    phrase_str = '_phrase' if args.combine_phrases else ''
-    vocab_infile = '../../../preprocess/data/vocab{}{}.pk'.format(debug_str, phrase_str)
+    vocab_infile = '../../../preprocess/data/vocab{}.pk'.format(debug_str)
     print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)

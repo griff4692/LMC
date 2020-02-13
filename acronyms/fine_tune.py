@@ -89,7 +89,7 @@ def load_casi(prev_args, train_frac=1.0):
     data_fp = os.path.join(data_dir, 'preprocessed_dataset_window_{}.csv'.format(prev_args.window))
     if not os.path.exists(data_fp):
         print('Need to preprocess dataset first...')
-        preprocess_minnesota_dataset(window=prev_args.window, combine_phrases=prev_args.combine_phrases)
+        preprocess_minnesota_dataset(window=prev_args.window)
         print('Saving dataset to {}'.format(data_fp))
     df = pd.read_csv(data_fp)
     df['section'] = df['section_mapped']

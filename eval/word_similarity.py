@@ -2,12 +2,11 @@ import os
 
 import pandas as pd
 from scipy.stats import spearmanr, pearsonr
-import spacy
 
 from eval_utils import eval_tokenize, point_similarity
 
 
-def evaluate_word_similarity(model, vocab, combine_phrases=False):
+def evaluate_word_similarity(model, vocab):
     umnrs = {
         'name': 'UMNRS',
         'file': os.path.join('../eval/eval_data', 'UMNSRS_relatedness.csv'),
@@ -26,10 +25,6 @@ def evaluate_word_similarity(model, vocab, combine_phrases=False):
 
     sim_datasets = [umnrs, mayo]
 
-    chunker = None
-    if combine_phrases:
-        chunker = spacy.load('en_core_sci_sm')
-
     for didx, sim_dataset in enumerate(sim_datasets):
         word_sim_df = pd.read_csv(sim_dataset['file'])
         human_scores = word_sim_df[sim_dataset['label']].tolist()
@@ -37,9 +32,9 @@ def evaluate_word_similarity(model, vocab, combine_phrases=False):
         for row_idx, row in word_sim_df.iterrows():
             row = row.to_dict()
             t1 = eval_tokenize(
-                row[sim_dataset['t1']], unique_only=True, combine_phrases=combine_phrases, chunker=chunker)
+                row[sim_dataset['t1']], unique_only=True)
             t2 = eval_tokenize(
-                row[sim_dataset['t2']], unique_only=True, combine_phrases=combine_phrases, chunker=chunker)
+                row[sim_dataset['t2']], unique_only=True)
             sim = point_similarity(model, vocab, t1, t2)
             if not sim == 0.0:  # means both terms are OOV
                 known_human_scores.append(human_scores[row_idx])

@@ -2,6 +2,45 @@ import numpy as np
 import torch
 from torch import nn
 import torch.utils.data
+from transformers import AlbertConfig, AlbertModel, DistilBertConfig, DistilBertModel
+
+
+class LMCEncoderBERT(nn.Module):
+    def __init__(self, args, token_vocab_size, output_dim=200):
+        super(LMCEncoderBERT, self).__init__()
+
+        if args.debug:
+            bert_dim = 100
+            num_hidden_layers = 3
+            embedding_size = 100
+            intermediate_size = 100
+            output_dim = 100
+        else:
+            bert_dim = 768
+            num_hidden_layers = 6
+            embedding_size = 128
+            intermediate_size = 768
+        num_attention_heads = max(1, bert_dim // 64)
+        print('Using {} attention heads in encoder'.format(num_attention_heads))
+
+        config = AlbertConfig(
+            vocab_size=token_vocab_size,
+            embedding_size=embedding_size,
+            hidden_size=bert_dim,
+            num_hidden_layers=num_hidden_layers,
+            intermediate_size=intermediate_size,  # 3072 is default
+            num_attention_heads=num_attention_heads
+        )
+
+        self.bert = AlbertModel(config)
+
+        self.u = nn.Linear(bert_dim, output_dim, bias=True)
+        self.v = nn.Linear(bert_dim, 1, bias=True)
+
+    def forward(self, **kwargs):
+        output = self.bert(**kwargs)
+        cls_token = output[0][:, 0]
+        return self.u(cls_token), self.v(cls_token).exp(), None
 
 
 class LMCEncoder(nn.Module):

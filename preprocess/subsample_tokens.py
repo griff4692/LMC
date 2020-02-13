@@ -15,7 +15,6 @@ if __name__ == '__main__':
     arguments.add_argument('--tokenized_fp', default='data/mimic/NOTEEVENTS_tokenized')
     arguments.add_argument('--token_counts_fp', default='data/mimic/NOTEEVENTS_token_counts')
 
-    arguments.add_argument('-combine_phrases', default=False, action='store_true')
     arguments.add_argument('-debug', default=False, action='store_true')
     arguments.add_argument('--min_token_count', default=10, type=int)
     arguments.add_argument('--subsample_param', default=0.001, type=float)
@@ -32,12 +31,11 @@ if __name__ == '__main__':
     args.token_counts_fp = os.path.expanduser(args.token_counts_fp)
 
     debug_str = '_mini' if args.debug else ''
-    phrase_str = '_phrase' if args.combine_phrases else ''
     sentence_str = '_sentence' if args.split_sentences else ''
-    tokenized_data_fn = '{}{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str, sentence_str)
+    tokenized_data_fn = '{}{}{}.json'.format(args.tokenized_fp, debug_str, sentence_str)
     with open(tokenized_data_fn, 'r') as fd:
         tokenized_data = json.load(fd)
-    token_counts_fn = '{}{}{}{}.json'.format(args.token_counts_fp, debug_str, phrase_str, sentence_str)
+    token_counts_fn = '{}{}{}.json'.format(args.token_counts_fp, debug_str, sentence_str)
     with open(token_counts_fn, 'r') as fd:
         token_counts = json.load(fd)
     N = float(token_counts['__ALL__'])
@@ -96,11 +94,11 @@ if __name__ == '__main__':
     print('Adding {} document categories'.format(len(categories)))
     vocab.add_tokens(categories, token_support=0)
 
-    subsampled_out_fn = '{}_subsampled{}{}{}.json'.format(args.tokenized_fp, debug_str, phrase_str, sentence_str)
+    subsampled_out_fn = '{}_subsampled{}{}.json'.format(args.tokenized_fp, debug_str, sentence_str)
     print('Saving subsampled tokens to {}'.format(subsampled_out_fn))
     with open(subsampled_out_fn, 'w') as fd:
         json.dump(tokenized_subsampled_data, fd)
-    vocab_out_fn = 'data/vocab{}{}{}.pk'.format(debug_str, phrase_str, sentence_str)
+    vocab_out_fn = 'data/vocab{}{}.pk'.format(debug_str, sentence_str)
     print('Saving vocabulary of size {} to {}'.format(vocab.size(), vocab_out_fn))
     with open(vocab_out_fn, 'wb') as fd:
         pickle.dump(vocab, fd)
