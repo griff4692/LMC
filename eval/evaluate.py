@@ -5,11 +5,11 @@ import torch
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 from fine_tune import acronyms_finetune, load_casi, load_mimic
 from bsg_utils import restore_model as restore_bsg, save_checkpoint as save_bsg
-from lmc_context_utils import restore_model as restore_lmc, save_checkpoint as save_lmc
+from lmc_utils import restore_model as restore_lmc, save_checkpoint as save_lmc
 from acronym_expander import AcronymExpander
 from word_similarity import evaluate_word_similarity
 

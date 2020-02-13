@@ -13,7 +13,7 @@ from tqdm import tqdm
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from acronym_batcher import AcronymBatcherLoader
@@ -23,7 +23,7 @@ from acronym_utils import process_batch
 from bsg_utils import restore_model as restore_bsg, save_checkpoint as save_bsg
 from error_analysis import analyze, render_test_statistics
 from eval_utils import lf_tokenizer, preprocess_minnesota_dataset
-from lmc_context_utils import save_checkpoint as lmc_context_save, restore_model as lmc_context_restore
+from lmc_utils import save_checkpoint as lmc_save, restore_model as lmc_restore
 from mimic_tokenize import create_document_token
 from model_utils import get_git_revision_hash, render_args
 
@@ -296,8 +296,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     args.experiment += '_{}'.format(args.dataset)
-    restore_func = restore_bsg if args.lm_type == 'bsg' else lmc_context_restore
-    save_func = save_bsg if args.lm_type == 'bsg' else lmc_context_save
+    restore_func = restore_bsg if args.lm_type == 'bsg' else lmc_restore
+    save_func = save_bsg if args.lm_type == 'bsg' else lmc_save
     acronym_model = AcronymExpander if args.lm_type == 'bsg' else AcronymExpanderLMC
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     args.hinge_loss_margin = 1.0

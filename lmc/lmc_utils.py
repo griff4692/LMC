@@ -6,12 +6,12 @@ import argparse
 import torch
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-from lmc_context_model import LMCC
+from lmc_model import LMC
 
 
 def restore_model(restore_name, weights_path=None):
     if weights_path is None:
-        checkpoint_dir = os.path.join('../lmc_context/weights', restore_name)
+        checkpoint_dir = os.path.join('../lmc/weights', restore_name)
     else:
         checkpoint_dir = os.path.join(weights_path, restore_name)
     checkpoint_fns = os.listdir(checkpoint_dir)
@@ -45,7 +45,7 @@ def restore_model(restore_name, weights_path=None):
         if k[:7] == 'module.':
             name = k[7:]  # remove `module.`
         new_state_dict[name] = v
-    lmc_model = LMCC(args, token_vocab.size(), metadata_vocab.size())
+    lmc_model = LMC(args, token_vocab.size(), metadata_vocab.size())
     lmc_model.load_state_dict(new_state_dict)
 
     optimizer_state = checkpoint_state['optimizer_state_dict']

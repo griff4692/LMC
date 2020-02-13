@@ -8,10 +8,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from compute_utils import compute_kl, mask_2D
-from lmc_context_utils import restore_model
+from lmc_utils import restore_model
 from model_utils import tensor_to_np
 
 SWORDS = set(stopwords.words('english'))

@@ -4,11 +4,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
+sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc/')
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
 from compute_utils import compute_kl, mask_2D
-from lmc_context_decoder import LMCDecoder
-from lmc_context_encoder import LMCContextEncoder
+from lmc_decoder import LMCDecoder
+from lmc_encoder import LMCEncoder
 
 
 class AcronymExpanderLMC(nn.Module):
@@ -21,7 +21,7 @@ class AcronymExpanderLMC(nn.Module):
         self.metadata = args.metadata
 
         if args.random_encoder:
-            self.encoder = LMCContextEncoder(token_vocab_size, metadata_vocab_size)
+            self.encoder = LMCEncoder(token_vocab_size, metadata_vocab_size)
         else:
             prev_encoder_token_embeddings = lmc_model.encoder.token_embeddings.weight.detach().numpy()
             self.encoder = lmc_model.encoder

@@ -1,14 +1,12 @@
-import sys
-
 import numpy as np
 import torch
 from torch import nn
 import torch.utils.data
 
 
-class LMCContextEncoder(nn.Module):
+class LMCEncoder(nn.Module):
     def __init__(self, token_vocab_size, metadata_vocab_size, input_dim=100, hidden_dim=64, output_dim=100):
-        super(LMCContextEncoder, self).__init__()
+        super(LMCEncoder, self).__init__()
         self.token_embeddings = nn.Embedding(token_vocab_size, input_dim, padding_idx=0)
         self.metadata_embeddings = nn.Embedding(metadata_vocab_size, hidden_dim * 2, padding_idx=0)
         self.dropout = nn.Dropout(0.2)
@@ -57,7 +55,6 @@ class LMCContextEncoder(nn.Module):
         merged_embeds.masked_fill_(mask_tiled, 0)
 
         h_reps, (h_sum, _) = self.lstm(merged_embeds)
-        # h_sum = h_sum.transpose(1, 0).contiguous().view(batch_size, -1)
 
         e_dim = h_reps.size()[-1]
         att_scores = torch.bmm(h_reps, metadata_embedding.unsqueeze(-1)).squeeze(-1) / np.sqrt(e_dim)

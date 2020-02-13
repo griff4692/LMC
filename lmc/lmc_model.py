@@ -4,16 +4,16 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
-from lmc_context_encoder import LMCContextEncoder
-from lmc_context_decoder import LMCDecoder
+from lmc_encoder import LMCEncoder
+from lmc_decoder import LMCDecoder
 from compute_utils import compute_kl, mask_2D
 
 
-class LMCC(nn.Module):
+class LMC(nn.Module):
     def __init__(self, args, token_vocab_size, section_vocab_size):
-        super(LMCC, self).__init__()
+        super(LMC, self).__init__()
         self.device = args.device
-        self.encoder = LMCContextEncoder(token_vocab_size, section_vocab_size)
+        self.encoder = LMCEncoder(token_vocab_size, section_vocab_size)
         self.decoder = LMCDecoder(token_vocab_size, section_vocab_size)
 
         self.margin = args.hinge_loss_margin or 1.0
@@ -21,8 +21,6 @@ class LMCC(nn.Module):
     def _compute_marginal(self, ids, metadata_ids):
         ids_tiled = ids.unsqueeze(-1).repeat(1, 1, metadata_ids.size()[-1])
         mu_marginal, sigma_marginal = self.decoder(ids_tiled, metadata_ids)
-        # mu = mu_marginal.mean(2)
-        # sigma = sigma_marginal.mean(2)
         return mu_marginal, sigma_marginal + 1e-3
 
     def forward(self, center_ids, center_metadata_ids, context_ids, context_metadata_ids, neg_ids, neg_metadata_ids,
