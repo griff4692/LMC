@@ -51,7 +51,7 @@ def _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str,
         sf_confusion[sf][1].append(pred_lf_idx)
 
 
-def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map):
+def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment=None):
     correct_fp = os.path.join(results_dir, 'correct.txt')
     reports_fp = os.path.join(results_dir, 'reports.txt')
     errors_fp = os.path.join(results_dir, 'errors.txt')
@@ -60,6 +60,7 @@ def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion
     df = defaultdict(list)
     cols = [
         'sf',
+        'experiment',
         'support',
         'num_targets',
         'micro_precision',
@@ -129,6 +130,7 @@ def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion
         except:
             print('Only 1 target class for test set SF={}'.format(sf))
 
+    df['experiment'] = [experiment] * len(df['sf'])
     summary_df = pd.DataFrame(df, columns=cols)
     summary_df.to_csv(summary_fp, index=False)
     with open(reports_fp, 'w') as fd:
@@ -143,12 +145,12 @@ def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion
             avg_val = summary_df[key].mean()
             print('Global {} --> {}'.format(key, avg_val))
 
-    # num_targets = summary_df['num_targets'].unique().tolist()
-    # print('Num Targets, Macro F1, Weighted F1')
-    # for t in sorted(num_targets):
-    #     avg_macro_f1 = summary_df[summary_df['num_targets'] == t]['macro_f1'].mean()
-    #     avg_weighted_f1 = summary_df[summary_df['num_targets'] == t]['weighted_f1'].mean()
-        # print('{},{},{}'.format(t, avg_macro_f1, avg_weighted_f1))
+    num_targets = summary_df['num_targets'].unique().tolist()
+    print('Num Targets, Macro F1, Weighted F1')
+    for t in sorted(num_targets):
+        avg_macro_f1 = summary_df[summary_df['num_targets'] == t]['macro_f1'].mean()
+        avg_weighted_f1 = summary_df[summary_df['num_targets'] == t]['weighted_f1'].mean()
+        print('{},{},{}'.format(t, avg_macro_f1, avg_weighted_f1))
 
 
 def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
@@ -181,7 +183,7 @@ def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metada
             rel_weights = tensor_to_np(rel_weights)
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, rel_weights)
 
-    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
+    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment=args.experiment)
 
 
 def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=None):
@@ -210,7 +212,7 @@ def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, ind
         pred_lf_idxs = tensor_to_np(torch.argmax(scores, 1))
         batch_data = test_batcher.get_prev_batch()
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, None)
-    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map)
+    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment='elmo')
 
 
 def render_test_statistics(df, sf_lf_map):

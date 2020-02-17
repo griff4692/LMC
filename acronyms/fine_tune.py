@@ -310,5 +310,6 @@ if __name__ == '__main__':
         args.epochs = 0
         acronyms_finetune(args, acronym_model, load_casi, restore_func, save_func, use_existing=True, train_frac=0.0)
     else:
+        args.epochs = 0
         loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
         acronyms_finetune(args, acronym_model, loader, restore_func, save_func, train_frac=0.0)
