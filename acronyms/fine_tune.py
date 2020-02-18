@@ -10,12 +10,12 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/eval/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/lmc_context/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, '../acronyms/')
+sys.path.insert(0, '../bsg/')
+sys.path.insert(0, '../eval/')
+sys.path.insert(0, '../lmc_context/')
+sys.path.insert(0, '../preprocess/')
+sys.path.insert(0, '../utils/')
 from acronym_batcher import AcronymBatcherLoader
 from acronym_expander import AcronymExpander
 from acronym_expander_lmc import AcronymExpanderLMC
@@ -138,10 +138,10 @@ def load_mimic(prev_args, train_frac=1.0):
 
     if train_frac == 1.0 or train_frac == 0.0:
         train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(df, batch_size=128)
+        test_batcher = AcronymBatcherLoader(df, batch_size=32)
     else:
         train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=128)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=32)
     # assert len(set(train_df['row_idx'].tolist()).intersection(set(test_df['row_idx'].tolist()))) == 0
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 

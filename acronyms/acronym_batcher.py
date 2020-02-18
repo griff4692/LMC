@@ -1,6 +1,8 @@
 from allennlp.data.tokenizers.token import Token
+from torch.nn.utils.rnn import pad_sequence
+import torch
+import torch.nn
 import numpy as np
-
 
 class AcronymBatcherLoader:
     def __init__(self, df, batch_size=32):
@@ -18,6 +20,51 @@ class AcronymBatcherLoader:
     def get_prev_batch(self):
         return self.batches[self.batch_ct - 1]
 
+    def bert_next(self, tokenizer, sf_tokenized_lf_map):
+        batch = self.batches[self.batch_ct]
+        self.batch_ct += 1
+        batch_size = batch.shape[0]
+        target_lf_ids = torch.zeros([batch_size, ], dtype=int)
+        ## may need revision b/c of word pieces
+        
+        #max_context_len = max([len(tt.split()) for tt in batch['trimmed_tokens'].tolist()])
+        num_outputs = [len(sf_tokenized_lf_map[sf]) for sf in batch['sf'].tolist()]
+        #context_ids = np.zeros([batch_size, max_context_len, 50])
+        max_output_length = max(num_outputs)
+        #max_lf_len = 5
+        #lf_ids = np.zeros([batch_size, max_output_length, max_lf_len, 50])
+        
+        context_ids = []
+        lf_ids = [[] for x in range(batch_size)]
+        max_lf_len = 0
+        for batch_idx, (_, row) in enumerate(batch.iterrows()):
+            row = row.to_dict()
+            sf = row['sf'].lower()
+            target_lf_ids[batch_idx] = torch.tensor(row['target_lf_idx'], dtype=int)
+            context_tokens = row['trimmed_tokens'].split()
+            context_id_seq = tokenizer.encode(context_tokens, add_special_tokens=True)
+            context_ids.append(context_id_seq)
+#            context_ids[batch_idx, :len(context_id_seq), :] = context_id_seq
+            candidate_lfs = sf_tokenized_lf_map[row['sf']]
+            for lf_idx, lf_toks in enumerate(candidate_lfs):
+                lf_id_seq = tokenizer.encode(' '.join(lf_toks), add_special_tokens=True)
+                max_lf_len = max(max_lf_len, len(lf_id_seq))
+                lf_ids[batch_idx].append(lf_id_seq)
+#                lf_ids[batch_idx, lf_idx, :len(lf_id_seq),:] = lf_id_seq
+                
+        max_context_len = max([len(c) for c in context_ids])
+        context_ids_populate = torch.zeros([batch_size, max_context_len])
+        for batch_idx, seq in enumerate(context_ids):
+            context_ids_populate[batch_idx, :len(seq)] = torch.tensor(seq, dtype=int)
+
+        lf_ids_populate = torch.zeros([batch_size, max_output_length, max_lf_len])
+
+        for batch_idx, candidate_lfs in enumerate(lf_ids):
+            for lf_idx, lf_seq in enumerate(candidate_lfs):
+                lf_ids_populate[batch_idx, lf_idx, :len(lf_seq)] = torch.tensor(lf_seq, dtype=int)
+
+        return (context_ids_populate, lf_ids_populate, target_lf_ids), num_outputs
+        
     def elmo_tokenize(self, tokens, vocab, indexer):
         tokens = list(map(lambda t: Token(t), tokens))
         return indexer.tokens_to_indices(tokens, vocab, 'elmo')['elmo']

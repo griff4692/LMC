@@ -12,7 +12,7 @@ from nltk.corpus import stopwords
 import pandas as pd
 import spacy
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, '../utils/')
 from model_utils import render_args
 from compute_sections import HEADER_SEARCH_REGEX
 

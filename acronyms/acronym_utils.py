@@ -5,7 +5,7 @@ from allennlp.modules.token_embedders.bidirectional_language_model_token_embedde
 import numpy as np
 import torch
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, '../utils/')
 from model_utils import tensor_to_np
 
 

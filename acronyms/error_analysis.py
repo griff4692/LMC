@@ -12,8 +12,8 @@ from sklearn.metrics import classification_report
 import torch
 from tqdm import tqdm
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/acronyms/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, '../acronyms/')
+sys.path.insert(0, '../utils/')
 from acronym_utils import process_batch
 from model_utils import tensor_to_np
 

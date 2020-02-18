@@ -5,7 +5,7 @@ from torch import nn
 from torch.nn import functional as F
 import torch.utils.data
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, '../utils/')
 from compute_utils import compute_att
 
 

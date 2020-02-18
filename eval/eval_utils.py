@@ -9,9 +9,10 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cosine
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/bsg/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/preprocess/')
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, '../eval/')
+sys.path.insert(0, '../bsg/')
+sys.path.insert(0, '../preprocess/')
+sys.path.insert(0, '../utils/')
 from bsg_model import BSG
 from casi_constants import LF_BLACKLIST, LF_MAPPING, SF_BLACKLIST
 from clean_mimic import clean_text

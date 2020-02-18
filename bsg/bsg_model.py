@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, '../utils/')
 from bsg_encoder import BSGEncoderLSTM
 from compute_utils import compute_kl, mask_2D
 

@@ -3,7 +3,7 @@ import sys
 import torch
 import torch.nn as nn
 
-sys.path.insert(0, '/home/ga2530/ClinicalBayesianSkipGram/utils/')
+sys.path.insert(0, '../utils')
 from compute_utils import mask_2D
 
 
