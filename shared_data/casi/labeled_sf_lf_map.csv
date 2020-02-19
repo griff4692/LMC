@@ -1,0 +1,261 @@
+sf,target_lf_sense,target_label
+AB,Atrioventricular;atrio-ventricular;atrioventricular,atrio-ventricular;atrioventricular
+AB,X-ray finding,abdominal x-ray;ab x-ray; abdominal xray
+AB,abortion,abortion
+AB,ankle-brachial,ankle-brachial;ankle brachial
+AB,antipyrine benzocaine,antipyrine benzocaine;antipyrine-benzocaine;antipyrine and benzocaine;benzocaine otic
+AB,arterial blood,arterial blood
+AB,arteriovenous,arteriovenous
+AB,blood group in ABO system,blood group
+VBG,Vertical banded gastroplasty;vertical banded gastroplasty,vertical-banded gastroplasty;gastric banding;gastric stapling
+VBG,venous blood gas,venous blood gas
+AC,"ACE - Angiotensin-converting enzyme;Angiotensin Converting Enzyme;Angiotensin converting enzyme;Angiotensin-Converting Enzyme;Angiotensin-converting enzyme;angiotensin converting enzyme;angiotensin converting enzymes;angiotensin-converting enzyme;Antigens, CD143;CD143 Antigen;CD143 Antigens;Carboxycathepsin;Dipeptidyl Carboxypeptidase I;Dipeptidyl carboxypeptidase I;Dipeptidyl Peptidase A;Peptidase P;Peptidyl Dipeptidase A;Peptidyl-Dipeptidase A;Peptidyl-dipeptidase A;peptidyl dipeptidase A;dipeptidyl peptidase;kininase",angiotensin-converting enzyme;angiotensin converting enzyme;angiotensin converting enzymes;cd143 antigen;cd143;carboxycathepsin;dipeptidyl carboxypeptidase;dipeptidyl peptidase;kininase
+AC,Abdominal Circumference;Abdominal circumference;abdominal circumference,abdominal circumference
+AC,Adriamycin and cyclophosphamide;adriamycin cyclophosphamide,adriamycin and cyclophosphamide;adriamycin cyclophosphamide;adriamycin;cyclophosphamide
+AC,Before Meal;Before Meals;Before meal;before meals;meal before;Before food;before food;food before;Preprandial;preprandial;ac - ante cibum;ante cibum;ante cibus,ante cibum;ante cibus;before food;before meal;before meals;prepandial
+AC,acetate,acetate
+AC,acromioclavicular,acromioclavicular
+AC,alternating current,alternating current
+AC,antecubital,antecubital
+AC,anticoagulation,anticoagulation;anticoagulant
+AC,assist control,assist control
+ALD,ADRENOLEUKODYSTROPHY;Adrenoleucodystrophy;Adrenoleukodystrophies;Adrenoleukodystrophy;adreno-leukodystrophy;adrenoleucodystrophy;adrenoleukodystrophy;ALD (Adrenoleukodystrophy);ALDs (Adrenoleukodystrophy);adrenoleukodystrophy (ALD),adreno-leukodystrophy;adrenoleucodystrophy;adrenoleukodystrophies;adrenoleukodystrophy;adrenoleukodystrophy
+ALD,"Alanine Aminotransferase;Alanine aminotransferase;Aminotransferase, Alanine;alanine amino transferase;alanine aminotransferase;alanine-aminotransferase",alanine aminotransferase;alanine amino transferase;alanine-aminotransferase
+ALD,acetyl lysergic acid diethylamide,ald-52;1-acetyl-lsd;acetyl lysergic acid diethylamide;lysergic acid diethylamide
+ALD,ad lib on demand,ad lib on demand
+ALD,left anterior descending,left anterior descending
+AMA,Antimitochondrial Antibodies;antimitochondrial antibodies;antimitochondrial antibody;Mitochondrial Antibody,antimitochondrial antibodies;antimitochondrial antibody;mitochondrial antibody
+AMA,advanced maternal age,advanced maternal age
+AMA,against medical advice,against medical advice
+ASA,"ASA;ASPIRIN;Aspirin;aspirin;aspirins;Acetylsalicylic Acid;Acetylsalicylic acid;Acid, Acetylsalicylic;acetylsalicylic acid;Antiplatelet aspirin;Aspirin [antiplatelet];antiplatelet aspirin;aspirin antiplatelet;Aspirin (product);Aspirin product;aspirin products;Aspirin - chemical;aspirin chemicals;acetylsalicyclic acid",acetylsalicylic acid;aspirin
+ASA,aminosalicylic acid,aminosalicylic acid
+AVR,Auditory brainstem response;auditory brain stem response;auditory brainstem response,auditory brain stem response;auditory brainstem response
+AVR,aortic valve regurgitation,aortic valve regurgitation;aortic regurgitation
+AVR,aortic valve replacement,aortic valve replacement
+AVR,aortic valve resistance,aortic valve resistance;valve resistance
+AVR,augmented voltage right arm,augmented vector right
+AVR,rapid ventricular response,rapid ventricular response;rapid ventricular rate
+AV,Atrioventricular;atrio-ventricular;atrioventricular,atrio-ventricular;atrioventricular
+AV,aortic valve,aortic valve
+AV,arteriovenous,arteriovenous
+BAL,blood alcohol level,blood alcohol level;blood alcohol content
+BAL,bronchoalveolar lavage,bronchoalveolar lavage;bronchoalveolar washing
+BMP,"BMT;bmt;BMT - Bone marrow transplant;bone marrow transplant (BMT);bone marrow transplant bmt;BONE MARROW TRANSPLANT;Bone Marrow Transplant;Bone marrow transplant;Bone marrow transplanted;bone marrow transplant;bone marrow transplants;Bone Marrow Grafting;Bone marrow graft;Graft of bone marrow NOS;Grafting of bone marrow NOS;Grafting, Bone Marrow;bone marrow graft;bone marrow grafting;Bone Marrow Transplantation;Transplantation of bone marrow;Transplantation of bone marrow, NOS;Transplantation, Bone Marrow;bone marrow transplantation;bone marrow transplantations;transplantation, bone marrow;Bone marrow transplant, not otherwise specified;Marrow Transplantation",bone marrow transplant
+BMP,"Bone Morphogenetic Protein;Bone Morphogenetic Proteins;Morphogenetic Protein, Bone;Morphogenetic Proteins, Bone;bone morphogenetic protein;bone morphogenetic proteins",bone morphogenetic protein;bone morphogenetic proteins;rhBMP-2
+BMP,basic metabolic profile,basic metabolic profile;basic metabolic panel
+BMP,beta-natriuretic peptide,ventricular natriuretic peptide;brain natriuretic peptide;b-type natriuretic peptide;beta-natriuretic peptide
+BM,Bone marrow;bone marrow,bone marrow
+BM,"Bowel Function;Bowel function;bowel function;bowel functioning;Bowel Movement;Bowel movements;bowel movement;bowel movements;bowels movement;bowels movements;Bowel action;bowel action;Bowel habit;Bowel habits;Bowel habits, NOS;bowel habit;bowel habits;Bowel motion - function;Defaecation;Defecation;Defecation, NOS;Defecations;defaecation;defecation;Normal defecation;stool passing",bowel movement;bowel movements
+BM,breast milk,breast milk
+C&S,"Central Nervous System;Central Nervous Systems;Central nervous system;Nervous System, Central;Nervous Systems, Central;System, Central Nervous;Systems, Central Nervous;central nervous system",central nervous system
+C&S,carcinosarcoma,carcinosarcoma
+C&S,conjunctiva and sclera;conjunctivae and sclerae,conjunctiva and sclera;conjunctiva;sclera
+C&S,culture and sensitivity,culture and sensitivity
+C&S,protein C and protein S,protein c and protein s;protein c;protein s
+CA,CANCER;CANCER (NOS);Cancer;Cancers;cancer;cancers,cancer
+CA,carbohydrate antigen,carbohydrate antigen;sialyl-lewis;sialyl lewis;sialyl lewis(a);sialyl-lewis(a)
+CDI,Children's Depression Inventory,children's depression inventory;depression inventory
+CDI,center for diagnostic imaging,center for diagnostic imaging;diagnostic imaging
+CDI,"clean, dry, intact","clean, dry, intact;clean, dry, and intact;clean/dry/intact"
+CEA,"ACCIDENT CEREBROVASCULAR;Accident - cerebrovascular;CEREBROVASCULAR ACCIDENT;Cerebrovascular Accident;Cerebrovascular Accidents;Cerebrovascular accident;Cerebrovascular accident, NOS;cerebrovascular accident;cerebrovascular accidents;APOPLEXY;Apoplexy;Apoplexy, NOS;apoplexy;APOPLEXY, CEREBRAL;Cerebral apoplexy;Cerebral apoplexy, NOS;Apoplexy, Cerebrovascular;Cerebrovascular Apoplexy;Brain Attack;Brain attack;Brain Vascular Accident;Brain Vascular Accidents;Vascular Accident, Brain;Vascular Accidents, Brain;vascular brain accident;CEREBRAL VASCULAR ACCIDENT;cerebral vascular accident;cerebral vascular accidents;vascular cerebral accident;CEREBROVASCULAR ACCIDENT, (CVA);CVA (Cerebrovascular Accident);CVA - Cerebrovascular accident;CVA, CEREBROVASCULAR ACCIDENT;CVAs (Cerebrovascular Accident);Cerebral Stroke;Cerebral Strokes;Stroke, Cerebral;Strokes, Cerebral;cerebral stroke;stroke cerebral;Cerebrovascular Stroke;Cerebrovascular Strokes;Stroke, Cerebrovascular;Strokes, Cerebrovascular;cerebrovascular stroke;STROKE;Stroke;Stroke NOS;Stroke, NOS;Strokes;stroke;strokes",cerebrovascular accident;stroke
+CEA,"Antigen, CD66e;Antigens, CD66e;CD66e Antigen;CD66e Antigens;Antigen, Carcinoembryonic;CARCINOEMBRYONIC ANTIGEN;Carcinoembryonic Antigen;Carcinoembryonic antigen;Carcinoembryonic antigens;carcinoembryonic antigen;CD66e Ag;CEA - Carcinoembryonic antigen;CEA Family Protein;Carcinoembryonic Ag;carcinoembryonic Ag;Carcinoembryonic Antigen Family Protein;Lymphocyte antigen CD66E;Meconium Antigen 100;carcinoembryonal antigen",carcinoembryonic antigen;cd66e
+CEA,CANCER;CANCER (NOS);Cancer;Cancers;cancer;cancers,cancer
+CEA,carotid endarterectomy,carotid endarterectomy
+CR,C-reactive,c-reactive; c reactive
+CR,Complete Remission;In complete remission;complete remission;Complete response;complete response;Pathological Complete Remission;full remission,complete remission;complete response
+CR,Controlled Release;controlled release;controlled-release,controlled release;extended release;sustained release
+CR,cardiorespiratory,cardiorespiratory
+CR,closed reduction,closed reduction
+CR,creatinine,creatinine
+CTA,"ADP Phosphocreatine Phosphotransferase;Phosphocreatine Phosphotransferase, ADP;Phosphotransferase, ADP Phosphocreatine;ATP Creatine Phosphotransferase;Creatine Phosphotransferase, ATP;Phosphotransferase, ATP Creatine;CK - Creatine kinase;creatine kinase (CK);CPK - Creatine phosphokinase;creatine phosphokinase (CPK);Creatine Kinase;Creatine kinase;Kinase, Creatine;creatine kinase;Creatine Kinase-B;Creatine Kinase-B Chain;Creatine Phosphokinase;Creatine phosphokinase;Phosphokinase, Creatine;creatine phosphokinase;creatinephosphokinase",adp phosphocreatine phosphotransferase;atp creatine phosphotransferase;creatine phosphokinase;creatine kinase;creatine kinase-b;creatine kinase-b chain
+CTA,cerebellopontine angle,cerebellopontine angle
+CTA,clear to auscultation,clear to auscultation
+CTA,computed tomographic angiography,computed tomographic angiography;ct angiography
+CVA,"ACCIDENT CEREBROVASCULAR;Accident - cerebrovascular;CEREBROVASCULAR ACCIDENT;Cerebrovascular Accident;Cerebrovascular Accidents;Cerebrovascular accident;Cerebrovascular accident, NOS;cerebrovascular accident;cerebrovascular accidents;APOPLEXY;Apoplexy;Apoplexy, NOS;apoplexy;APOPLEXY, CEREBRAL;Cerebral apoplexy;Cerebral apoplexy, NOS;Apoplexy, Cerebrovascular;Cerebrovascular Apoplexy;Brain Attack;Brain attack;Brain Vascular Accident;Brain Vascular Accidents;Vascular Accident, Brain;Vascular Accidents, Brain;vascular brain accident;CEREBRAL VASCULAR ACCIDENT;cerebral vascular accident;cerebral vascular accidents;vascular cerebral accident;CEREBROVASCULAR ACCIDENT, (CVA);CVA (Cerebrovascular Accident);CVA - Cerebrovascular accident;CVA, CEREBROVASCULAR ACCIDENT;CVAs (Cerebrovascular Accident);Cerebral Stroke;Cerebral Strokes;Stroke, Cerebral;Strokes, Cerebral;cerebral stroke;stroke cerebral;Cerebrovascular Stroke;Cerebrovascular Strokes;Stroke, Cerebrovascular;Strokes, Cerebrovascular;cerebrovascular stroke;STROKE;Stroke;Stroke NOS;Stroke, NOS;Strokes;stroke;strokes",cerebrovascular accident;stroke
+CVA,costovertebral angle,costovertebral angle
+CVP,"Cyclophosphamide/Prednisone/Vincristine;cyclophosphamide, vincristine, prednisone;cyclophosphamide/prednisone/vincristine",cyclophosphamide;vincristine;prednisone
+CVP,cardiovascular pulmonary,cardiovascular pulmonary
+CVP,central venous pressure,central venous pressure
+CVS,"Biopsies, Chorionic Villi;Biopsy, Chorionic Villi;Chorionic Villi Biopsies;Chorionic Villi Biopsy;chorionic villi biopsy;CVB - Chorionic villus biopsy;CVS - Chorionic villus sampling;chorionic villus sampling (CVS);Chorionic Villi Sampling;Chorionic Villus Sampling;Chorionic villus sampling;Sampling of chorionic villus;Sampling, Chorionic Villi;Sampling, Chorionic Villus;chorionic villi sampling;chorionic villus samples;chorionic villus sampling;Chorionic Villi Samplings;Chorionic Villus Samplings;Samplings, Chorionic Villi;Samplings, Chorionic Villus",chorionic villus sampling;chorionic villous sampling
+CVS,cardiovascular system,cardiovascular system
+CVS,"customer, value, service",cvs pharmacy;cvs brand;cvs store
+DC,Discontinue;Discontinued;discontinue;discontinued,discontinue
+DC,deceased donor,deceased donor
+DC,direct and consensual,direct and consensual;direct consensual
+DC,direct current,direct current
+DC,discharge;discharged,discharge
+DIP,"DIP - Desquamative interstitial pneumonitis;Desquamative Interstitial Pneumonia;Desquamative interstitial pneumonia;PNEUMONIA, DESQUAMATIVE INTERSTITIAL;desquamative interstitial pneumonia;Desquamative interstitial pneumonitis;desquamative interstitial pneumonitis;ILD, DESQUAMATIVE;INTERSTITIAL LUNG DISEASE, DESQUAMATIVE;INTERSTITIAL PNEUMONITIS, DESQUAMATIVE, FAMILIAL;PNEUMONITIS, DESQUAMATIVE INTERSTITIAL, FAMILIAL;PNEUMONIA, DESQUAMATIVE INTERSTITIAL, FAMILIAL;RBILD;Respiratory Bronchiolitis Interstitial Lung Disease;Respiratory bronchiolitis interstitial lung disease;desquamative interstitial pneumonia (DIP)",desquamative interstitial pneumonia;interstitial pneumonia
+DIP,dipropionate,dipropionate
+DIP,distal interphalangeal,distal interphalangeal
+DM,dextromethorphan,dextromethorphan
+DM,diabetes mellitus,diabetes mellitus
+DM,medical doctor,medical doctor
+DT,"DEEP VEIN THROMBOSIS;Deep Vein Thrombosis;Deep vein thrombosis;Deep vein thrombosis NOS;Deep-Vein Thrombosis;Thrombosis, Deep Vein;Thrombosis, Deep-Vein;Vein Thrombosis, Deep;deep vein thrombosis;deep-vein thrombosis;DVT - Deep vein thrombosis;deep vein thrombosis (DVT)",deep vein thrombosis
+DT,Delirium Tremens;delirium tremens,delirium tremens
+DT,Physical Therapy;Physical therapy;physical therapies;physical therapy;therapy physical,physical therapy
+DT,diphtheria-tetanus,dt vaccine;dtap vaccine;diphtheria;tetanus
+DT,doppler echo,doppler echo;doppler ultrasound;doppler echocardiography
+DT,dorsalis pedis,dorsalis pedis
+EC,enteric-coated,enteric-coated;enteric coated
+EC,enterocutaneous,enterocutaneous
+EC,epirubicin,ellence;epirubicin
+EC,extensor carpi,extensor carpi
+ER,"ESTROGEN RECEPTOR;Estrogen Receptor;Estrogen Receptors;Estrogen receptor;Oestrogen receptor;Receptors of estrogens;Receptors, Estrogen;estrogen receptor;estrogen receptors;oestrogen receptor;oestrogen receptors;estrogen receptor (ER)",estrogen receptor
+ER,Emergency Room;emergency room,emergency room
+ER,Extended Release;extended release;extended-release;Extended Release Dosage Form;Extended Release Dose Form,extended release
+ES,"ESR - Erythrocyte sedimentation rate;erythrocyte sedimentation rate (ESR);Erythrocyte Sedimentation Rate;Erythrocyte Sedimentation Rates;Erythrocyte sedimentation rate;Rate, Erythrocyte Sedimentation;Rates, Erythrocyte Sedimentation;Sedimentation Rate, Erythrocyte;Sedimentation Rates, Erythrocyte;erythrocyte rate sedimentation;erythrocyte sedimentation rate;erythrocyte sedimentation rates;erythrocytes rate sedimentation",erythrocyte rate sedimentation;erythrocyte sedimentation rate;erythrocyte sedimentation rates;erythrocytes rate sedimentation
+ES,ejection fraction;ejection fractions,ejection fraction;ejection fractions
+ES,enhanced sensitivity,enhanced sensitivity
+ES,extra strength,extra strength
+ET,"Convulsive Therapies, Electric;Convulsive Therapy, Electric;Electric Convulsive Therapies;Electric Convulsive Therapy;Therapies, Electric Convulsive;Therapy, Electric Convulsive;electric convulsive therapy;ECS;ecs;ECT - Electroconvulsive therapy;electroconvulsive therapy (ECT);ECT therapy;ect therapy;EST - Electroshock treatment;EST therapy;Electric Shock Therapies;Electric Shock Therapy;Electric shock therapy;Shock Therapies, Electric;Shock Therapy, Electric;Therapies, Electric Shock;Therapy, Electric Shock;electric shock therapy;Electroconvulsive Therapies;Electroconvulsive Therapy;Electroconvulsive therapy;Electroconvulsive therapy NOS;Electroconvulsive therapy, NOS;Therapies, Electroconvulsive;Therapy, Electroconvulsive;electroconvulsive therapy;Electroconvulsive treatment;electroconvulsive treatment;electroconvulsive treatments;Electroplexy;Electroshock Therapies;Electroshock Therapy;Electroshock therapy;Electroshock therapy, NOS;Therapies, Electroshock;Therapy, Electroshock;electroshock therapy;Electroshock treatment;electroshock treatment;electric shock treatment;electric shock treatments;electroconvulsive shock therapy;electroplexy shock therapy;shock treatment;shock treatments;shocking treatment",electroconvulsive therapy;electroshock treatment;electric shock treatments;electroplexy;electroconvulsive treatments;electroshock therapy;electroconvulsive shock therapy;shock treatments;electroplexy shock therapy;electric shock therapy;electric convulsive therapies;shock treatment;electric convulsive therapy;electric shock treatment;electric shock therapies;electroconvulsive treatment;shocking treatment;electroshock therapies;ect therapy;electroconvulsive therapies
+ET,ENDOTRACHEAL;endotracheal,endotracheal
+ET,Electrophysiology;electrophysiology,electrophysiology
+ET,elective termination,elective termination
+ET,enterocutaneous,enterocutaneous
+ET,enterostomal therapy,enterostomal therapy
+ET,pressure equalization,pressure equalization;pressure equalizing
+FSH,FOLLICLE STIMULATING HORMONE;Follicle Stimulating Hormone;Follicle stimulating hormone;Follicle-Stimulating Hormone;Follicle-stimulating hormone;follicle hormone stimulating;follicle hormones stimulating;follicle stimulating hormone;follicle-stimulating hormone;follicle-stimulating hormones;FOLLITROPIN;Follitropin;follitropin;FSH (Follicle Stimulating Hormone);FSH - Follicle-stimulating hormone;follicle stimulating fsh hormone;FSH preparation;Follicle stimulating hormone preparation;Follicle-stimulating horm prod;Follicle-stimulating hormone product;Follicular stimulating hormone;follicular hormones stimulating;follicular stimulating hormone;Follitropin preparation;Pituitary follicle stimulating hormone;fshs,follicle stimulating hormone;follicle-stimulating hormone
+FSH,facioscapulohumeral muscular dystrophy;fascioscapulohumeral muscular dystrophy,facioscapulohumeral muscular dystrophy;fascioscapulohumeral muscular dystrophy
+GT,Gamma Glutamyl Transferase;Gamma glutamyl transferase;Gamma-Glutamyl transferase;Gamma-glutamyl transferase;gamma Glutamyltransferase;gamma glutamyl transferase;gamma glutamyltransferase;gamma-Glutamyltransferase;gamma-glutamyl transferase;gamma-glutamyltransferase;gammaglutamyltransferase,gamma glutamyl transferase;gamma glutamyltransferase;gamma-glutamyl transferase;gamma-glutamyltransferase;gammaglutamyltransferase
+GT,gamma-glutamyl transpeptidase;glutamyl transpeptidase,gamma-glutamyl transpeptidase;glutamyl transpeptidase;gamma-glutamyl transferase;gamma-glutamyltransferase
+GT,gastrostomy tube,gastrostomy tube
+GT,glucose tolerance,glucose tolerance
+GT,guttae,gutta;guttae
+IA,"ATTACK, TRANSIENT ISCHEMIC;Attack, Transient Ischemic;Attacks, Transient Ischemic;ISCHEMIC ATTACK, TRANSIENT;Ischemic Attack, Transient;Ischemic Attacks, Transient;TRANSIENT ISCHEMIC ATTACK;TRANSIENT ISCHEMIC ATTACKS;Transient Ischemic Attack;Transient Ischemic Attacks;Transient ischaemic attack;Transient ischaemic attacks;Transient ischemic attack;Transient ischemic attacks;attack ischemic transient;attacks ischemic transient;ischemic attack transient;transient ischaemic attack;transient ischaemic attacks;transient ischemic attack;transient ischemic attacks;Brain TIA;TIA, Brain;brain tia;tia brain;STROKE, TEMPORARY;TIA (Transient Ischemic Attack);TIA - Transient ischaemic attack;TIAs (Transient Ischemic Attack);transient ischemic attack (TIA);Temporary cerebral vascular dysfunction;transient cerebral ischemic attack",transient ischemic attack
+IA,Intraarterial;intra-arterial;intraarterial,intra-arterial;intraarterial
+IB,INTRAVENOUS;Intravenous;intravenous;IV - Intravenous;intravenous (IV),intravenous
+IB,interferon beta,interferon beta
+IB,international baccalaureate,ib program;ib education;ib diploma;international baccalaureate
+IM,INTRAMUSCULAR;Intramuscular;intramuscular,intramuscular
+IM,intramedullary,intramedullary
+IR,Infra-red;infrared,infra-red;infrared;electromagnetic radiation
+IR,Interventional radiology;interventional radiology,interventional radiology
+IR,immediate-release,immediate-release;immediate release
+IR,internal rotation,internal rotation
+IVF,"Artificial Fertilization;artificial fertilization;Fertilization in Vitro;Fertilization in vitro;Fertilizations in Vitro;In Vitro Fertilization;In Vitro Fertilizations;In vitro fertilisation;In vitro fertilization;In-vitro fertilisation;In-vitro fertilization;fertilisation in vitro;fertilization in vitro;in vitro Fertilization;in vitro fertilisation;in vitro fertilization;in-vitro fertilisation;vitro fertilisation;vitro fertilization;Fertilization, Test-Tube;Fertilizations, Test-Tube;Test Tube Fertilization;Test-Tube Fertilization;Test-Tube Fertilizations;test-tube fertilization;In vitro fertilisation procedure;In vitro fertilization procedure;Test tube baby technique;Test tube ovum fertilisation;Test tube ovum fertilization",in vitro fertilization;in-vitro fertilization;artificial insemination
+IVF,inferior vena cava;inferior vena cavae,inferior vena cava;inferior vena cavae
+IVF,intravenous fluid,intravenous fluid
+LA,"Antibodies, Antinuclear;Antibody, Antinuclear;Antinuclear Antibodies;Antinuclear Antibody;Antinuclear antibodies;Antinuclear antibody;antinuclear antibodies;antinuclear antibody",antinuclear antibodies;antinuclear antibody
+LA,left atrial,left atrial
+LA,long-acting,long-acting;long acting;extended release;extended-release
+LE,left ventricle,left ventricle
+LE,leukocyte esterase,leukocyte esterase
+LE,long-acting,long-acting;long acting;extended release;extended-release
+LE,lower extremity,lower extremity
+LE,lupus erythematosus,lupus erythematosus
+LE,lymphedema,lymphedema
+LE,sinemet-levodopa,sinemet;carbidopa;levodopa
+MOM,Mall of America,mall of america;shopping mall
+MOM,MoM;Multiple of the median;multiple of the median;multiples of median;multiples of the median,multiple of the median;multiples of median;multiples of the median
+MOM,milk of magnesia,milk of magnesia
+MP,"3H-Purine-6-thiol;6 MP;6-MP;6-mp;6MP;6 Mercaptopurine;6 mercaptopurine;6-Mercaptopurine;6-mercaptopurine;Mercapto-6-purine;Purine, 6-mercapto-;6 Thiohypoxanthine;6-Thiohypoxanthine;6 Thiopurine;6 thiopurine;6-Thiopurine;6-thiopurine;6-Purinethiol;6-Thioxopurine;6MP - Mercaptopurine;MERCAPTOPURINE;Mercaptopurine;mercaptopurine;Mercapurin;Mern","3h-purine-6-thiol;6 mercaptopurine;6 mp;6 thiohypoxanthine;6 thiopurine;6-mercaptopurine;6-mp;6-purinethiol;6-thiohypoxanthine;6-thiopurine;6-thioxopurine;6mercaptopurine;6mp;mercapto-6-purine;mercaptopurine;mercapurin;mern;purine, 6-mercapto-"
+MP,"NP;Nurse Practitioner;Nurse Practitioners;Nurse practitioner;Nurse practitioners;Practitioner, Nurse;Practitioners, Nurse;nurse practitioner;nurse practitioners",nurse practitioner;nurse practitioners
+MP,menstrual period,menstrual period
+MP,mesangial proliferative,mesangial proliferative;mesangial cell proliferation;mesangial proliferation
+MP,metabolic panel,metabolic panel
+MP,metacarpophalangeal,metacarpophalangeal
+MP,metarsophalangeal,metarsophalangeal
+MP,metatarsophalangeal,metatarsophalangeal
+MP,metatarsophalangeal/metacarpophalangeal,metacarpophalangeal;metatarsophalangeal
+MP,military police,military police;police;army;military
+MP,milligram,milligram
+MR,"INFARCTION (MI), MYOCARDIAL;MI - Myocardial infarction;MI, MYOCARDIAL INFARCTION;MYOCARDIAL INFARCTION, (MI);Myocardial infarction (MI);Infarction, Myocardial;Infarctions, Myocardial;MYOCARDIAL INFARCTION;Myocardial Infarction;Myocardial Infarctions;Myocardial infarction;Myocardial infarction NOS;Myocardial infarction, NOS;infarctions myocardial;myocardial infarction;myocardial infarctions",myocardial infarction
+MR,magnetic resonance,magnetic resonance
+MR,medical record,medical record
+MR,mental retardation,mental retardation
+MR,mitral regurgitation,mitral regurgitation
+MSSA,MSSA;Methicillin susceptible Staphylococcus aureus;methicillin-susceptible Staphylococcus aureus,methicillin susceptible staphylococcus aureus;methicillin-susceptible staphylococcus aureus
+MSSA,modified selective severity assessment,modified selective severity assessment;selective severity assessment
+MS,(drug) MS;medical student,medical student
+MS,"MITRAL STENOSIS;Mitral Stenosis;Mitral stenosis;STENOSIS, MITRAL;Stenosis, Mitral;mitral stenosis;MITRAL VALVE STENOSIS;MITRAL VALVE, STENOSIS;Mitral Valve Stenosis;Mitral valve stenosis;Mitral valve stenosis, NOS;Stenosis, Mitral Valve;Valve Stenosis, Mitral;mitral valve stenosis",mitral stenosis
+MS,"MS (Multiple Sclerosis);MS - Multiple sclerosis;MS multiple sclerosis;multiple sclerosis (MS);multiple sclerosis MS;MULTIPLE SCLEROSIS;Multiple Sclerosis;Multiple sclerosis;Multiple sclerosis NOS;Multiple sclerosis, NOS;SCLEROSIS MULTIPLE;SCLEROSIS, MULTIPLE;Sclerosis, Multiple;multiple sclerosis;multiples sclerosis",multiple sclerosis
+MS,Master of Science;master of science,master of science;graduate degree
+MS,morphine sulfate,morphine sulfate
+MS,musculoskeletal,musculoskeletal
+NAD,no acute distress,no acute distress
+NAD,nothing abnormal detected,nothing abnormal detected
+NP,"NP;Nurse Practitioner;Nurse Practitioners;Nurse practitioner;Nurse practitioners;Practitioner, Nurse;Practitioners, Nurse;nurse practitioner;nurse practitioners",nurse practitioner;nurse practitioners
+NP,nasopharyngeal,nasopharyngeal
+NP,nasopharynx,nasopharynx
+NP,natriuretic peptide,natriuretic peptide
+OP,oblique presentation/occiput posterior,oblique presentation;occiput posterior
+OP,operative,operative
+OP,ophthalmic,ophthalmic
+OP,oropharynx,oropharynx
+OP,out-patient;outpatient,out-patient;outpatient
+OP,ova and parasites,ova and parasites;ova and parasite
+OTC,"Drugs, Non Prescription;Drugs, Non-Prescription;Drugs, Nonprescription;NON-PRESCRIPTION DRUGS;Non Prescription Drugs;Non-Prescription Drugs;Non-prescription drug;Non-prescription drug, NOS;Non-prescription drugs;Nonprescription Drugs;non prescription drugs;non-prescription drug;non-prescription drugs;nonprescription drug;nonprescription drugs;Drugs, OTC;OTC Drugs;OTC drug;Drugs, Over-the-Counter;Over the Counter Drugs;Over-the-Counter Drugs;over the counter drugs;over-the-counter drug;over-the-counter drugs;Medicines, Over-the-Counter;Over-the-Counter Medicines;Medicines, Patent;Patent Medicines;medicines patent;medicines patents;patent medicine;patent medicines;Nonprescription;nonprescription;OTC Medicines;OTC medicines;OTC products;otc product;otc products;Over the Counter;Over-the-Counter;over the counter;over-the-counter;Over the Counter Product;Over the counter products;Over-the-Counter Product;counter over product;over the counter products;products over the counter;pharmaceutical drug",over-the-counter;over the counter
+OTC,ornithine transcarbamoylase,ornithine carbamoyltransferase;ornithine transcarbamoylase
+PAC,"ANTIGEN, PROSTATE-SPECIFIC;Antigen, Prostate-Specific;PROSTATE-SPECIFIC ANTIGEN;Prostate Specific Antigen;Prostate specific Antigen;Prostate specific antigen;Prostate-Specific Antigen;prostate specific antigen;prostate-specific antigen;PSA - Prostate specific antigen;prostate specific antigen (PSA)",prostate specific antigen;prostate-specific antigen;gamma-seminoprotein;kallikrein-3
+PAC,"Analgesia, Patient Controlled;Analgesia, Patient-Controlled;Patient Controlled Analgesia;Patient controlled analgesia;Patient-Controlled Analgesia;analgesia controlled patient;patient controlled analgesia;patient-controlled analgesia;PCA - Patient controlled analgesia",patient controlled analgesia;patient-controlled analgesia
+PAC,"Atrial Contraction, Premature;Atrial Contractions, Premature;Atrial premature contractions;PREMATURE ATRIAL CONTRACTION;Premature Atrial Contraction;Premature Atrial Contractions;Premature atrial contraction;Premature atrial contractions;atrial premature contractions;premature atrial contraction;premature atrial contractions",premature atrial contraction;premature atrial contractions
+PAC,physician assistant certification,physician assistant certification;physician's assistant certification;certified physician's assistant
+PAC,picture archiving communication,picture archiving communication;picture archiving and communication
+PAC,post anesthesia care,post anesthesia care
+PAC,pulmonary arterial concentration,pulmonary arterial concentration
+PAC,pulmonary artery catheter,pulmonary artery catheter
+PA,"Assistant, Physicians';Assistants, Physician;Assistants, Physicians';PHYSICIAN ASSISTANT;Physician Assistant;Physician Assistants;Physician's Assistants;Physicians Assistants;Physicians' Assistant;Physicians' Assistants;Physicians' assistants;physician assistant;physician assistants;physician's assistant;physician's assistants",physician assistant;physician assistants;physician's assistant;physician's assistants;physicians assistants;physician associate;physician's associate
+PA,"PLASMINOGEN ACTIVATOR, TISSUE;Plasminogen Activator, Tissue;Tissue Plasminogen Activator;Tissue plasminogen activator;plasminogen activator, tissue;tissue plasminogen activator",tissue plasminogen activator;plasminogen activator
+PA,posterior-anterior,posterior-anterior;posterior;anterior
+PA,pulmonary artery,pulmonary artery
+PA,pulmonary auscultation,pulmonary auscultation
+PA,pulmonary emboli;pulmonary embolus;pulmonary embolism,pulmonary emboli;pulmonary embolism;pulmonary embolus
+PCP,"Analgesia, Patient Controlled;Analgesia, Patient-Controlled;Patient Controlled Analgesia;Patient controlled analgesia;Patient-Controlled Analgesia;analgesia controlled patient;patient controlled analgesia;patient-controlled analgesia;PCA - Patient controlled analgesia",patient controlled analgesia;patient-controlled analgesia
+PCP,"PCP - Primary care physician;Physician, Primary Care;Physicians, Primary Care;Primary Care Physician;Primary Care Physicians;Primary care physician;care physician primary;care physicians primary;primary care physician;primary care physicians;primary physician care",primary care physician
+PCP,PHENCYCLIDINE;Phencyclidine;phencyclidine;phencyclidines,phencyclidine;angel dust
+PCP,Pneumocystis Jiroveci Pneumonia;Pneumocystis jiroveci pneumonia,pneumocystis jiroveci pneumonia;pneumocystis pneumonia
+PDA,"Analgesia, Patient Controlled;Analgesia, Patient-Controlled;Patient Controlled Analgesia;Patient controlled analgesia;Patient-Controlled Analgesia;analgesia controlled patient;patient controlled analgesia;patient-controlled analgesia;PCA - Patient controlled analgesia",patient controlled analgesia;patient-controlled analgesia
+PDA,"DUCTUS ARTERIOSUS PATENT;DUCTUS ARTERIOSUS, PATENT;Ductus Arteriosus, Patent;PATENT DUCTUS ARTERIOSUS;Patent Ductus Arteriosus;Patent ductus arteriosus;arteriosus ductus patent;patent arteriosus ductus;patent ductus arteriosus;PDA - Patent ductus arteriosus;PDA1;Patency of the Ductus Arteriosus;Patent arterial duct;Patent ductus Botalli;Patent ductus arteriosus - persisting type;Persistent ductus arteriosus;ductus arteriosus persistent;persistent ductus arteriosus;arteriosis ductus patent;patent ductus arteriosis",patent ductus arteriosus;patent ductus botalli;persistent ductus arteriosus;persistent ductus botalli
+PDA,Posterior descending artery;posterior descending artery;posterior descending artery (PDA),posterior descending artery
+PD,"PPD;ppd's;ppds;PPD - Purified protein derivative - S;PPD-S;Purified Protein Derivative;Purified protein derivative;derivative protein purified;purified protein derivative;Purified Protein Derivative of Tuberculin;TUBERCULIN,PURIFIED PROTEIN DERIVATIVE;Tuberculin purified protein derivative;tuberculin purified protein derivative;Purified protein derivative - S;Tuberculin PPD",purified protein derivative;tuberculin
+PD,Parkinson disease;Parkinson's disease,parkinson disease;parkinson's disease
+PD,dorsalis pedis,dorsalis pedis
+PD,pancreatic duct,pancreatic duct
+PD,patent ductus,patent ductus;persistent ductus
+PD,peritoneal dialysis,peritoneal dialysis
+PD,personality disorder,personality disorder
+PD,phosphate dehydrogenase,phosphate dehydrogenase
+PD,police department,police department;police
+PD,posterior descending,posterior descending
+PD,prism diopter;prism diopters;prism dioptres,prism diopter;prism diopters;prism dioptres;prismatic deflection;prismatic deviation
+PD,pulmonary emboli;pulmonary embolus;pulmonary embolism,pulmonary emboli;pulmonary embolism;pulmonary embolus
+PE,pleural effusion,pleural effusion
+PE,pressure equalization,pressure equalization;pressure equalizing
+PE,pulmonary emboli;pulmonary embolus;pulmonary embolism,pulmonary emboli;pulmonary embolism;pulmonary embolus
+PM,afternoon,afternoon;evening;night
+PM,metacarpophalangeal,metacarpophalangeal
+PM,physical medicine and rehabilitation,physical medicine and rehabilitation;physiatry;physiatrics
+PR,"PR - Progesterone receptor;progesterone receptor (PR);PROGESTERONE RECEPTOR;Progesterone Receptor;Progesterone Receptors;Progesterone receptor;Receptor, Progesterone;Receptors, Progesterone;progesterone receptor;progesterone receptors",progesterone receptor
+PR,per rectum,per rectum
+PR,pulmonary regurgitation;pulmonic regurgitation,pulmonary regurgitation;pulmonic regurgitation
+PR,pulse rate,pulse rate
+PT,"PT - Prothrombin time;PT assay;Prothrombin Time;Prothrombin Times;Prothrombin time;Time, Prothrombin;Times, Prothrombin;prothrombin time;prothrombin times;Prothrombin time assay;Protime;Quick one stage prothrombin time;prothrombin test",prothrombin test;prothrombin time
+PT,Physical Therapy;Physical therapy;physical therapies;physical therapy;therapy physical,physical therapy
+PT,posterior tibial,posterior tibial
+PT,prothrombin,prothrombin
+RA,"ARTHRITIS RHEUMATOID;ARTHRITIS, RHEUMATOID;Arthritis, Rheumatoid;RHEUMATOID ARTHRITIS;Rheumatoid Arthritis;Rheumatoid arthritis;Rheumatoid arthritis NOS;rheumatoid arthritis",rheumatoid arthritis
+RA,retinoic acid,retinoic acid
+RA,right atria;right atrium,right atria;right atrium
+RA,room air,room air
+RT,"RADIATION THERAPY;Radiation Therapy;Radiation therapy;Radiation therapy, NOS;Therapy, Radiation;radiation therapies;radiation therapy;radiations therapy;therapy radiation;therapy, radiation",radiation therapy;radiation
+RT,respiratory therapist,respiratory therapist
+RT,respiratory therapy,respiratory therapy
+RT,retrograde tachycardia,retrograde tachycardia;tachycardia
+SA,MSSA;Methicillin susceptible Staphylococcus aureus;methicillin-susceptible Staphylococcus aureus,methicillin susceptible staphylococcus aureus;methicillin-susceptible staphylococcus aureus
+SA,saturation,saturation
+SA,sinuatrial,sinuatrial;sinoatrial
+SA,sinus arrest,sinus arrest
+SA,slow acting/sustained action,slow acting;sustained action
+SBP,blood pressure systolic;systolic blood pressure,systolic blood pressure
+SBP,spontaneous bacterial peritonitis,spontaneous bacterial peritonitis
+SMA,"Atrophy, Spinal Muscular;MUSCULAR ATROPHY, SPINAL;Muscular Atrophy, Spinal;Spinal Muscular Atrophy;Spinal muscular atrophy;Spinal muscular atrophy NOS;Spinal muscular atrophy, NOS;atrophies muscular spinal;atrophy muscular spinal;atrophy spinal muscular;muscular atrophy spinal;muscular spinal atrophy;spinal muscular atrophy;SMA - Spinal muscular atrophy;atrophy muscular sma spinal;SPINAL MUSCLE ATROPHY;muscle spinal atrophy;spinal muscle atrophy;Spinal muscular atrophy, unspecified;Unspecified spinal muscular atrophy;spinal amyotrophy",spinal muscular atrophy
+SMA,sequential multiple autoanalyzer,sequential multiple autoanalyzer;autoanalyzer
+SMA,smooth muscle actin,acta2;alpha-actin;alpha-actin-2;aortic smooth muscle;alpha smooth muscle actin;smooth muscle actin
+SMA,smooth muscle antibodies;smooth muscle antibody,smooth muscle antibodies;smooth muscle antibody
+SMA,superior mesenteric artery,superior mesenteric artery
+US,U S;U.S.;UNITED STATES;United States;USA;USA - United States of America;United States of America,united states;united states of america
+US,ULTRASOUND;Ultrasound;ultrasound;ultrasounds,ultrasound;ultrasounds
+VAD,"Surgeries, Video-Assisted Thoracic;Surgery, Thoracic, Video-Assisted;Surgery, Video-Assisted Thoracic;Thoracic Surgeries, Video-Assisted;Thoracic Surgery, Video Assisted;Thoracic Surgery, Video-Assisted;Video Assisted Thoracic Surgery;Video-Assisted Thoracic Surgeries;Video-Assisted Thoracic Surgery;Video-assisted Thoracic Surgery;Video-assisted thoracic surgery;video assisted thoracic surgery;video-assisted thoracic surgery;VATS;vats;VATSs;video-assisted thoracic surgery (VATS)",video-assisted thoracoscopic surgery;video assisted thoracic surgery
+VAD,vascular access device,vascular access device
+VAD,ventricular assist device,ventricular assist device
+VAD,vincristine adriamycin and dexamethasone;vincristine-Adriamycin-dexamethasone,combination chemotherapy;combination chemo;vincristine;adriamycin;dexamethasone
