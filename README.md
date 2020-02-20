@@ -1,5 +1,54 @@
 # Latent Meaning Cells
-This is the main repository for the Latent Meaning Cells (LMC) Model.  The LMC is a Deep Generative Model for Jointly Modeling Words and Document Metadata. 
+This is the main repository for the Latent Meaning Cells (LMC) Model.  The LMC is a Deep Generative Model for Jointly Modeling Words and Document Metadata.
+
+## Overview of Generative Process
+
+The generative process of the LMC model is shown in plate notation below:
+
+![plate notation](shared_data/graphics/marginalization.jpg)
+
+```
+For k in 1...D
+    Draw metadata d_k ~ p(d_k)
+    For i in 1...N_k:
+        Draw word w_ik ~ p(w_ik)
+        Draw latent meaning z_ik|w_ik, d_k ~ p(z_ik|w_ik, d_k)
+    For j in 1...2W:
+        Draw context word c_ijk|z_ik ~ p(c_ijk|z_ik)
+```
+
+
+### D
+represents the set of metadata in the corpus.  This could be the number of unique section headers or even simply the number of documents in the corpus.
+
+### d_k 
+represents the k'th metadata
+
+### N_k
+
+represents the number of unique tokens in the k'th metadata. For our purposes, metadata are pseudo-documents which contain a sequence of words.  For instance, if the metadata is a section header *Discharge Medications*, that metadata is comprised of the concatenation of the body of every section entitled *Discharge Medications* across the corpus.  Yet, when computing context windows, we do not combine text from different phsyical documents.
+
+### w_ik
+
+represents the i'th center word belonging to the k'th metadata.
+
+### z_ik|w_ik,d_k
+
+represents the latent meaning given the center word **w_ik** and metadata **d_k**
+
+
+### W
+
+denotes the window size. That is, the number of words drawn from the left and right side of the center word. 
+
+
+### c_ijk|z_ik
+
+denotes the j'th context word given the latent meaning of i'th center word in k'th metadata.
+
+This formulationn allows for the latent meaning of a word to depend on the metadata (section header, paragraph id, etc.) in which it is found, and vice versa.  For instance,  the latent meaning of a *sports* article is not the same for all sports articles. Sports can refer to the NBA, the Olympics, or chess.  Therefore, the concept of a sports article is conditioned on its words.  Conversely, if you see the word *net*, its latent meaning will shift more to basketball than to fishing if you know that it is used within a sports article.  The LMC models both phenomena.  This notion is encapsulated in the below figure.
+
+![lmc visualization](shared_data/graphics/capsules.jpg)
 
 ## Contents
 
