@@ -22,16 +22,16 @@ For k in 1...D
 Please refer to the paper for more information on the distributions and model parameters.
 
 ### D
-represents the set of metadata in the corpus.  This could be the number of unique section headers or even simply the number of documents in the corpus.
+represents the set of metadata in the corpus.  This could be the number of unique section headers or even simply the number of documents in the corpus, depending on the modeling choice.
 
-### d<sub>k</sub> 
+### d<sub>k</sub>
 represents the k<sup>th</sup> metadata
 
-### N<sub>k</sub> 
+### N<sub>k</sub>
 
-represents the number of unique tokens in the k<sup>th</sup> metadata. For our purposes, metadata are pseudo-documents which contain a sequence of words.  For instance, if the metadata is a section header *Discharge Medications*, that metadata is comprised of the concatenation of the body of every section entitled *Discharge Medications* across the corpus.  Yet, when computing context windows, we do not combine text from different phsyical documents.
+represents the number of unique tokens in the k<sup>th</sup> metadata. For our purposes, metadata are pseudo-documents which contain a sequence of words.  For instance, if the metadata is a section header *Discharge Medications*, that metadata is comprised of the concatenation of the body of every section entitled *Discharge Medications* across the corpus.  Yet, when computing context windows, we do not combine text from different physical documents.
 
-### w<sub>ik</sub> 
+### w<sub>ik</sub>
 
 represents the i<sup>th</sup> center word belonging to the k<sup>th</sup> metadata.
 
