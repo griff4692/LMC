@@ -14,11 +14,12 @@ For k in 1...D
     Draw metadata d_k ~ p(d_k)
     For i in 1...N_k:
         Draw word w_ik ~ p(w_ik)
-        Draw latent meaning z_ik|w_ik, d_k ~ p(z_ik|w_ik, d_k)
+        Draw latent meaning z_ik|w_ik,d_k ~ p(z_ik|w_ik, d_k)
     For j in 1...2W:
         Draw context word c_ijk|z_ik ~ p(c_ijk|z_ik)
 ```
 
+Please refer to the paper for more information on the distributions and model parameters.
 
 ### D
 represents the set of metadata in the corpus.  This could be the number of unique section headers or even simply the number of documents in the corpus.
