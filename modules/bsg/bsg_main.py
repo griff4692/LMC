@@ -122,7 +122,7 @@ if __name__ == '__main__':
             batch_ids = batcher.next(ids, sec_ids, cat_ids, vocab, args.window)
             batch_ids = list(map(lambda x: torch.LongTensor(x).to(device_str), batch_ids))
 
-            kl_loss, recon_loss = kl_loss, recon_loss = model(*batch_ids)
+            kl_loss, recon_loss = model(*batch_ids)
             joint_loss = kl_loss + recon_loss
             joint_loss.backward()  # backpropagate loss
 
