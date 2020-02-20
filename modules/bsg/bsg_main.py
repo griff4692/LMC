@@ -76,9 +76,15 @@ if __name__ == '__main__':
     # I.e. for above example, if document=ECHO -> 1, header=DATE -> 2, header=SURGICALPROCEDURE -> 3,
     # then sec_ids = [-1, 2, 2, 3, 3] and cat_ids = [1, 1, 1, 1, 1]
     sec_ids, cat_ids = enumerate_metadata_ids_multi_bsg(ids, sec_pos_idxs, cat_pos_idxs)
-    all_metadata_pos_idxs = np.concatenate([sec_pos_idxs, cat_pos_idxs])
+    print('Snippet from beginning of data...')
+    for ct, (sid, cid, tid) in enumerate(zip(sec_ids, cat_ids, ids)):
+        print('\t', vocab.get_tokens([sid, cid, tid]))
+        if ct >= 10:
+            break
+
     # Demarcates boundary tokens to safeguard against ever training on metadata tokens as center words
     # This will trigger PyTorch embedding error if it happens
+    all_metadata_pos_idxs = np.concatenate([sec_pos_idxs, cat_pos_idxs])
     ids[all_metadata_pos_idxs] = -1
 
     device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
