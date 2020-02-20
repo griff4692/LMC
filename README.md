@@ -48,7 +48,7 @@ denotes the window size. That is, the number of words drawn from the left and ri
 
 denotes the j<sup>th</sup> context word given the latent meaning of i<sup>th</sup> center word in k<sup>th</sup> metadata.
 
-This formulation allows for the latent meaning of a word to depend on the metadata (section header, paragraph id, etc.) in which it is found, and vice versa.  For instance,  the latent meaning of a *sports* article is not the same for all sports articles. Sports can refer to the NBA, the Olympics, or chess.  Therefore, the concept of a sports article is conditioned on its words.  Conversely, if you see the word *net*, its latent meaning will shift more to basketball than to fishing if you know that it is used within a sports article.  The LMC models both phenomena.  This notion is encapsulated in the below figure.
+This formulation allows for the latent meaning of a word to depend on the metadata (section header, paragraph id, etc.) in which it is found, and vice versa.  For instance,  the latent meaning of a *sports* article is not the same for all *sports* articles. Sports can refer to the NBA, the Olympics, or chess.  Therefore, the concept of a sports article is refined by knowing the words used inside the article.  Conversely, if you see the word *net*, its latent meaning will shift more to basketball than to fishing if you know that it is used within a sports article.  The LMC models both phenomena.  This notion is encapsulated in the below figure.
 
 ![lmc visualization](shared_data/graphics/capsules.jpg)
 
