@@ -115,13 +115,13 @@ def load_casi(prev_args, train_frac=1.0):
 
     if train_frac == 1.0 or train_frac == 0.0:
         train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(df, batch_size=1024)
+        test_batcher = AcronymBatcherLoader(df, batch_size=512)
         train_df = df
         test_df = df
     else:
         train_df, test_df = train_test_split(df, random_state=1992, test_size=1.0 - train_frac)
         train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=1024)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=512)
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
@@ -153,10 +153,10 @@ def load_mimic(prev_args, train_frac=1.0):
 
     if train_frac == 1.0 or train_frac == 0.0:
         train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(df, batch_size=1024)
+        test_batcher = AcronymBatcherLoader(df, batch_size=512)
     else:
         train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=1024)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=512)
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
