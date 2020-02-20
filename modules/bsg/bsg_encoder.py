@@ -27,7 +27,7 @@ class BSGEncoder(nn.Module):
         self.u = nn.Linear(hidden_dim * 2, input_dim, bias=True)
         self.v = nn.Linear(hidden_dim * 2, 1, bias=True)
 
-    def forward(self, center_ids, context_ids, mask, token_mask_p= 0.2):
+    def forward(self, center_ids, context_ids, mask, token_mask_p=0.2):
         """
         :param center_ids: LongTensor of batch_size
         :param context_ids: LongTensor of batch_size x 2 * context_window
