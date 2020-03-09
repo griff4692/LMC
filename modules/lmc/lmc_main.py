@@ -123,12 +123,13 @@ if __name__ == '__main__':
                         help='sections or category. What to define latent variable over.')
     parser.add_argument('--metadata_samples', default=3, type=int)
     parser.add_argument('--window', default=10, type=int)
+    parser.add_argument('-pool_bert', default=False, action='store_true')
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()
+    if args.debug:  # Mini dataset may have fewer than 200 examples
+        args.batch_size = 200
     render_args(args)
-    if args.debug:  # Mini dataset may have fewer than 256 examples
-        args.batch_size = 256
 
     # Load Data
     debug_str = '_mini' if args.debug else ''

@@ -6,9 +6,9 @@ from transformers import AlbertConfig, AlbertModel
 
 
 class LMCEncoderBERT(nn.Module):
-    def __init__(self, args, token_vocab_size, output_dim=200):
+    def __init__(self, args, token_vocab_size, output_dim=150):
         super(LMCEncoderBERT, self).__init__()
-        self.pool_layers = True
+        self.pool_layers = args.pool_bert
 
         if args.debug_model:
             bert_dim = 100
