@@ -181,13 +181,13 @@ class DistributedDataset(Dataset):
             flattened_left = list(itertools.chain(*left_wp_ids))
             flattened_right = list(itertools.chain(*right_wp_ids))
             c_wp_seq = flattened_left + center_tok_wp_ids + flattened_right
-            left_seq = center_meta_wp_ids + center_tok_wp_ids
-            full_context_wp_seq = ([CLS_ID] + c_wp_seq + [SEP_ID] + left_seq + [SEP_ID])
+            right_seq = center_meta_wp_ids + center_tok_wp_ids
+            full_context_wp_seq = [CLS_ID] + c_wp_seq + [SEP_ID] + right_seq + [SEP_ID]
 
             cutoff = min(len(full_context_wp_seq), max_encoder_len)
             context_bert_ids[batch_idx, :cutoff] = full_context_wp_seq[:cutoff]
-            context_bert_mask[batch_idx, cutoff:] = 1
-            left_cutoff = 1 + len(c_wp_seq)
+            context_bert_mask[batch_idx, cutoff:] = 0
+            left_cutoff = 2 + len(c_wp_seq)
             context_token_type_ids[batch_idx, left_cutoff:] = 1
 
             for idx, (context_id, p_wp_ids) in enumerate(zip(full_ids, full_wp_ids)):
