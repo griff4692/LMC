@@ -224,7 +224,7 @@ class DistributedDataset(Dataset):
         return len(self.kwargs['batches'])
 
 
-def create_tokenizer_maps(bert_tokenizer, token_vocab, metadata_vocab):
+def create_tokenizer_maps(bert_tokenizer, token_vocab, metadata_vocab, token_keys=False):
     """
     :param bert_tokenizer: Pre-trained HuggingFace WordPiece tokenizer
     :param token_vocab: unigram token vocabulary for MIMIC-III
@@ -233,17 +233,19 @@ def create_tokenizer_maps(bert_tokenizer, token_vocab, metadata_vocab):
 
     This speeds up the batching process by only having to calculate WordPieces once for each unique word / metadata type
     """
-    token_to_wp = [None] * token_vocab.size()
-    meta_to_wp = [None] * metadata_vocab.size()
+    token_to_wp = {} if token_keys else [None] * token_vocab.size()
+    meta_to_wp = {} if token_keys else [None] * metadata_vocab.size()
 
     for i in tqdm(range(token_vocab.size())):
         token = token_vocab.get_token(i)
+        key = token if token_keys else i
         wps = bert_tokenizer.encode(token, add_special_tokens=False)
-        token_to_wp[i] = wps
+        token_to_wp[key] = wps
     for i in tqdm(range(metadata_vocab.size())):
         meta = metadata_vocab.get_token(i)
+        key = meta if token_keys else i
         wps = bert_tokenizer.encode(meta, add_special_tokens=False)
-        meta_to_wp[i] = wps
+        meta_to_wp[key] = wps
 
     special_map = {}
     for t, i in zip(bert_tokenizer.all_special_tokens, bert_tokenizer.all_special_ids):

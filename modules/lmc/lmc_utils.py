@@ -4,10 +4,21 @@ import sys
 
 import argparse
 import torch
+from transformers import BertTokenizer
 
 home_dir = os.path.expanduser('~/LMC/')
 sys.path.insert(0, os.path.join(home_dir, 'modules', 'lmc'))
-from lmc_model import LMC
+from lmc_model import LMC, LMCBERT
+
+
+def load_bert_tokenizer(bert_tokenizer, metadata_vocab):
+    metadata_tokens = metadata_vocab.i2w[1:] + ['digitparsed']
+    special_tokens_dict = {'cls_token': '[CLS]', 'sep_token': '[SEP]', 'unk_token': '[UNK]', 'bos_token': '[BOS]',
+                           'eos_token': '[EOS]', 'pad_token': '[PAD]', 'mask_token': '[MASK]',
+                           'additional_special_tokens': metadata_tokens}
+    num_added_toks = bert_tokenizer.add_special_tokens(special_tokens_dict)
+    print('Readded special tokens={}'.format(num_added_toks))
+    print('Mapping regular vocab ids to WordPiece ids for token and metadata...')
 
 
 def restore_model(restore_name):
@@ -54,9 +65,16 @@ def restore_model(restore_name):
     bert_tokenizer = None
     if hasattr(args, 'bert') and args.bert:
         bert_tokenizer = checkpoint_state['bert_tokenizer']
-        token_vocab_size = max(bert_tokenizer.vocab_size, max(bert_tokenizer.all_special_ids) + 1)
 
-    lmc_model = LMC(args, token_vocab_size, metadata_vocab.size())
+        # TODO remove.  This is for backward compatibility
+        if bert_tokenizer is None:
+            bert_tokenizer_fn = os.path.join(home_dir, 'preprocess/data/bert_tokenizer_vocab.pth')
+            bert_tokenizer = BertTokenizer.from_pretrained(bert_tokenizer_fn)
+            load_bert_tokenizer(bert_tokenizer, metadata_vocab)
+        token_vocab_size = max(bert_tokenizer.vocab_size, max(bert_tokenizer.all_special_ids) + 1)
+        lmc_model = LMCBERT(args, token_vocab_size)
+    else:
+        lmc_model = LMC(args, token_vocab_size, metadata_vocab.size())
     lmc_model.load_state_dict(new_state_dict)
 
     optimizer_state = checkpoint_state['optimizer_state_dict']

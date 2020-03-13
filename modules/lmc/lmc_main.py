@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(home_dir, 'preprocess'))
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
 from lmc_model import LMC, LMCBERT
 from lmc_prebatch import create_tokenizer_maps, DistributedDataset, generate_metadata_samples
-from lmc_utils import save_checkpoint
+from lmc_utils import load_bert_tokenizer, save_checkpoint
 from model_utils import get_git_revision_hash, render_args
 from vocab import Vocab
 from compute_sections import enumerate_metadata_ids_lmc
@@ -63,13 +63,7 @@ def _prepare_data(args, token_vocab, ids):
     bert_tokenizer_fn = os.path.join(home_dir, 'preprocess/data/bert_tokenizer_vocab.pth')
     bert_tokenizer = BertTokenizer.from_pretrained(bert_tokenizer_fn) if args.bert else None
     if bert_tokenizer is not None:
-        metadata_tokens = metadata_vocab.i2w[1:] + ['digitparsed']
-        special_tokens_dict = {'cls_token': '[CLS]', 'sep_token': '[SEP]', 'unk_token': '[UNK]', 'bos_token': '[BOS]',
-                               'eos_token': '[EOS]', 'pad_token': '[PAD]', 'mask_token': '[MASK]',
-                               'additional_special_tokens': metadata_tokens}
-        num_added_toks = bert_tokenizer.add_special_tokens(special_tokens_dict)
-        print('Readded special tokens={}'.format(num_added_toks))
-        print('Mapping regular vocab ids to WordPiece ids for token and metadata...')
+        load_bert_tokenizer(bert_tokenizer, metadata_vocab)
         # This is just for efficiency so we only compute word pieces once for every unigram in corpus
         wp_conversions = create_tokenizer_maps(bert_tokenizer, token_vocab, metadata_vocab)
         token_vocab_size = max(bert_tokenizer.vocab_size, max(bert_tokenizer.all_special_ids) + 1)
@@ -216,7 +210,8 @@ if __name__ == '__main__':
                 checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
                 if epoch < 10:
                     save_checkpoint(args, model, optimizer, token_vocab, losses_dict, kwargs['token_metadata_counts'],
-                                    checkpoint_fp=checkpoint_fp, metadata_vocab=kwargs['metadata_vocab'])
+                                    checkpoint_fp=checkpoint_fp, metadata_vocab=kwargs['metadata_vocab'],
+                                    bert_tokenizer=kwargs['bert_tokenizer'])
 
         epoch_joint_loss /= float(num_batches)
         epoch_kl_loss /= float(num_batches)
@@ -231,4 +226,5 @@ if __name__ == '__main__':
         checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
         if epoch < 10:  # Epoch >= 10 usually only happens when debugging in which we case we don't want to keep saving
             save_checkpoint(args, model, optimizer, token_vocab, losses_dict, kwargs['token_metadata_counts'],
-                            checkpoint_fp=checkpoint_fp, metadata_vocab=kwargs['metadata_vocab'])
+                            checkpoint_fp=checkpoint_fp, metadata_vocab=kwargs['metadata_vocab'],
+                            bert_tokenizer=kwargs['bert_tokenizer'])

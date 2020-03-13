@@ -10,6 +10,43 @@ sys.path.insert(0, os.path.join(home_dir, 'utils'))
 from compute_utils import compute_kl, mask_2D
 
 
+class LMCBertAcronymExpander(nn.Module):
+    def __init__(self, args, lmc_model):
+        super(LMCBertAcronymExpander, self).__init__()
+
+        self.encoder = lmc_model.encoder
+        self.decoder = lmc_model.decoder
+
+        self.device = args.device
+
+    def forward(self, context_ids, context_token_type_ids, lf_ids, lf_token_type_ids, target_lf_ids, context_mask, lf_mask, num_outputs):
+        batch_size, max_output_size, max_lf_ngram = lf_ids.size()
+        _, num_context_ids = context_ids.size()
+
+        sf_mu, sf_sigma, _ = self.encoder(
+            input_ids=context_ids, attention_mask=context_mask, token_type_ids=context_token_type_ids)
+
+        lf_ids_flat = lf_ids.view(batch_size * max_output_size, max_lf_ngram)
+        lf_mask_flat = lf_mask.view(batch_size * max_output_size, max_lf_ngram)
+        lf_token_type_ids_flat = lf_token_type_ids.view(batch_size * max_output_size, max_lf_ngram)
+        lf_mu_flat, lf_sigma_flat = self.decoder(
+            input_ids=lf_ids_flat, attention_mask=lf_mask_flat, token_type_ids=lf_token_type_ids_flat
+        )
+
+        # Tile SFs across each LF and flatten
+        sf_mu_flat = sf_mu.unsqueeze(1).repeat(1, max_output_size, 1).view(batch_size * max_output_size, -1)
+        sf_sigma_flat = sf_sigma.unsqueeze(1).repeat(1, max_output_size, 1).view(batch_size * max_output_size, -1)
+
+        output_dim = torch.Size([batch_size, max_output_size])
+        output_mask = mask_2D(output_dim, num_outputs).to(self.device)
+
+        kl = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(batch_size, max_output_size)
+        score = -kl
+
+        score.masked_fill_(output_mask, float('-inf'))
+        return score, target_lf_ids, None
+
+
 class LMCAcronymExpander(nn.Module):
     """
     Loads in a pre-trained LMC Model and ranks candidate Long Forms for each Acronym Short Form

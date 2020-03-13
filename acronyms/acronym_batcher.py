@@ -1,3 +1,5 @@
+import itertools
+
 # from allennlp.data.tokenizers.token import Token
 import numpy as np
 
@@ -47,6 +49,77 @@ class AcronymBatcherLoader:
                 lf_ids[batch_idx, lf_idx, :len(lf_id_seq), :] = lf_id_seq
 
         return (context_ids, lf_ids, target_lf_ids), num_outputs
+
+    def next_bert(self, wp_conversions, sf_lf_map, sf_tokenized_lf_map, lf_metadata_counts):
+        MAX_CONTEXT_LEN = 100
+        MAX_LF_LEN = 25
+
+        batch = self.batches[self.batch_ct]
+        self.batch_ct += 1
+        batch_size = batch.shape[0]
+        num_outputs = [len(sf_tokenized_lf_map[sf]) for sf in batch['sf'].tolist()]
+        max_output_length = max(num_outputs)
+        target_lf_ids = np.zeros([batch_size, ], dtype=int)
+        context_lens = []
+
+        token_to_wp = wp_conversions['token_to_wp']
+        meta_to_wp = wp_conversions['meta_to_wp']
+        special_to_wp = wp_conversions['special_to_wp']
+
+        PAD_ID = special_to_wp['[PAD]']
+        CLS_ID = special_to_wp['[CLS]']
+        SEP_ID = special_to_wp['[SEP]']
+
+        context_ids = np.empty([batch_size, MAX_CONTEXT_LEN], dtype=int)
+        context_ids.fill(PAD_ID)
+        context_bert_mask = np.ones([batch_size, MAX_CONTEXT_LEN])
+        context_token_type_ids = np.zeros([batch_size, MAX_CONTEXT_LEN], dtype=int)
+
+        lf_ids = np.empty([batch_size, max_output_length, MAX_LF_LEN], dtype=int)
+        lf_ids.fill(PAD_ID)
+        lf_bert_mask = np.ones([batch_size, max_output_length, MAX_LF_LEN])
+        lf_token_type_ids = np.zeros([batch_size, max_output_length, MAX_LF_LEN], dtype=int)
+
+        for batch_idx, (_, row) in enumerate(batch.iterrows()):
+            row = row.to_dict()
+            sf = row['sf']
+            candidate_lf_tokenized = sf_tokenized_lf_map[sf]
+            candidate_lf_senses = sf_lf_map[sf]
+
+            target_lf_ids[batch_idx] = row['target_lf_idx']
+
+            null_section = row['section'] == '<pad>' or row['section'] not in meta_to_wp
+            section_id = [PAD_ID] if null_section else meta_to_wp[row['section']]
+            # TODO add SF into context
+            cids = list(itertools.chain(*list(map(lambda x: token_to_wp[x], row['trimmed_tokens'].split(' ')))))
+            left_seq = [CLS_ID] + cids + [SEP_ID]
+            right_seq = section_id + token_to_wp[sf.lower()] + [SEP_ID]
+            full_cids = left_seq + right_seq
+            N = len(full_cids)
+            context_cutoff = min(MAX_CONTEXT_LEN, N)
+            context_ids[batch_idx, :context_cutoff] = full_cids[:context_cutoff]
+            context_bert_mask[batch_idx, context_cutoff:] = 0
+            context_token_type_ids[batch_idx, len(left_seq):] = 1
+            context_lens.append(N)
+            for lf_idx, lf_toks in enumerate(candidate_lf_tokenized):
+                lf_sense = candidate_lf_senses[lf_idx]
+                lf_m = lf_metadata_counts[lf_sense]
+                k = 'section' if 'section' in lf_m.keys() else 'category'
+                meta_wp_ids = list(map(lambda x: [PAD_ID] if (x == '<pad>' or x not in meta_to_wp) else meta_to_wp[x], lf_m[k]))
+                meta_flat_ids = list(itertools.chain(*meta_wp_ids))
+                lf_wp_ids = map(lambda x: token_to_wp[x], lf_toks)
+                lf_ids_flat = list(itertools.chain(*lf_wp_ids))
+                left_lf_seq = [CLS_ID] + lf_ids_flat + [SEP_ID]
+                right_lf_seq = meta_flat_ids + [SEP_ID]
+                lf_id_seq = left_lf_seq + right_lf_seq
+
+                lf_cutoff = min(len(lf_id_seq), MAX_LF_LEN)
+                lf_ids[batch_idx, lf_idx, :lf_cutoff] = lf_id_seq[:lf_cutoff]
+                lf_bert_mask[batch_idx, lf_idx, lf_cutoff:] = 0
+                lf_token_type_ids[batch_idx, lf_idx, len(left_lf_seq):] = 1
+
+        return (context_ids, context_token_type_ids, lf_ids, lf_token_type_ids, target_lf_ids), [
+            context_bert_mask, lf_bert_mask], [num_outputs]
 
     def next(self, token_vocab, sf_lf_map, sf_tokenized_lf_map, lf_metadata_counts, metadata_vocab=None):
         batch = self.batches[self.batch_ct]

@@ -21,7 +21,8 @@ from acronym_utils import load_casi, load_mimic, lf_tokenizer, run_test_epoch, r
 from bsg_acronym_expander import BSGAcronymExpander
 from bsg_utils import restore_model as restore_bsg
 from error_analysis import analyze, render_test_statistics
-from lmc_acronym_expander import LMCAcronymExpander
+from lmc_acronym_expander import LMCAcronymExpander, LMCBertAcronymExpander
+from lmc_prebatch import create_tokenizer_maps
 from lmc_utils import restore_model as lmc_restore
 from model_utils import get_git_revision_hash, render_args
 
@@ -61,10 +62,9 @@ def extract_smoothed_metadata_probs(metadata='section'):
         return lf_metadata_counts
 
 
-def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0):
+def run_evaluation(args, dataset_loader, restore_func, train_frac=0.0):
     """
     :param args: argparse instance specifying evaluation configuration (including pre-trained model path)
-    :param acronym_model: PyTorch model to rank candidate acronym expansions (an instance of model from ./modules/)
     :param dataset_loader: function to load acronym expansion dataset (i.e. either CASI or Reverse Substitution MIMIC)
     :param restore_func: Function to load pre-trained model weights (different for BSG and LMC)
     :param train_frac: If you want to fine tune the model, this should be about 0.8.
@@ -77,11 +77,13 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
     if args.lm_type == 'bsg':
         prev_args, lm, token_vocab, _ = restore_func(args.lm_experiment)
         metadata_vocab = None
+        bert_tokenizer = None
         prev_args.metadata = None
     else:
-        prev_args, lm, token_vocab, metadata_vocab, _, _, _ = restore_func(args.lm_experiment)
+        prev_args, lm, token_vocab, metadata_vocab, bert_tokenizer, _, _ = restore_func(args.lm_experiment)
     train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(prev_args, train_frac=train_frac)
     args.metadata = prev_args.metadata
+    args.bert = hasattr(prev_args, 'bert') and prev_args.bert
 
     # Construct smoothed empirical probabilities of metadata conditioned on LF ~ p(metadata|LF)
     lf_metadata_counts = extract_smoothed_metadata_probs(metadata=args.metadata)
@@ -107,6 +109,13 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
 
     render_test_statistics(test_df, sf_lf_map)
 
+    wp_conversions = None
+    if bert_tokenizer is not None:
+        additional_tokens = test_df['trimmed_tokens'].tolist() + train_df['trimmed_tokens'].tolist()
+        for arr in additional_tokens:
+            token_vocab.add_tokens(arr.split(' '))
+        wp_conversions = create_tokenizer_maps(bert_tokenizer, token_vocab, metadata_vocab, token_keys=True)
+
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join(home_dir, 'weights', 'acronyms', args.experiment)
     if os.path.exists(weights_dir):
@@ -117,7 +126,12 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
-    model = acronym_model(args, lm, token_vocab).to(args.device)
+    if args.lm_type == 'bsg':
+        model = BSGAcronymExpander(args, lm, token_vocab).to(args.device)
+    elif hasattr(prev_args, 'bert') and prev_args.bert:
+        model = LMCBertAcronymExpander(args, lm).to(args.device)
+    else:
+        model = LMCAcronymExpander(args, lm, token_vocab).to(args.device)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
@@ -127,21 +141,21 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
     best_weights = model.state_dict()
     best_epoch = 1
     lowest_test_loss = run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab,
-                                      sf_tokenized_lf_map, sf_lf_map, lf_metadata_counts)
-    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
-            lf_metadata_counts, results_dir=results_dir)
+                                      wp_conversions, sf_tokenized_lf_map, sf_lf_map, lf_metadata_counts)
+    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, wp_conversions,
+            sf_tokenized_lf_map, lf_metadata_counts, results_dir=results_dir)
 
     # Make sure it's calculating gradients
     for epoch in range(1, args.epochs + 1):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
         print('Starting Epoch={}'.format(epoch))
         _ = run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_vocab, metadata_vocab,
-                                     sf_tokenized_lf_map, sf_lf_map, lf_metadata_counts)
+                                     wp_conversions, sf_tokenized_lf_map, sf_lf_map, lf_metadata_counts)
         test_loss = run_test_epoch(
             args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map, sf_lf_map,
             lf_metadata_counts)
-        analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
-                lf_metadata_counts, results_dir=results_dir)
+        analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, wp_conversions,
+                sf_tokenized_lf_map, lf_metadata_counts, results_dir=results_dir)
 
         lowest_test_loss = min(lowest_test_loss, test_loss)
         if lowest_test_loss == test_loss:
@@ -149,8 +163,8 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
             best_epoch = epoch
     print('Loading weights from {} epoch to perform error analysis'.format(best_epoch))
     model.load_state_dict(best_weights)
-    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
-            lf_metadata_counts, results_dir=results_dir)
+    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, wp_conversions,
+            sf_tokenized_lf_map, lf_metadata_counts, results_dir=results_dir)
 
 
 if __name__ == '__main__':
@@ -172,6 +186,6 @@ if __name__ == '__main__':
     args.experiment += '_{}'.format(args.dataset)
     dataset_loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
     restore_func = restore_bsg if args.lm_type == 'bsg' else lmc_restore
-    acronym_model = BSGAcronymExpander if args.lm_type == 'bsg' else LMCAcronymExpander
+
     args.device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
-    run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0)
+    run_evaluation(args, dataset_loader, restore_func, train_frac=0.0)

@@ -331,8 +331,8 @@ def preprocess_casi_dataset(window=10):
         json.dump(used_sf_lf_map, fd)
 
 
-def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
-                  token_metadata_counts):
+def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, wp_conversions, sf_lf_map,
+                  sf_tokenized_lf_map, token_metadata_counts):
     """
     :param args: argparse instance
     :param batcher: AcronymBatcherLoader instance
@@ -347,8 +347,13 @@ def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, 
 
     rel_weight only applies to the LMC model which returns the result of the metadata-token gating function
     """
-    batch_input, batch_p, batch_counts = batcher.next(token_vocab, sf_lf_map, sf_tokenized_lf_map,
-                                                  token_metadata_counts, metadata_vocab=metadata_vocab)
+    if args.bert:
+        batch_input, batch_p, batch_counts = batcher.next_bert(
+            wp_conversions, sf_lf_map, sf_tokenized_lf_map, token_metadata_counts)
+    else:
+        batch_input, batch_p, batch_counts = batcher.next(
+            token_vocab, sf_lf_map, sf_tokenized_lf_map, token_metadata_counts, metadata_vocab=metadata_vocab
+        )
     batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0).to(args.device), batch_input))
     batch_p = list(map(lambda x: torch.FloatTensor(x).to(args.device), batch_p))
     full_input = batch_input + batch_counts if args.lm_type == 'bsg' else batch_input + batch_p + batch_counts
@@ -359,8 +364,8 @@ def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, 
     return batch_loss, num_examples, num_correct, scores, rel_weights
 
 
-def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
-               sf_lf_map, token_metadata_counts):
+def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab, wp_conversions,
+                   sf_tokenized_lf_map, sf_lf_map, token_metadata_counts):
     """
     :param args: argparse instance
     :param test_batcher: AcronymBatcherLoader instance
@@ -379,8 +384,8 @@ def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_v
     for _ in tqdm(range(test_batcher.num_batches())):
         with torch.no_grad():
             batch_loss, num_examples, num_correct, _, _ = process_batch(
-                args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
-                token_metadata_counts)
+                args, test_batcher, model, loss_func, token_vocab, metadata_vocab, wp_conversions, sf_lf_map,
+                sf_tokenized_lf_map, token_metadata_counts)
         test_correct += num_correct
         test_examples += num_examples
         test_epoch_loss += batch_loss.item()
@@ -392,8 +397,8 @@ def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_v
     return test_loss
 
 
-def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_vocab, metadata_vocab, sf_tokenized_lf_map,
-                    sf_lf_map, token_metadata_counts):
+def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_vocab, metadata_vocab, wp_conversions,
+                    sf_tokenized_lf_map, sf_lf_map, token_metadata_counts):
     """
     :param args: argparse instance
     :param train_batcher: AcronymBatcherLoader instance
