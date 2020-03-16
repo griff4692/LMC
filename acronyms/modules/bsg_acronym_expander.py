@@ -15,8 +15,10 @@ class BSGAcronymExpander(nn.Module):
     Loads in a pre-trained BSG Model and ranks candidate Long Forms for each Acronym Short Form
     Ranking function for each LF_k: DKL(q(z|SF,c)||p(z|LFk))
     """
-    def __init__(self, bsg_model, token_vocab):
+    def __init__(self, args, bsg_model, token_vocab):
         super(BSGAcronymExpander, self).__init__()
+
+        self.device = args.device
 
         vocab_size = token_vocab.size()
         prev_vocab_size, embed_dim = bsg_model.embeddings_mu.weight.size()
@@ -52,8 +54,7 @@ class BSGAcronymExpander(nn.Module):
 
         # Mask padded context ids
         mask_size = torch.Size([batch_size, num_context_ids])
-        device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
-        mask = mask_2D(mask_size, num_contexts).to(device_str)
+        mask = mask_2D(mask_size, num_contexts).to(self.device)
 
         sf_mu, sf_sigma = self.encoder(sf_ids, context_ids, mask, token_mask_p=None)
         return sf_mu, sf_sigma
@@ -109,8 +110,7 @@ class BSGAcronymExpander(nn.Module):
         lf_sigma_flat = lf_sigma_sum.view(batch_size * max_output_size, -1)
 
         output_dim = torch.Size([batch_size, max_output_size])
-        device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
-        output_mask = mask_2D(output_dim, num_outputs).to(device_str)
+        output_mask = mask_2D(output_dim, num_outputs).to(self.device)
 
         kl = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(batch_size, max_output_size)
         score = -kl

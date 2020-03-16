@@ -20,7 +20,7 @@ class LMCAcronymExpander(nn.Module):
 
     Please refer to LMC paper for details on ranking function and derivations.
     """
-    def __init__(self, lmc_model, token_vocab,):
+    def __init__(self, args, lmc_model, token_vocab):
         super(LMCAcronymExpander, self).__init__()
 
         token_vocab_size = token_vocab.size()
@@ -44,6 +44,8 @@ class LMCAcronymExpander(nn.Module):
         decoder_init = np.random.normal(0, 1, size=(token_vocab_size, decoder_embed_dim))
         decoder_init[:prev_token_vocab_size, :] = prev_decoder_token_embeddings
         self.decoder.token_embeddings.load_state_dict({'weight': torch.from_numpy(decoder_init)})
+
+        self.device = args.device
 
     def _compute_marginal(self, ids, metadata_ids, normalizer=None):
         """
@@ -90,8 +92,7 @@ class LMCAcronymExpander(nn.Module):
         # Compute SF contexts
         # Mask padded context ids
         mask_size = torch.Size([batch_size, num_context_ids])
-        device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
-        mask = mask_2D(mask_size, num_contexts).to(device_str)
+        mask = mask_2D(mask_size, num_contexts).to(self.device)
         sf_mu, sf_sigma, rel_weights = self.encoder(
             sf_ids, section_ids, context_ids, mask, center_mask_p=None, context_mask_p=None)
 
@@ -109,7 +110,7 @@ class LMCAcronymExpander(nn.Module):
         lf_mu_flat = lf_mu.view(batch_size * max_output_size * num_metadata, -1)
         lf_sigma_flat = lf_sigma.view(batch_size * max_output_size * num_metadata, 1)
         output_dim = torch.Size([batch_size, max_output_size])
-        output_mask = mask_2D(output_dim, num_outputs).to(device_str)
+        output_mask = mask_2D(output_dim, num_outputs).to(self.device)
 
         kl_marginal = compute_kl(sf_mu_flat, sf_sigma_flat, lf_mu_flat, lf_sigma_flat).view(
             batch_size, max_output_size, num_metadata)

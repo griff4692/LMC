@@ -117,8 +117,7 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = acronym_model(lm, token_vocab).to(device)
+    model = acronym_model(args, lm, token_vocab).to(args.device)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
@@ -164,6 +163,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', default='casi', help='casi or mimic')
 
     # Training Hyperparameters
+    parser.add_argument('-cpu', default=False, action='store_true')
     parser.add_argument('--epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=10, type=int)
@@ -173,5 +173,5 @@ if __name__ == '__main__':
     dataset_loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
     restore_func = restore_bsg if args.lm_type == 'bsg' else lmc_restore
     acronym_model = BSGAcronymExpander if args.lm_type == 'bsg' else LMCAcronymExpander
-    args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    args.device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
     run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0)
