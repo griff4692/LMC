@@ -1,12 +1,17 @@
+import os
+import sys
+
 import torch
 from torch import nn
 from torch.nn import functional as F
 import torch.utils.data
 from transformers import AlbertConfig, AlbertModel
 
+from albert_encode import encode
+
 
 class LMCDecoderBERT(nn.Module):
-    def __init__(self, args, token_vocab_size, output_dim=150):
+    def __init__(self, args, token_vocab_size, output_dim=100):
         super(LMCDecoderBERT, self).__init__()
         self.pool_layers = args.pool_bert
 
@@ -38,24 +43,11 @@ class LMCDecoderBERT(nn.Module):
 
         self.u = nn.Linear(bert_dim, output_dim, bias=True)
         self.v = nn.Linear(bert_dim, 1, bias=True)
+        self.att_linear = nn.Linear(bert_dim, 1, bias=True)
+        self.dropout = nn.Dropout(0.2)
 
     def forward(self, **kwargs):
-        if self.pool_layers:
-            all_encoded_layers = self.bert(**kwargs)[2]
-            num_layers = len(all_encoded_layers)
-            last_layers = min(num_layers - 1, 4)
-            last_encoded_layers = torch.stack(all_encoded_layers[-last_layers:]).sum(0)
-            att_mask = kwargs['attention_mask']
-            denom = att_mask.sum(1).unsqueeze(-1)
-            last_encoded_layers *= att_mask.unsqueeze(-1)
-            h = last_encoded_layers.sum(1) / denom
-        else:
-            output = self.bert(**kwargs)[0]
-            att_mask = kwargs['attention_mask']
-            denom = att_mask.sum(1).unsqueeze(-1)
-            output *= att_mask.unsqueeze(-1)
-            h = output.sum(1) / denom
-
+        h = self.dropout(encode(self, **kwargs))
         return self.u(h), self.v(h).exp()
 
 

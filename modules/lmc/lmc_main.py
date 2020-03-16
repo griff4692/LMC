@@ -169,7 +169,7 @@ if __name__ == '__main__':
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
-    optimizer = AdamW(trainable_params, args.lr) if args.bert else torch.optim.Adam(trainable_params, lr=args.lr)
+    optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join(home_dir, 'weights', 'lmc', args.experiment)

@@ -1,12 +1,17 @@
+import os
+import sys
+
 import numpy as np
 import torch
 from torch import nn
 import torch.utils.data
 from transformers import AlbertConfig, AlbertModel
 
+from albert_encode import encode
+
 
 class LMCEncoderBERT(nn.Module):
-    def __init__(self, args, token_vocab_size, output_dim=150):
+    def __init__(self, args, token_vocab_size, output_dim=100):
         super(LMCEncoderBERT, self).__init__()
         self.pool_layers = args.pool_bert
 
@@ -17,10 +22,10 @@ class LMCEncoderBERT(nn.Module):
             intermediate_size = 100
             output_dim = 100
         else:
-            bert_dim = 768
-            num_hidden_layers = 6
+            bert_dim = 512
+            num_hidden_layers = 4
             embedding_size = 128
-            intermediate_size = 768
+            intermediate_size = 512
         num_attention_heads = max(1, bert_dim // 64)
         print('Using {} attention heads in encoder'.format(num_attention_heads))
 
@@ -37,24 +42,11 @@ class LMCEncoderBERT(nn.Module):
         self.bert = AlbertModel(config)
         self.u = nn.Linear(bert_dim, output_dim, bias=True)
         self.v = nn.Linear(bert_dim, 1, bias=True)
+        self.att_linear = nn.Linear(bert_dim, 1, bias=True)
+        self.dropout = nn.Dropout(0.2)
 
     def forward(self, **kwargs):
-        if self.pool_layers:
-            all_encoded_layers = self.bert(**kwargs)[2]
-            num_layers = len(all_encoded_layers)
-            last_layers = min(num_layers - 1, 4)
-            last_encoded_layers = torch.stack(all_encoded_layers[-last_layers:]).sum(0)
-            att_mask = kwargs['attention_mask']
-            denom = att_mask.sum(1).unsqueeze(-1)
-            last_encoded_layers *= att_mask.unsqueeze(-1)
-            h = last_encoded_layers.sum(1) / denom
-        else:
-            output = self.bert(**kwargs)[0]
-            att_mask = kwargs['attention_mask']
-            denom = att_mask.sum(1).unsqueeze(-1)
-            output *= att_mask.unsqueeze(-1)
-            h = output.sum(1) / denom
-
+        h = self.dropout(encode(self, **kwargs))
         return self.u(h), self.v(h).exp(), None
 
 
