@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(home_dir, 'utils'))
 from bsg_batcher import BSGBatchLoader
 from bsg_model import BSG
 from bsg_utils import save_checkpoint
-from compute_sections import enumerate_metadata_ids_multi_bsg
+from compute_sections import enumerate_metadata_ids
 from model_utils import get_git_revision_hash, render_args
 
 
@@ -35,8 +35,8 @@ if __name__ == '__main__':
     # Model Hyperparameters
     parser.add_argument('--hidden_dim', default=64, type=int, help='hidden dimension for encoder')
     parser.add_argument('--input_dim', default=100, type=int, help='embedding dimemsions for encoder')
-    parser.add_argument('-multi_bsg', default=False, action='store_true')
-    parser.add_argument('--multi_weights', default='0.7,0.2,0.1')
+    parser.add_argument('-mbsge', default=False, action='store_true')
+    parser.add_argument('--mbsge_weights', default='0.9,0.1')
     parser.add_argument('--mask_p', default=None, type=float, help=(
         'Mask Encoder tokens with probability mask_p if a float.  Otherwise, default is no masking.'))
 
@@ -49,49 +49,47 @@ if __name__ == '__main__':
     if args.debug:  # Mini dataset may have fewer than 256 examples
         args.batch_size = 256
 
-    ids_infile = os.path.join(home_dir, 'preprocess', 'data', 'ids{}.npy'.format(debug_str))
+    ids_infile = os.path.join(home_dir, 'preprocess', 'data', 'mimic', 'ids{}.npy'.format(debug_str))
     print('Loading data from {}...'.format(ids_infile))
     with open(ids_infile, 'rb') as fd:
         ids = np.load(fd)
 
     # Load Vocabulary
-    vocab_infile = os.path.join(home_dir, 'preprocess', 'data', 'vocab{}.pk'.format(debug_str))
+    vocab_infile = os.path.join(home_dir, 'preprocess', 'data', 'mimic', 'vocab{}.pk'.format(debug_str))
     print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
-    print('Loaded vocabulary of size={}...'.format(vocab.section_start_vocab_id))
+    print('Loaded vocabulary of size={}...'.format(vocab.metadata_start_id))
 
     print('Collecting metadata information')
-    assert vocab.section_start_vocab_id <= vocab.category_start_vocab_id
-    sec_id_range = np.arange(vocab.section_start_vocab_id, vocab.category_start_vocab_id)
-    cat_id_range = np.arange(vocab.category_start_vocab_id, vocab.size())
+    metadata_id_range = np.arange(vocab.metadata_start_id, vocab.size())
 
     # Indices in ids held by section and category ids, respectively
     # I.e. for example ids array [document=ECHO, header=DATE, today, header=SURGICALPROCEDURE, none]
     # sec_ids = [1, 3] and cat_ids = [0]
-    sec_pos_idxs = np.where(np.isin(ids, sec_id_range))[0]
-    cat_pos_idxs = np.where(np.isin(ids, cat_id_range))[0]
+    metadata_pos_idxs = np.where(np.isin(ids, metadata_id_range))[0]
 
     # For each element in ids, pre-compute its corresponding by section and category ids, respectively
     # I.e. for above example, if document=ECHO -> 1, header=DATE -> 2, header=SURGICALPROCEDURE -> 3,
     # then sec_ids = [-1, 2, 2, 3, 3] and cat_ids = [1, 1, 1, 1, 1]
-    sec_ids, cat_ids = enumerate_metadata_ids_multi_bsg(ids, sec_pos_idxs, cat_pos_idxs)
+    metadata_ids = enumerate_metadata_ids(ids, metadata_pos_idxs)
     print('Snippet from beginning of data...')
-    for ct, (sid, cid, tid) in enumerate(zip(sec_ids, cat_ids, ids)):
-        print('\t', vocab.get_tokens([sid, cid, tid]))
+    for ct, (mid, tid) in enumerate(zip(metadata_ids, ids)):
+        print('\t', vocab.get_tokens([mid, tid]))
         if ct >= 10:
             break
 
     # Demarcates boundary tokens to safeguard against ever training on metadata tokens as center words
     # This will trigger PyTorch embedding error if it happens
-    all_metadata_pos_idxs = np.concatenate([sec_pos_idxs, cat_pos_idxs])
-    ids[all_metadata_pos_idxs] = -1
+    sep_pos_idxs = np.where(ids == vocab.sep_id())[0]
+    full_sep_pos_idxs = np.concatenate([sep_pos_idxs, metadata_pos_idxs])
+    ids[full_sep_pos_idxs] = -1
 
     device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('Training on {}...'.format(device_str))
 
     # Instantiate Batch Loader for BSG
-    batcher = BSGBatchLoader(len(ids), all_metadata_pos_idxs, batch_size=args.batch_size)
+    batcher = BSGBatchLoader(len(ids), full_sep_pos_idxs, batch_size=args.batch_size)
 
     # Instantiate PyTorch BSG Model
     model = BSG(args, vocab.size()).to(device_str)
@@ -119,7 +117,7 @@ if __name__ == '__main__':
             # Reset gradients
             optimizer.zero_grad()
 
-            batch_ids = batcher.next(ids, sec_ids, cat_ids, vocab, args.window)
+            batch_ids = batcher.next(ids, metadata_ids, vocab, args.window)
             batch_ids = list(map(lambda x: torch.LongTensor(x).to(device_str), batch_ids))
 
             kl_loss, recon_loss = model(*batch_ids)
@@ -131,7 +129,7 @@ if __name__ == '__main__':
             epoch_joint_loss += joint_loss.item()
             optimizer.step()
 
-            checkpoint_interval = 10000
+            checkpoint_interval = 100000
             if (i + 1) % checkpoint_interval == 0:
                 print('Saving Checkpoint at Batch={}'.format(i + 1))
                 d = float(i + 1)

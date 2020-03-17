@@ -41,7 +41,7 @@ if __name__ == '__main__':
     with open(token_counts_fn, 'r') as fd:
         token_counts = json.load(fd)
     N = float(token_counts['__ALL__'])
-    print('Subsampling {} tokens'.format(N))
+    print('Subsampling {} tokens'.format(int(N)))
 
     # Store subsampled data
     tokenized_subsampled_data = []
@@ -49,7 +49,6 @@ if __name__ == '__main__':
     vocab = Vocab()
     num_docs = len(tokenized_data)
     sections = set()
-    categories = set()
     for doc_idx in tqdm(range(num_docs)):
         tokenized_doc_str = tokenized_data[doc_idx]
         subsampled_doc = []
@@ -60,15 +59,14 @@ if __name__ == '__main__':
                 continue
             wc = token_counts[token]
             is_section_header = 'header=' in token
-            is_doc_header = 'document=' in token
+            is_sep_token = token == '<sep>'
             if is_section_header:
                 # Don't keep section if it is empty (has no tokens in it)
                 if not tidx + 1 == len(doc_tokens) and not 'header=' in doc_tokens[tidx + 1]:
                     subsampled_doc.append(token)
                     sections.add(token)
-            elif is_doc_header:  # Keep all document special tokens
+            elif is_sep_token:
                 subsampled_doc.append(token)
-                categories.add(token)
             else:
                 if wc < args.min_token_count:
                     continue
@@ -89,20 +87,17 @@ if __name__ == '__main__':
         tokenized_subsampled_data.append(' '.join(subsampled_doc))
 
     print('Reduced tokens from {} to {}'.format(int(N), sum(vocab.support)))
-    vocab.section_start_vocab_id = vocab.size()
+    vocab.metadata_start_id = vocab.size()
     print('Adding {} section headers'.format(len(sections)))
-    # Add sections later and maintain demarcators that let you know when section and category ids begin
+    # Add sections later and maintain demarcators that let you know when section ids begin
     # Note: this comes in handy later when separating token_vocab into metadata_vocab
     vocab.add_tokens(sections, token_support=0)
-    vocab.category_start_vocab_id = vocab.size()
-    print('Adding {} document categories'.format(len(categories)))
-    vocab.add_tokens(categories, token_support=0)
 
     subsampled_out_fn = '{}_subsampled{}{}.json'.format(args.tokenized_fp, debug_str, sentence_str)
     print('Saving subsampled tokens to {}'.format(subsampled_out_fn))
     with open(subsampled_out_fn, 'w') as fd:
         json.dump(tokenized_subsampled_data, fd)
-    vocab_out_fn = 'data/vocab{}{}.pk'.format(debug_str, sentence_str)
+    vocab_out_fn = 'data/mimic/vocab{}{}.pk'.format(debug_str, sentence_str)
     print('Saving vocabulary of size {} to {}'.format(vocab.size(), vocab_out_fn))
     with open(vocab_out_fn, 'wb') as fd:
         pickle.dump(vocab, fd)

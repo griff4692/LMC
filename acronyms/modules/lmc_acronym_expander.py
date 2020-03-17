@@ -67,13 +67,11 @@ class LMCAcronymExpander(nn.Module):
         sigma_marginal = sigma_marginal_flat.view(batch_size, max_output, num_metadata, -1)
         return mu_marginal, sigma_marginal
 
-    def forward(self, sf_ids, section_ids, category_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct,
+    def forward(self, sf_ids, metadata_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct,
                 lf_metadata_ids, lf_metadata_p, num_outputs, num_contexts):
         """
         :param sf_ids: LongTensor of batch_size
-        :param section_ids: LongTensor of batch_size
-        :param category_ids: LongTensor of batch_size
-        :param context_ids: LongTensor of batch_size x 2 * context_window
+        :param metadata_ids: LongTensor of batch_size x 2 * context_window
         :param lf_ids: LongTensor of batch_size x max_output_size x max_lf_len
         :param target_lf_ids: LongTensor of batch_size representing which index in lf_ids lies the target LF
         :param lf_token_ct: LongTensor of batch_size x max_output_size.  N-gram count for each LF (used for masking)
@@ -94,7 +92,7 @@ class LMCAcronymExpander(nn.Module):
         mask_size = torch.Size([batch_size, num_context_ids])
         mask = mask_2D(mask_size, num_contexts).to(self.device)
         sf_mu, sf_sigma, rel_weights = self.encoder(
-            sf_ids, section_ids, context_ids, mask, center_mask_p=None, context_mask_p=None)
+            sf_ids, metadata_ids, context_ids, mask, center_mask_p=None, context_mask_p=None)
 
         num_metadata = lf_metadata_ids.size()[-1]
 

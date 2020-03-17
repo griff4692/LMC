@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(home_dir, 'preprocess'))
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
 from acronym_batcher import AcronymBatcherLoader
 from casi_constants import LF_BLACKLIST, LF_MAPPING, SF_BLACKLIST
-from mimic_tokenize import clean_text, create_document_token, create_section_token, get_mimic_stopwords, tokenize_str
+from data_tokenize import clean_text, create_section_token, get_mimic_stopwords, tokenize_str
 from model_utils import tensor_to_np
 
 
@@ -139,12 +139,7 @@ def load_mimic(prev_args, train_frac=1.0):
     used_sf_lf_map = {}
     df = pd.read_csv(os.path.join(
         home_dir, 'preprocess/context_extraction/data/mimic_rs_dataset_preprocessed_window_10.csv'))
-    df['category'] = df['category'].apply(create_document_token)
-    if prev_args.metadata == 'category':
-        df['metadata'] = df['category']
-    else:
-        df['metadata'] = df['section']
-        df['metadata'].fillna('<pad>', inplace=True)
+    df['metadata'].fillna('<pad>', inplace=True)
     sfs = df['sf'].unique().tolist()
     for sf in sfs:
         used_sf_lf_map[sf] = sf_lf_map[sf]

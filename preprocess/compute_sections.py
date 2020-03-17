@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+import itertools
 from multiprocessing import Pool
 import re
 from time import time
@@ -8,11 +9,31 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from map_sections import get_canonical_section
 
-HEADER_SEARCH_REGEX = r'(?:^|\s{4,}|\n)[\d.#]{0,4}\s*([A-Z][A-z0-9/ ]+[A-z]:)'
+
+HEADER_SEARCH_REGEX = r'(?:^|\s{4,}|\n)[\d.#]{0,4}\s*([A-Z][-A-z0-9/() ]{0,100}[A-z0-9]:)'
 
 
-def enumerate_metadata_ids_multi_bsg(ids, sec_pos_idxs, cat_pos_idxs):
+def enumerate_metadata_ids(ids, metadata_pos_idxs):
+    """
+    :param ids: List of token ids.
+    :param metadata_pos_idxs: Positional indices where ids are metadata
+    :return: metadata_ids of length(ids).  The ith item in sec_ids and cat_ids, respectively,
+    signals the section and note category ids from which the token at index i belongs.
+    """
+    N = len(ids)
+    meta_ids = []
+
+    num_metadata = len(metadata_pos_idxs)
+    for idx, meta_pos_idx in enumerate(metadata_pos_idxs):
+        meta_id = ids[meta_pos_idx]
+        end_idx = metadata_pos_idxs[idx + 1] if idx + 1 < num_metadata else N
+        meta_ids[meta_pos_idx:end_idx] = [meta_id] * (end_idx - meta_pos_idx)
+    return meta_ids
+
+
+def enumerate_metadata_ids_mbsge(ids, sec_pos_idxs, cat_pos_idxs):
     """
     :param ids: List of token ids.
     :param sec_pos_idxs: Positional indices where ids are section headers
@@ -71,7 +92,8 @@ def enumerate_metadata_ids_multi_bsg(ids, sec_pos_idxs, cat_pos_idxs):
         cat_ids += [curr_cat_id] * metadata_len
 
     assert len(sec_ids) == len(cat_ids) == N
-    return sec_ids, cat_ids
+    raise Exception('No category ids now.')
+    # return sec_ids, cat_ids
 
 
 def enumerate_metadata_ids_lmc(ids, metadata_pos_idxs, token_vocab, metadata_vocab):
@@ -119,7 +141,6 @@ def extract_headers(text):
 if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC-III Section Header Extraction Script.')
     arguments.add_argument('-debug', default=False, action='store_true')
-    arguments.add_argument('--min_count', default=10, type=int)
 
     args = arguments.parse_args()
 
@@ -129,27 +150,33 @@ if __name__ == '__main__':
     df = pd.read_csv('data/mimic/NOTEEVENTS{}.csv'.format(debug_str))
 
     texts = df['TEXT'].tolist()
+    all_categories = df['CATEGORY'].tolist()
 
     print('Extracting section headers...')
     start_time = time()
     p = Pool()
-    sections = p.map(extract_headers, texts)
+    raw_sections = p.map(extract_headers, texts)
+    categories = []
+    for i, rs in enumerate(raw_sections):
+        categories += [all_categories[i]] * len(rs)
+    raw_sections = list(itertools.chain(*raw_sections))
+    canonical_sections = list(itertools.starmap(get_canonical_section, zip(raw_sections, categories)))
     p.close()
     end_time = time()
     print('Took {} seconds'.format(end_time - start_time))
 
+    canonical_to_raw = defaultdict(set)
+    for raw, canonical in zip(raw_sections, canonical_sections):
+        canonical_to_raw[canonical].add(raw)
+
     print('Done!  Now extracting counts...')
-    all_counts = 0
-    section_counts = defaultdict(int)
-    for section_arr in sections:
-        for section in section_arr:
-            section_counts[section] += 1
-            all_counts += 1
-    print('Located {} section headers in all {} documents'.format(all_counts, len(texts)))
+    df_obj = {'section': [], 'count': [], 'section_variants': []}
+    section_counts = Counter(canonical_sections)
+    for section, count in section_counts.items():
+        df_obj['section'].append(section)
+        df_obj['count'].append(count)
+        df_obj['section_variants'].append('; '.join(list(canonical_to_raw[section])))
 
-    df = pd.DataFrame(section_counts.items(), columns=['section', 'count'])
+    df = pd.DataFrame(df_obj)
+    df.sort_values('count', ascending=False, inplace=True)
     df.to_csv('data/mimic/section{}.csv'.format(debug_str), index=False)
-
-    freq_df = df[df['count'] >= args.min_count]
-    print('Only {} section headers occur more than {} times'.format(freq_df.shape[0], args.min_count))
-    freq_df.to_csv('data/mimic/section_freq{}.csv'.format(debug_str), index=False)

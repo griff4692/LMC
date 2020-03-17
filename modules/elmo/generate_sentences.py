@@ -13,7 +13,7 @@ if __name__ == '__main__':
     """
     Necessary for training ELMo with AllenNLP module which expects a corpus file where each line is a unique sentence.
     
-    Before running, you must run pre-processing pipeline (mimic_tokenize, subsample_tokens)
+    Before running, you must run pre-processing pipeline (tokenize, subsample_tokens)
     with flag split_sentences=True.
     """
     parser = argparse.ArgumentParser('Generates list of sentences from pre-processed MIMIC data.')

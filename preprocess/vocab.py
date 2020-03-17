@@ -3,18 +3,22 @@ import numpy as np
 
 class Vocab:
     PAD_TOKEN = '<pad>'
+    SEP_TOKEN = '<sep>'
 
     def __init__(self):
         self.w2i = {}
         self.i2w = []
         self.support = []
         self.add_token(Vocab.PAD_TOKEN)
+        self.add_token(Vocab.SEP_TOKEN)
         self.cached_neg_sample_prob = None
-        self.section_start_vocab_id = None
-        self.category_start_vocab_id = None
+        self.metadata_start_id = None
 
     def pad_id(self):
         return self.get_id(Vocab.PAD_TOKEN)
+
+    def sep_id(self):
+        return self.get_id(Vocab.SEP_TOKEN)
 
     def add_tokens(self, tokens, token_support=1):
         for tidx, token in enumerate(tokens):
@@ -47,11 +51,10 @@ class Vocab:
     def token_count(self, token):
         return self.id_count(self.get_id(token))
 
-    def truncate(self, end_idx):
-        assert end_idx in (self.category_start_vocab_id, self.section_start_vocab_id)
+    def truncate(self):
         print('Removing section pseudo-tokens from vocabulary...')
-        self.support = self.support[:end_idx]
-        self.i2w = self.i2w[:end_idx]
+        self.support = self.support[:self.metadata_start_id]
+        self.i2w = self.i2w[:self.metadata_start_id]
 
     def get_ids(self, tokens):
         return list(map(self.get_id, tokens))

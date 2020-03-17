@@ -83,7 +83,7 @@ The repository containts the following modules:
 In `./preprocess`, please run the following scripts in order:
 1. `generate_mini_dataset.py` - sample from full dataset to create mini development set (principally for debugging).
 2. `compute_sections.py` - Use custom regex to precompute the names of all section headers in MIMIC-III.
-3. `mimic_tokenize.py` - Tokenize the data and save
+3. `tokenize.py` - Tokenize the data and save
 4. `subsample_tokens.py` - Subsample frequent tokens to speed-up training and increase effective window size.
 
 The output of these scripts is a series of data files:

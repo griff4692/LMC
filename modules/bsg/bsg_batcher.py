@@ -52,11 +52,10 @@ class BSGBatchLoader:
 
         return np.concatenate([left_context_truncated, right_context_truncated])
 
-    def next(self, ids, full_sec_ids, full_cat_ids, vocab, window_size):
+    def next(self, ids, full_meta_ids, vocab, window_size):
         """
         :param ids: Flattened list of all token and metadata ids
-        :param full_sec_ids: For each element in ids provides its corresponding section id
-        :param full_sec_ids: For each element in ids provides its corresponding note type (category) id
+        :param full_meta_ids: For each element in ids provides its corresponding metadata id
         :param vocab: token vocabulary from which we negatively sample words
         :param window_size: Distance to the left and right of center word for which to extract context
         :return:
@@ -67,18 +66,15 @@ class BSGBatchLoader:
         window_sizes = []
 
         neg_ids = vocab.neg_sample(size=(self.batch_size, (window_size * 2)))
-        sec_ids = np.zeros([self.batch_size,], dtype=int)
-        cat_ids = np.zeros([self.batch_size,], dtype=int)
-
+        meta_ids = np.zeros([self.batch_size,], dtype=int)
         for batch_idx, center_idx in enumerate(batch_idxs):
-            sec_ids[batch_idx] = full_sec_ids[center_idx]
-            cat_ids[batch_idx] = full_cat_ids[center_idx]
+            meta_ids[batch_idx] = full_meta_ids[center_idx]
             example_context_ids = self.extract_context_ids(ids, center_idx, window_size)
             actual_window_size = len(example_context_ids)
             context_ids[batch_idx, :actual_window_size] = example_context_ids
             window_sizes.append(actual_window_size)
         self.batch_ct += 1
-        return center_ids, sec_ids, cat_ids, context_ids, neg_ids, window_sizes
+        return center_ids, meta_ids, context_ids, neg_ids, window_sizes
 
     def reset(self):
         """

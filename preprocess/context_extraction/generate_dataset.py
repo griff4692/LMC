@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 
-MAX_NUM = 750
+MAX_NUM = 750  # 10000
 
 
 if __name__ == '__main__':
