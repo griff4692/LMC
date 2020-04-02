@@ -37,7 +37,6 @@ class BSG(nn.Module):
         log_weights_init = np.random.uniform(low=-3.5, high=-1.5, size=(vocab_size, 1))
         self.embeddings_log_sigma.load_state_dict({'weight': torch.from_numpy(log_weights_init)})
 
-        self.multi_bsg = args.multi_bsg
         if hasattr(args, 'mask_p'):
             self.mask_p = args.mask_p
         else:
