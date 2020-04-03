@@ -94,14 +94,14 @@ class BSG(nn.Module):
         mask = mask_2D(mask_size, num_contexts).to(self.device)
 
         center_ids = token_ids
-        if self.multi_bsg:
-            center_id_candidates = torch.cat([
-                token_ids.unsqueeze(0),
-                sec_ids.unsqueeze(0),
-                cat_ids.unsqueeze(0)
-            ])
-            input_sample = torch.multinomial(self.input_weights, batch_size, replacement=True).to(self.device)
-            center_ids = center_id_candidates.gather(0, input_sample.unsqueeze(0)).squeeze(0)
+        # if self.multi_bsg:
+        #     center_id_candidates = torch.cat([
+        #         token_ids.unsqueeze(0),
+        #         sec_ids.unsqueeze(0),
+        #         cat_ids.unsqueeze(0)
+        #     ])
+        #     input_sample = torch.multinomial(self.input_weights, batch_size, replacement=True).to(self.device)
+        #     center_ids = center_id_candidates.gather(0, input_sample.unsqueeze(0)).squeeze(0)
 
         mu_q, sigma_q = self.encoder(center_ids, context_ids, mask, token_mask_p=self.mask_p)
         mu_p, sigma_p = self._compute_priors(token_ids)
