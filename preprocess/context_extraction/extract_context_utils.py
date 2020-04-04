@@ -60,14 +60,33 @@ class ContextExtractor:
         :param context_config: The context configuration
         :return: A string containing the context around the found match (Can parameterize later to return str or list!)
         """
-        match_str = document[match_found.start():match_found.end()].strip()
+        match_str = document[match_found.start():match_found.end()]
         preceding_text = document[:match_found.start()]
         succeeding_text = document[match_found.end():]
         if context_config['type'] == ContextType.WORD:
-            preceding_text_words = self.trim_boundaries(re.split(r'\s+', preceding_text))
-            succeeding_text_words = self.trim_boundaries(re.split(r'\s+', succeeding_text))
-            return match_str, ' '.join(preceding_text_words[len(preceding_text_words) - context_config['size']:]
-                            + ['TARGETWORD'] + succeeding_text_words[:context_config['size']])
+            preceding_text_words = self.trim_boundaries(re.split(r'(\s+)', preceding_text))
+            prev_str = ''
+            curr_words = 0
+            for tok_idx in range(len(preceding_text_words) - 1, -1, -1):
+                tok = preceding_text_words[tok_idx]
+                curr_words += 1 if len(re.sub(r'\s+', '', tok)) > 0 else 0
+                prev_str = tok + prev_str
+                if curr_words >= context_config['size']:
+                    break
+
+            succeeding_text_words = self.trim_boundaries(re.split(r'(\s+)', succeeding_text))
+            next_str = ''
+            curr_words = 0
+            for tok_idx in range(len(succeeding_text_words)):
+                tok = succeeding_text_words[tok_idx]
+                curr_words += 1 if len(re.sub(r'\s+', '', tok)) > 0 else 0
+                next_str += tok
+                if curr_words >= context_config['size']:
+                    break
+
+            match_str_template = re.sub(r'\b.+\b', 'TARGETWORD', match_str)
+            full_str = prev_str + match_str_template + next_str
+            return match_str.strip(), full_str
         if context_config['type'] == ContextType.PARAGRAPH:
             preceding_text_lines = self.trim_boundaries(re.split(self.split_lines_regex, preceding_text))
             succeeding_text_lines = self.trim_boundaries(re.split(self.split_lines_regex, succeeding_text))

@@ -137,11 +137,13 @@ def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion
 
     suffixes = ['precision', 'recall', 'f1']
     types = ['weighted', 'macro']
+    agg_metrics = {}
     for t in types:
         for suffix in suffixes:
             key = '{}_{}'.format(t, suffix)
             avg_val = summary_df[key].mean()
             print('Global {} --> {}'.format(key, avg_val))
+            agg_metrics[key] = avg_val
 
     num_targets = summary_df['num_targets'].unique().tolist()
     print('Num Targets, Macro F1, Weighted F1')
@@ -149,6 +151,8 @@ def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion
         avg_macro_f1 = summary_df[summary_df['num_targets'] == t]['macro_f1'].mean()
         avg_weighted_f1 = summary_df[summary_df['num_targets'] == t]['weighted_f1'].mean()
         print('{},{},{}'.format(t, avg_macro_f1, avg_weighted_f1))
+
+    return agg_metrics
 
 
 def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window, full_context, row_idx, rel_weight):
@@ -203,7 +207,7 @@ def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metada
             rel_weights = tensor_to_np(rel_weights)
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, rel_weights)
 
-    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment=args.experiment)
+    return _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment=args.experiment)
 
 
 def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=None):
@@ -232,7 +236,7 @@ def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, ind
         pred_lf_idxs = tensor_to_np(torch.argmax(scores, 1))
         batch_data = test_batcher.get_prev_batch()
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, None)
-    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment='elmo')
+    return _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment='elmo')
 
 
 def render_test_statistics(df, sf_lf_map):

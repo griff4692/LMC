@@ -1,4 +1,5 @@
 from collections import defaultdict
+import itertools
 import json
 import os
 from shutil import rmtree
@@ -26,20 +27,16 @@ from lmc_utils import restore_model as lmc_restore
 from model_utils import get_git_revision_hash, render_args
 
 
-def extract_smoothed_metadata_probs(metadata='section'):
+def extract_smoothed_metadata_probs():
     """
-    :param metadata: What metadata variable to use (i.e. section or category)
     :return: Returns smoothed version of empirical probabilities as computed in preprocess/context_extraction/data/
     """
-    if metadata is None:
-        return None
-    metadata_file = os.path.join(
-        home_dir, 'preprocess/context_extraction/data/{}_marginals.json'.format(args.metadata))
+    metadata_file = os.path.join(home_dir, 'preprocess/context_extraction/data/metadata_marginals.json')
     with open(metadata_file, 'r') as fd:
         lf_metadata_counts = json.load(fd)
 
     for lf, counts in lf_metadata_counts.items():
-        names = counts[metadata]
+        names = counts['metadata']
         c_arr = counts['count']
         p_arr = counts['p']
         trunc_names = []
@@ -55,13 +52,13 @@ def extract_smoothed_metadata_probs(metadata='section'):
         lf_metadata_counts[lf] = {
             'count': trunc_c,
             'p': trunc_p,
-            metadata: trunc_names
+            'metadata': trunc_names
         }
 
         return lf_metadata_counts
 
 
-def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0):
+def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0, sf=None):
     """
     :param args: argparse instance specifying evaluation configuration (including pre-trained model path)
     :param acronym_model: PyTorch model to rank candidate acronym expansions (an instance of model from ./modules/)
@@ -77,14 +74,12 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
     if args.lm_type == 'bsg':
         prev_args, lm, token_vocab, _ = restore_func(args.lm_experiment)
         metadata_vocab = None
-        prev_args.metadata = None
     else:
         prev_args, lm, token_vocab, metadata_vocab, _, _, _ = restore_func(args.lm_experiment)
-    train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(prev_args, train_frac=train_frac)
-    args.metadata = prev_args.metadata
+    train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(train_frac=train_frac, sf=sf)
 
     # Construct smoothed empirical probabilities of metadata conditioned on LF ~ p(metadata|LF)
-    lf_metadata_counts = extract_smoothed_metadata_probs(metadata=args.metadata)
+    lf_metadata_counts = extract_smoothed_metadata_probs() if args.lm_type == 'lmc' else None
 
     casi_dir = os.path.join(home_dir, 'shared_data', 'casi')
     canonical_lfs = pd.read_csv(os.path.join(casi_dir, 'labeled_sf_lf_map.csv'))
@@ -128,8 +123,8 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
     best_epoch = 1
     lowest_test_loss = run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab,
                                       sf_tokenized_lf_map, sf_lf_map, lf_metadata_counts)
-    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
-            lf_metadata_counts, results_dir=results_dir)
+    _ = analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+                lf_metadata_counts, results_dir=results_dir)
 
     # Make sure it's calculating gradients
     for epoch in range(1, args.epochs + 1):
@@ -149,7 +144,7 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
             best_epoch = epoch
     print('Loading weights from {} epoch to perform error analysis'.format(best_epoch))
     model.load_state_dict(best_weights)
-    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+    return analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
             lf_metadata_counts, results_dir=results_dir)
 
 
@@ -167,6 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=10, type=int)
+    parser.add_argument('-individual', default=False, action='store_true')
 
     args = parser.parse_args()
     args.experiment += '_{}'.format(args.dataset)
@@ -174,4 +170,33 @@ if __name__ == '__main__':
     restore_func = restore_bsg if args.lm_type == 'bsg' else lmc_restore
     acronym_model = BSGAcronymExpander if args.lm_type == 'bsg' else LMCAcronymExpander
     args.device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
-    run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0)
+
+    if args.individual:
+        args.epochs = 2
+        if args.dataset == 'mimic':
+            mimic_fn = os.path.join(home_dir, 'preprocess/context_extraction/data/mimic_rs_preprocessed_sample.csv')
+            sfs = pd.read_csv(mimic_fn)['sf'].unique().tolist()
+        else:
+            casi_dir = os.path.join(home_dir, 'shared_data', 'casi')
+            with open(os.path.join(casi_dir, 'sf_lf_map.json'), 'r') as fd:
+                sfs = json.load(fd).keys()
+        sf_results = []
+        cols = None
+        for sf in sfs:
+            metrics = run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.75, sf=sf)
+            k = list(metrics.keys())
+            if cols is None:
+                cols = ['sf'] + k
+            result = [sf]
+            for c in cols[1:]:
+                result.append(metrics[c])
+            sf_results.append(result)
+
+        result = pd.DataFrame(sf_results, columns=cols)
+        print('\n\n')
+        for col in cols[1:]:
+            print(col, result[col].mean())
+        print('\n\n')
+        print('FINIT!')
+    else:
+        run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0)

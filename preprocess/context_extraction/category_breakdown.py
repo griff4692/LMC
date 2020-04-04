@@ -2,7 +2,7 @@ import pandas as pd
 
 
 if __name__ == '__main__':
-    df = pd.read_csv('data/mimic_rs_dataset_preprocessed_window_10.csv')
+    df = pd.read_csv('context_extraction/data/mimic_rs_preprocessed.csv')
 
     sfs = df['sf'].unique().tolist()
 
