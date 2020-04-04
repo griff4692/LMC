@@ -46,7 +46,7 @@ class BSG(nn.Module):
             if hasattr(args, 'multi_weights'):
                 weights = np.array(list(map(float, args.multi_weights.split(','))))
             else:
-                weights = np.array([0.7, 0.2, 0.1])
+                weights = np.array([0.9, 0.1])
             self.input_weights = torch.from_numpy(weights).to(self.device)
 
     def _max_margin(self, mu_q, sigma_q, pos_mu_p, pos_sigma_p, neg_mu_p, neg_sigma_p, mask):
@@ -81,9 +81,10 @@ class BSG(nn.Module):
     def _compute_priors(self, ids):
         return self.embeddings_mu(ids), self.embeddings_log_sigma(ids).exp()
 
-    def forward(self, token_ids, sec_ids, cat_ids, context_ids, neg_context_ids, num_contexts):
+    def forward(self, token_ids, sec_ids, context_ids, neg_context_ids, num_contexts):
         """
         :param center_ids: batch_size
+        :param sec_ids: batch_size
         :param context_ids: batch_size, 2 * context_window
         :param neg_context_ids: batch_size, 2 * context_window
         :param num_contexts: batch_size (how many context words for each center id - necessary for masking padding)
@@ -99,7 +100,6 @@ class BSG(nn.Module):
             center_id_candidates = torch.cat([
                 token_ids.unsqueeze(0),
                 sec_ids.unsqueeze(0),
-                cat_ids.unsqueeze(0)
             ])
             input_sample = torch.multinomial(self.input_weights, batch_size, replacement=True).to(self.device)
             center_ids = center_id_candidates.gather(0, input_sample.unsqueeze(0)).squeeze(0)

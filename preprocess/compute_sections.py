@@ -12,6 +12,24 @@ from tqdm import tqdm
 HEADER_SEARCH_REGEX = r'(?:^|\s{4,}|\n)[\d.#]{0,4}\s*([A-Z][A-z0-9/ ]+[A-z]:)'
 
 
+def enumerate_metadata_ids(ids, metadata_pos_idxs):
+    """
+    :param ids: List of token ids.
+    :param metadata_pos_idxs: Positional indices where ids are metadata
+    :return: metadata_ids of length(ids).  The ith item in sec_ids and cat_ids, respectively,
+    signals the section and note category ids from which the token at index i belongs.
+    """
+    N = len(ids)
+    meta_ids = []
+
+    num_metadata = len(metadata_pos_idxs)
+    for idx, meta_pos_idx in tqdm(enumerate(metadata_pos_idxs)):
+        meta_id = ids[meta_pos_idx]
+        end_idx = metadata_pos_idxs[idx + 1] if idx + 1 < num_metadata else N
+        meta_ids[meta_pos_idx:end_idx] = [meta_id] * (end_idx - meta_pos_idx)
+    return meta_ids
+
+
 def enumerate_metadata_ids_multi_bsg(ids, sec_pos_idxs, cat_pos_idxs):
     """
     :param ids: List of token ids.
