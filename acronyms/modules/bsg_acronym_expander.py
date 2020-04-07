@@ -59,14 +59,15 @@ class BSGAcronymExpander(nn.Module):
         sf_mu, sf_sigma = self.encoder(sf_ids, context_ids, mask, token_mask_p=None)
         return sf_mu, sf_sigma
 
-    def forward(self, sf_ids, section_ids, category_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct,
+    def forward(self, sf_ids, metadata_ids, context_ids, lf_ids, target_lf_ids, lf_token_ct,
                 lf_metadata_ids, num_outputs, num_contexts):
         """
         :param sf_ids: LongTensor of batch_size
+        :param metadata_ids: LongTensor of batch_size
         :param context_ids: LongTensor of batch_size x 2 * context_window
         :param lf_ids: LongTensor of batch_size x max_output_size x max_lf_len
-        :param lf_token_ct: batch_size, max_output_size - normalizer for lf_ids
         :param target_lf_ids: LongTensor of batch_size representing which index in lf_ids lies the target LF
+        :param lf_token_ct: batch_size, max_output_size - normalizer for lf_ids
         :param num_outputs: list representing the number of target LFs for each row in batch.
         :return:
         """
@@ -86,16 +87,11 @@ class BSGAcronymExpander(nn.Module):
         combined_mu.append(sf_mu_tokens)
         combined_sigma.append(sf_sigma_tokens)
 
-        # For MBSGE ensemble method, we leverage section ids and note category ids
-        if len(section_ids.nonzero()) > 0:
-            sf_mu_sec, sf_sigma_sec = self.encode_context(section_ids, context_ids, num_contexts)
+        # For MBSGE ensemble method, we leverage metadata ids
+        if len(metadata_ids.nonzero()) > 0:
+            sf_mu_sec, sf_sigma_sec = self.encode_context(metadata_ids, context_ids, num_contexts)
             combined_mu.append(sf_mu_sec)
             combined_sigma.append(sf_sigma_sec)
-
-        if len(category_ids.nonzero()) > 0:
-            sf_mu_cat, sf_sigma_cat = self.encode_context(category_ids, context_ids, num_contexts)
-            combined_mu.append(sf_mu_cat)
-            combined_sigma.append(sf_sigma_cat)
 
         combined_mu = torch.cat(list(map(lambda x: x.unsqueeze(1), combined_mu)), axis=1)
         combined_sigma = torch.cat(list(map(lambda x: x.unsqueeze(1), combined_sigma)), axis=1)

@@ -6,7 +6,7 @@ from collections import defaultdict
 
 def _compute_marginal_probs(df, metadata_col):
     """
-    :param df: reverse substition dataset
+    :param df: reverse substitution dataset
     :param metadata_col: column in df representing metadata we care about
     :return: dictionary. For each acronym expansion (LF), returns metadata it is found in along with conditional
     probabilities p(metadata|LF)
@@ -30,11 +30,5 @@ if __name__ == '__main__':
     These empirical counts are consumed by the LMC model when computing token marginals over metadata 
     """
     df = pd.read_csv('data/mimic_rs_dataset_preprocessed_window_10.csv')
-    lf_cat_marginals = _compute_marginal_probs(df, 'category')
-    lf_sec_marginals = _compute_marginal_probs(df, 'section')
-
-    with open('data/category_marginals.json', 'w') as fd:
-        json.dump(lf_cat_marginals, fd)
-
-    with open('data/section_marginals.json', 'w') as fd:
-        json.dump(lf_sec_marginals, fd)
+    with open('data/metadata_marginals.json', 'w') as fd:
+        json.dump(_compute_marginal_probs(df, 'metadata'), fd)

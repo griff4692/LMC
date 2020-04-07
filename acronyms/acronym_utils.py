@@ -137,7 +137,6 @@ def load_mimic(train_frac=1.0):
     used_sf_lf_map = {}
     df = pd.read_csv(os.path.join(
         home_dir, 'preprocess/context_extraction/data/mimic_rs_dataset_preprocessed_window_10.csv'))
-    df['metadata'] = df['section']
     df['metadata'].fillna('<pad>', inplace=True)
     sfs = df['sf'].unique().tolist()
     for sf in sfs:

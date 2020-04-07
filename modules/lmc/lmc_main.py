@@ -32,13 +32,11 @@ def _prepare_data(args, token_vocab, ids):
     :param ids: flattened list of token and metadata ids
     :return: kwargs which hold many useful data structures for efficient access of ids and metadata
     """
-    print('Collecting metadata information for {}...'.format(args.metadata))
-    assert token_vocab.section_start_vocab_id <= token_vocab.category_start_vocab_id
-    start_id = token_vocab.section_start_vocab_id if args.metadata == 'section' else token_vocab.category_start_vocab_id
-    end_id = token_vocab.category_start_vocab_id if args.metadata == 'section' else token_vocab.size()
+    print('Collecting metadata information...')
+    start_id, end_id = token_vocab.metadata_start_id, token_vocab.size()
     metadata_id_range = np.arange(start_id, end_id)
     is_metadata = np.isin(ids, metadata_id_range)
-    all_metadata_pos_idxs = np.where(ids >= token_vocab.section_start_vocab_id)[0]
+    metadata_pos_idxs = np.where(is_metadata)[0]
     metadata_vocab = Vocab()
     for id in metadata_id_range:
         name = token_vocab.get_token(id)
@@ -47,7 +45,9 @@ def _prepare_data(args, token_vocab, ids):
     metadata_pos_idxs = np.where(is_metadata)[0]
     full_metadata_ids, token_metadata_counts = enumerate_metadata_ids_lmc(
         ids, metadata_pos_idxs, token_vocab, metadata_vocab)
-    ids[all_metadata_pos_idxs] = -1  # Be very clear that these are special tokens
+    sep_pos_idxs = np.where(ids == token_vocab.sep_id())[0]
+    full_sep_pos_idxs = np.concatenate([sep_pos_idxs, metadata_pos_idxs])
+    ids[full_sep_pos_idxs] = -1  # Be very clear that these are special tokens
 
     print('Generating samples...')
     # It's very expensive to Monte Carlo sample for metadata samples online so we pre-compute a large batch of
@@ -56,11 +56,11 @@ def _prepare_data(args, token_vocab, ids):
         token_metadata_counts, metadata_vocab, sample=args.metadata_samples)
 
     # Once we create metadata_vocab, we remove metadata tokens from token_vocab
-    token_vocab.truncate(token_vocab.section_start_vocab_id)
+    token_vocab.truncate()
     token_vocab_size = token_vocab.size()
     wp_conversions = {}  # Only applicable with BERT
     # Bert Tokenizer if using BERT with flag -bert
-    bert_tokenizer_fn = os.path.join(home_dir, 'preprocess/data/bert_tokenizer_vocab.pth')
+    bert_tokenizer_fn = os.path.join(home_dir, 'preprocess/data/mimic/bert_tokenizer_vocab.pth')
     bert_tokenizer = BertTokenizer.from_pretrained(bert_tokenizer_fn) if args.bert else None
     if bert_tokenizer is not None:
         metadata_tokens = metadata_vocab.i2w[1:] + ['digitparsed']
@@ -75,7 +75,7 @@ def _prepare_data(args, token_vocab, ids):
         token_vocab_size = max(bert_tokenizer.vocab_size, max(bert_tokenizer.all_special_ids) + 1)
     num_ids = len(ids)
     print('Shuffling data...')
-    all_batch_idxs = np.array(list(set(np.arange(num_ids)) - set(all_metadata_pos_idxs)), dtype=int)
+    all_batch_idxs = np.array(list(set(np.arange(num_ids)) - set(full_sep_pos_idxs)), dtype=int)
     np.random.shuffle(all_batch_idxs)
     num_batches = len(all_batch_idxs) // args.batch_size
     truncated_N = args.batch_size * num_batches
@@ -119,16 +119,12 @@ if __name__ == '__main__':
 
     # Model Hyperparameters
     parser.add_argument('-bert', default=False, action='store_true')
-    parser.add_argument('--metadata', default='section',
-                        help='sections or category. What to define latent variable over.')
-    parser.add_argument('--metadata_samples', default=3, type=int)
+    parser.add_argument('--metadata_samples', default=10, type=int)
     parser.add_argument('--window', default=10, type=int)
     parser.add_argument('-pool_bert', default=False, action='store_true')
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()
-    if args.debug:  # Mini dataset may have fewer than 200 examples
-        args.batch_size = 200
     render_args(args)
 
     # Load Data
@@ -145,21 +141,21 @@ if __name__ == '__main__':
     if args.multi_gpu and torch.cuda.device_count() > 1:
         args.batch_size *= torch.cuda.device_count()
 
-    ids_infile = os.path.join(home_dir, 'preprocess', 'data', 'ids{}.npy'.format(debug_str))
+    ids_infile = os.path.join(home_dir, 'preprocess/data/mimic/ids{}.npy'.format(debug_str))
     print('Loading data from {}...'.format(ids_infile))
     with open(ids_infile, 'rb') as fd:
         ids = np.load(fd)
 
     # Load Vocabulary
-    vocab_infile = os.path.join(home_dir, 'preprocess', 'data', 'vocab{}.pk'.format(debug_str))
+    vocab_infile = os.path.join(home_dir, 'preprocess/data/mimic/vocab{}.pk'.format(debug_str))
     print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         token_vocab = pickle.load(fd)
-    print('Loaded vocabulary of size={}...'.format(token_vocab.section_start_vocab_id))
+    print('Loaded vocabulary of size={}...'.format(token_vocab.metadata_start_id))
 
     kwargs = _prepare_data(args, token_vocab, ids)
     dataset = DistributedDataset(**kwargs)
-    data_loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
+    data_loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=max(1, os.cpu_count() // 2))
     model = model_prototype(  # Either LMC or LMCBERT
         args, kwargs['token_vocab_size'], metadata_vocab_size=kwargs['metadata_vocab'].size()).to(args.device)
 

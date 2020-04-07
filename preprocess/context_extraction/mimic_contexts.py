@@ -1,3 +1,4 @@
+import itertools
 from multiprocessing import Pool
 import os
 import sys
@@ -30,7 +31,7 @@ def add_counts():
     contexts = pd.read_csv(context_fn)
     lf_counts = dict(contexts['lf'].value_counts())
 
-    lfs = pd.read_csv(os.path.join(shared_data, '/casi/labeled_sf_lf_map.csv'))
+    lfs = pd.read_csv(os.path.join(shared_data, 'casi', 'labeled_sf_lf_map.csv'))
     counts = []
     for lf in lfs['target_label'].tolist():
         count = 0 if not lf in lf_counts else lf_counts[lf]
@@ -48,7 +49,7 @@ def render_stats():
     print('N={}'.format(N))
     print('0 count={}'.format(count_freqs[0]))
     less_five = 0
-    for i in range(0, 5):
+    for i in range(5):
         less_five += count_freqs[i]
     print('LFs with less than 5 contexts={}'.format(less_five))
 
@@ -62,7 +63,7 @@ def render_stats():
     print('SFs with at least 2 contexts for every LF={}'.format(viable_sfs))
 
 
-def get_lf_contexts(row, window=20):
+def get_lf_contexts(row, window=15):
     doc_id, doc_category, doc_string = row['ROW_ID'], row['CATEGORY'], row['TEXT']
     contexts, doc_ids, forms, actual_lfs = [], [], [], []
     config = {'type': ContextType.WORD, 'size': window}
@@ -78,36 +79,37 @@ def get_lf_contexts(row, window=20):
     return list(zip(forms, actual_lfs, doc_ids, doc_categories, contexts))
 
 
-def extract_mimic_contexts(chunk, chunksize, debug):
+def extract_mimic_chunk_contexts(input):
+    chunk_idx, mimic_df = input
+    mimic_data = mimic_df.to_dict('records')
+    contexts = map(get_lf_contexts, mimic_data)
+    contexts_flat = list(itertools.chain(*contexts))
+    df = pd.DataFrame(contexts_flat, columns=['lf', 'lf_match', 'doc_id', 'category', 'context'])
+    df.to_csv('data/mimic_context_batches/{}.csv'.format(chunk_idx), index=False)
+    return True
+
+
+def extract_mimic_contexts(chunksize):
     tmp_batch_dir = 'data/mimic_context_batches/'
     if not os.path.exists(tmp_batch_dir):
         print('Creating dir={}'.format(tmp_batch_dir))
         os.mkdir(tmp_batch_dir)
 
-    debug_str = '_mini' if debug else ''
-    in_fp = os.path.join(home_dir, 'preprocess/data/mimic/NOTEEVENTS{}.csv'.format(debug_str))
+    in_fp = '/nlp/corpora/mimic/mimic_iii/NOTEEVENTS.csv'
     print('Loading MIMIC from {}'.format(in_fp))
     mimic_df = pd.read_csv(in_fp)
 
-    target_size = int(mimic_df.shape[0] / float(chunksize))
-    mimic_df = split(mimic_df, target_size)[chunk]
-    mimic_data = mimic_df.to_dict('records')
+    target_size = int(mimic_df.shape[0] / float(chunksize - 1))
+    mimic_chunk_dfs = split(mimic_df, target_size)
+    print('Split into {} chunks'.format(len(mimic_chunk_dfs)))
 
-    print('Loaded {} documents at chunk {}'.format(len(mimic_data), chunk))
     start_time = time()
     p = Pool()
-    contexts = p.map(get_lf_contexts, mimic_data)
+    statuses = p.map(extract_mimic_chunk_contexts, enumerate(mimic_chunk_dfs))
     p.close()
     end_time = time()
     print('Took {} seconds'.format(end_time - start_time))
-
-    contexts_flat = []
-    for x in contexts:
-        for y in x:
-            contexts_flat.append(y)
-
-    df = pd.DataFrame(contexts_flat, columns=['lf', 'lf_match', 'doc_id', 'category', 'context'])
-    df.to_csv('data/mimic_context_batches/{}{}.csv'.format(chunk, debug_str), index=False)
+    print(statuses)
 
 
 def collect_contexts():
@@ -128,10 +130,8 @@ def collect_contexts():
 if __name__ == '__main__':
     arguments = argparse.ArgumentParser('MIMIC-III Note Acronym Expansion Context Extraction.')
     arguments.add_argument('-add_counts', default=False, action='store_true')
-    arguments.add_argument('--chunk', default=0, type=int)
-    arguments.add_argument('--chunksize', default=10, type=int)
+    arguments.add_argument('--chunksize', default=16, type=int)
     arguments.add_argument('-collect', default=False, action='store_true')
-    arguments.add_argument('-debug', default=False, action='store_true')
     arguments.add_argument('-render_stats', default=False, action='store_true')
 
     args = arguments.parse_args()
@@ -143,4 +143,4 @@ if __name__ == '__main__':
     elif args.render_stats:
         render_stats()
     else:
-        extract_mimic_contexts(args.chunk, args.chunksize, args.debug)
+        extract_mimic_contexts(args.chunksize)

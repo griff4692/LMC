@@ -83,13 +83,8 @@ if __name__ == '__main__':
             break
 
     # Demarcates boundary tokens to safeguard against ever training on metadata tokens as center words
-    # This will trigger PyTorch embedding error if it happens
-    # TODO Backward compatibility
-    if hasattr(vocab, 'sep_id'):
-        sep_pos_idxs = np.where(ids == vocab.sep_id())[0]
-        full_pos_idxs = np.concatenate([sep_pos_idxs, sec_pos_idxs])
-    else:
-        full_pos_idxs = sec_pos_idxs
+    sep_pos_idxs = np.where(ids == vocab.sep_id())[0]
+    full_pos_idxs = np.concatenate([sep_pos_idxs, sec_pos_idxs])
     ids[full_pos_idxs] = -1
 
     device_str = 'cuda' if torch.cuda.is_available() else 'cpu'

@@ -26,20 +26,16 @@ from lmc_utils import restore_model as lmc_restore
 from model_utils import get_git_revision_hash, render_args
 
 
-def extract_smoothed_metadata_probs(metadata='section'):
+def extract_smoothed_metadata_probs():
     """
-    :param metadata: What metadata variable to use (i.e. section or category)
     :return: Returns smoothed version of empirical probabilities as computed in preprocess/context_extraction/data/
     """
-    if metadata is None:
-        return None
-    metadata_file = os.path.join(
-        home_dir, 'preprocess/context_extraction/data/{}_marginals.json'.format(args.metadata))
+    metadata_file = os.path.join(home_dir, 'preprocess/context_extraction/data/metadata_marginals.json')
     with open(metadata_file, 'r') as fd:
         lf_metadata_counts = json.load(fd)
 
     for lf, counts in lf_metadata_counts.items():
-        names = counts[metadata]
+        names = counts['metadata']
         c_arr = counts['count']
         p_arr = counts['p']
         trunc_names = []
@@ -55,7 +51,7 @@ def extract_smoothed_metadata_probs(metadata='section'):
         lf_metadata_counts[lf] = {
             'count': trunc_c,
             'p': trunc_p,
-            metadata: trunc_names
+            'metadata': trunc_names
         }
 
         return lf_metadata_counts
@@ -84,7 +80,7 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
     args.metadata = prev_args.metadata
 
     # Construct smoothed empirical probabilities of metadata conditioned on LF ~ p(metadata|LF)
-    lf_metadata_counts = extract_smoothed_metadata_probs(metadata=args.metadata)
+    lf_metadata_counts = extract_smoothed_metadata_probs() if args.lm_type == 'lmc' else None
 
     casi_dir = os.path.join(home_dir, 'shared_data', 'casi')
     canonical_lfs = pd.read_csv(os.path.join(casi_dir, 'labeled_sf_lf_map.csv'))
