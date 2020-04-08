@@ -96,6 +96,8 @@ def extract_mimic_contexts(chunksize):
         os.mkdir(tmp_batch_dir)
 
     in_fp = '/nlp/corpora/mimic/mimic_iii/NOTEEVENTS.csv'
+    if not os.path.exists(in_fp):
+        in_fp = '../data/mimic/NOTEEVENTS_mini.csv'
     print('Loading MIMIC from {}'.format(in_fp))
     mimic_df = pd.read_csv(in_fp)
 

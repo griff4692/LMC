@@ -14,6 +14,9 @@ from compute_sections import HEADER_SEARCH_REGEX
 from canonical_sections import get_canonical_section
 
 
+WINDOW = 10  # Context token window (10 tokens on either side of acronym / SF)
+
+
 def get_header_from_full_context(mimic_df, context, lf_match, doc_id, category, sub_header=False):
     """
     :param mimic_df: NOTEEVENTS.csv dataframe
@@ -66,9 +69,8 @@ def get_header_from_full_context(mimic_df, context, lf_match, doc_id, category, 
         return headers[-1]
 
 
-def preprocess_mimic_rs(window=10):
+def preprocess_mimic_rs():
     """
-    :param window: target context window surrounding LF
     :return: None
 
     Filters out invalid examples, tokenizes, and returns preprocessed dataset ready for evaluation.
@@ -175,9 +177,9 @@ def preprocess_mimic_rs(window=10):
             right_header_boundary = len(tokens) if right_header_window is None else right_header_window
             right_sep_boundary = len(tokens) if right_sep_window is None else right_sep_window
 
-            left_window = max(sf_idx - window, 0, left_header_boundary)
+            left_window = max(sf_idx - WINDOW, 0, left_header_boundary)
             left_window_sentence = max(left_window, left_sep_boundary)
-            right_window = min(sf_idx + window + 1, len(tokens), right_header_boundary)
+            right_window = min(sf_idx + WINDOW + 1, len(tokens), right_header_boundary)
             right_window_sentence = min(right_window, right_sep_boundary)
             window_tokens = tokens[left_window:sf_idx] + [row['sf']] + tokens[sf_idx + 1:right_window]
             window_tokens_sentence = tokens[left_window_sentence:sf_idx] + [row['sf']] + tokens[sf_idx + 1:right_window_sentence]
@@ -208,6 +210,7 @@ def preprocess_mimic_rs(window=10):
     df['tokenized_context'] = tokenized_contexts
     df['tokenized_context_sentence'] = trimmed_sentences
     df['metadata'] = metadata
+    df['sub_metadata'] = sub_sections
     df['is_valid'] = is_valid
 
     df = df[df['is_valid']]
@@ -218,7 +221,7 @@ def preprocess_mimic_rs(window=10):
     df.drop_duplicates(subset=['target_lf', 'tokenized_context'], inplace=True)
     N = df.shape[0]
     print('Removing {} duplicate rows. Saving {}'.format(prev_N - N, N))
-    df.to_csv('data/mimic_rs_dataset_preprocessed_window_{}.csv'.format(window), index=False)
+    df.to_csv('data/mimic_rs_preprocessed.csv', index=False)
 
 
 if __name__ == '__main__':
