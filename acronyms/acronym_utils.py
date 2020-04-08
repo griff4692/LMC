@@ -104,7 +104,7 @@ def load_casi(train_frac=1.0):
     with open(os.path.join(casi_dir, 'sf_lf_map.json'), 'r') as fd:
         sf_lf_map = json.load(fd)
 
-    mimic_fn = os.path.join(home_dir, 'preprocess/context_extraction/data/mimic_rs_dataset_preprocessed_window_10.csv')
+    mimic_fn = os.path.join(home_dir, 'preprocess/context_extraction/data/mimic_rs_preprocessed.csv')
     mimic_df = pd.read_csv(mimic_fn)
     mimics_sfs = mimic_df['sf'].unique().tolist()
     used_sf_lf_map = {}

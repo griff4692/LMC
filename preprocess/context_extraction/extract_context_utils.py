@@ -85,7 +85,7 @@ class ContextExtractor:
                     break
 
             match_str_template = re.sub(r'\b.+\b', 'TARGETWORD', match_str)
-            full_str = prev_str + match_str_template + succeeding_text
+            full_str = prev_str + match_str_template + next_str
             return match_str.strip(), full_str
         if context_config['type'] == ContextType.PARAGRAPH:
             preceding_text_lines = self.trim_boundaries(re.split(self.split_lines_regex, preceding_text))
