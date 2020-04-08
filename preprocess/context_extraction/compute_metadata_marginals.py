@@ -29,6 +29,6 @@ if __name__ == '__main__':
     Computes empirical probabilities of p(LF|metadata) based on LF contexts extracted from MIMIC.
     These empirical counts are consumed by the LMC model when computing token marginals over metadata 
     """
-    df = pd.read_csv('context_extraction/data/mimic_rs_preprocessed.csv')
+    df = pd.read_csv('data/mimic_rs_preprocessed.csv')
     with open('data/metadata_marginals.json', 'w') as fd:
         json.dump(_compute_marginal_probs(df, 'metadata'), fd)
