@@ -83,7 +83,7 @@ class LMCAcronymExpander(nn.Module):
         Used for masking to avoid returning invalid predictions.
         :param num_contexts: LongTensor of batch_size.  The actual window size of the SF context.
         Many are shorter than target of 2 * context_window.
-        :return: scores for each candidate LF, target_lf_ids, rel_weights (output of encoder gating function)
+        :return: scores for each candidate LF, target_lf_ids (output of encoder gating function)
         """
         batch_size, max_output_size, max_lf_ngram = lf_ids.size()
         _, num_context_ids = context_ids.size()
@@ -92,8 +92,7 @@ class LMCAcronymExpander(nn.Module):
         # Mask padded context ids
         mask_size = torch.Size([batch_size, num_context_ids])
         mask = mask_2D(mask_size, num_contexts).to(self.device)
-        sf_mu, sf_sigma, rel_weights = self.encoder(
-            sf_ids, metadata_ids, context_ids, mask, center_mask_p=None, context_mask_p=None)
+        sf_mu, sf_sigma = self.encoder(sf_ids, metadata_ids, context_ids, mask, context_mask_p=None)
 
         num_metadata = lf_metadata_ids.size()[-1]
 
@@ -117,4 +116,4 @@ class LMCAcronymExpander(nn.Module):
         score = -kl
 
         score.masked_fill_(output_mask, float('-inf'))
-        return score, target_lf_ids, rel_weights
+        return score, target_lf_ids, None
