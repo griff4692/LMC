@@ -47,6 +47,7 @@ if __name__ == '__main__':
     vocab = Vocab()
     num_docs = len(tokenized_data)
     sections = set()
+    sub_sections = set()
     for doc_idx in tqdm(range(num_docs)):
         tokenized_doc_str = tokenized_data[doc_idx]
         subsampled_doc = []
@@ -58,6 +59,7 @@ if __name__ == '__main__':
             wc = token_counts[token]
             is_section_header = 'header=' in token
             is_sep_token = token == '<sep>'
+            is_sub_token = 'sub=' in token
             if is_section_header:
                 token = token.strip('"')
                 # Don't keep section if it is empty (has no tokens in it)
@@ -66,6 +68,11 @@ if __name__ == '__main__':
                     sections.add(token)
             elif is_sep_token:
                 subsampled_doc.append(token)
+            elif is_sub_token:
+                if wc >= 100:
+                    sub_sections.add(token)
+                    assert subsampled_doc[-1] == '<sep>'
+                    subsampled_doc[-1] = token
             else:
                 if wc < args.min_token_count:
                     continue
@@ -90,6 +97,7 @@ if __name__ == '__main__':
     print('Adding {} section headers'.format(len(sections)))
     # Add sections later and maintain demarcators that let you know when section ids begin
     # Note: this comes in handy later when separating token_vocab into metadata_vocab
+    vocab.add_tokens(sub_sections, token_support=0)
     vocab.add_tokens(sections, token_support=0)
 
     subsampled_out_fn = '{}_subsampled{}.json'.format(args.tokenized_fp, debug_str)
