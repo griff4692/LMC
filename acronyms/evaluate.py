@@ -1,4 +1,5 @@
 from collections import defaultdict
+import itertools
 import json
 import os
 from shutil import rmtree
@@ -122,8 +123,8 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
     best_epoch = 1
     lowest_test_loss = run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab,
                                       sf_tokenized_lf_map, sf_lf_map, lf_metadata_counts)
-    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
-            lf_metadata_counts, results_dir=results_dir)
+    _ = analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+                lf_metadata_counts, results_dir=results_dir)
 
     # Make sure it's calculating gradients
     for epoch in range(1, args.epochs + 1):
@@ -143,7 +144,7 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
             best_epoch = epoch
     print('Loading weights from {} epoch to perform error analysis'.format(best_epoch))
     model.load_state_dict(best_weights)
-    analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
+    return analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
             lf_metadata_counts, results_dir=results_dir)
 
 
@@ -161,6 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--window', default=10, type=int)
+    parser.add_argument('-individual', default=False, action='store_true')
 
     args = parser.parse_args()
     args.experiment += '_{}'.format(args.dataset)
@@ -168,4 +170,28 @@ if __name__ == '__main__':
     restore_func = restore_bsg if args.lm_type == 'bsg' else lmc_restore
     acronym_model = BSGAcronymExpander if args.lm_type == 'bsg' else LMCAcronymExpander
     args.device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
-    run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0)
+
+    if args.individual:
+        if args.dataset == 'mimic':
+            mimic_fn = os.path.join(home_dir, 'preprocess/context_extraction/data/mimic_rs_preprocessed_sample.csv')
+            sfs = pd.read_csv(mimic_fn)['sf'].unique().tolist()
+        else:
+            casi_dir = os.path.join(home_dir, 'shared_data', 'casi')
+            with open(os.path.join(casi_dir, 'sf_lf_map.json'), 'r') as fd:
+                sfs = json.load(fd).keys()
+        sf_results = []
+        cols = None
+        for sf in sfs:
+            metrics = run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.75, lf=lf)
+            k = metrics.keys()
+            if cols is None:
+                cols = ['sf'] + k
+            result = [sf]
+            for c in cols[1:]:
+                result.append(metrics[c])
+
+        result = pd.DataFrame(result, columns=cols)
+        for col in cols[1:]:
+            print(col, result[col].mean())
+    else:
+        run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0)

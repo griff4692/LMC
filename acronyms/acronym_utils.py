@@ -92,7 +92,7 @@ def load_casi(train_frac=1.0):
     The sf_lf_map is a dictionary used to get list of candidate LFs (value) for given SF (key)
     """
     casi_dir = os.path.join(home_dir, 'shared_data', 'casi')
-    data_fp = os.path.join(casi_dir, 'preprocessed_dataset_window_{}.csv'.format(10))
+    data_fp = os.path.join(casi_dir, 'preprocessed_dataset_sample.csv')
     if not os.path.exists(data_fp):
         print('Need to preprocess dataset first...')
         preprocess_casi_dataset(window=10)
@@ -136,7 +136,7 @@ def load_mimic(train_frac=1.0):
         sf_lf_map = json.load(fd)
     used_sf_lf_map = {}
     df = pd.read_csv(os.path.join(
-        home_dir, 'preprocess/context_extraction/data/mimic_rs_preprocessed.csv'))
+        home_dir, 'preprocess/context_extraction/data/mimic_rs_preprocessed_sample.csv'))
     df['metadata'].fillna('<pad>', inplace=True)
     sfs = df['sf'].unique().tolist()
     for sf in sfs:
