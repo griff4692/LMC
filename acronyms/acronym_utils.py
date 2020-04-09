@@ -84,7 +84,7 @@ def eval_tokenize(str, unique_only=False):
     return tokens
 
 
-def load_casi(train_frac=1.0):
+def load_casi(train_frac=1.0, sf=None):
     """
     :param train_frac: If you want to fine tune the model, this should be about 0.8.
     :return: train_batcher, test_batcher, train_df, test_df, sf_lf_map
@@ -98,6 +98,8 @@ def load_casi(train_frac=1.0):
         preprocess_casi_dataset(window=10)
         print('Saving dataset to {}'.format(data_fp))
     df = pd.read_csv(data_fp)
+    if sf is not None:
+        df = df[df['sf'] == sf]
     df['section'] = df['section_mapped']
     df['row_idx'] = list(range(df.shape[0]))
 
@@ -112,19 +114,16 @@ def load_casi(train_frac=1.0):
         used_sf_lf_map[sf] = sf_lf_map[sf]
     df = df[df['sf'].isin(mimics_sfs)]
 
-    if train_frac == 1.0 or train_frac == 0.0:
-        train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(df, batch_size=512)
-        train_df = df
-        test_df = df
+    if train_frac == 0.0 or train_frac == 1.0:
+        train_df, test_df = df, df
     else:
         train_df, test_df = train_test_split(df, random_state=1992, test_size=1.0 - train_frac)
-        train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=512)
+    train_batcher = AcronymBatcherLoader(train_df, batch_size=min(32, train_df.shape[0]))
+    test_batcher = AcronymBatcherLoader(test_df, batch_size=min(512, test_df.shape[0]))
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
-def load_mimic(train_frac=1.0):
+def load_mimic(train_frac=1.0, sf=None):
     """
     :param train_frac: If you want to fine tune the model, this should be about 0.8.
     :return: train_batcher, test_batcher, train_df, test_df, sf_lf_map
@@ -138,18 +137,19 @@ def load_mimic(train_frac=1.0):
     df = pd.read_csv(os.path.join(
         home_dir, 'preprocess/context_extraction/data/mimic_rs_preprocessed_sample.csv'))
     df['metadata'].fillna('<pad>', inplace=True)
+    df['sub_metadata'].fillna('<pad>', inplace=True)
+    df['tokenized_context_sentence'].fillna('<pad>', inplace=True)
+    if sf is not None:
+        df = df[df['sf'] == sf]
     sfs = df['sf'].unique().tolist()
     for sf in sfs:
         used_sf_lf_map[sf] = sf_lf_map[sf]
-    train_df = df[df['is_train']]
-    test_df = df[~df['is_train']]
-
-    if train_frac == 1.0 or train_frac == 0.0:
-        train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(df, batch_size=512)
+    if train_frac == 0.0 or train_frac == 1.0:
+        train_df, test_df = df, df
     else:
-        train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=512)
+        train_df, test_df = train_test_split(df, random_state=1992, test_size=1.0 - train_frac)
+    train_batcher = AcronymBatcherLoader(train_df, batch_size=min(32, train_df.shape[0]))
+    test_batcher = AcronymBatcherLoader(test_df, batch_size=min(512, test_df.shape[0]))
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 

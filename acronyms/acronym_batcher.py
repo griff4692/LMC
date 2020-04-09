@@ -48,6 +48,7 @@ class AcronymBatcherLoader:
         return (context_ids, lf_ids, target_lf_ids), num_outputs
 
     def next(self, token_vocab, sf_lf_map, sf_tokenized_lf_map, lf_metadata_counts, metadata_vocab=None):
+        context_col = 'trimmed_tokens'
         batch = self.batches[self.batch_ct]
         self.batch_ct += 1
         batch_size = batch.shape[0]
@@ -55,7 +56,7 @@ class AcronymBatcherLoader:
         metadata_ids = np.zeros([batch_size, ], dtype=int)
         num_contexts = np.zeros([batch_size, ], dtype=int)
         target_lf_ids = np.zeros([batch_size, ], dtype=int)
-        max_context_len = max([len(tt.split()) for tt in batch['trimmed_tokens'].tolist()])
+        max_context_len = max([len(tt.split()) for tt in batch[context_col].tolist()])
         num_outputs = [len(sf_tokenized_lf_map[sf]) for sf in batch['sf'].tolist()]
         context_ids = np.zeros([batch_size, max_context_len])
         max_output_length = max(num_outputs)
@@ -72,7 +73,7 @@ class AcronymBatcherLoader:
             sf_ids[batch_idx] = token_vocab.get_id(row['sf'].lower())
             # Find target_sf index in sf_lf_map
             target_lf_ids[batch_idx] = row['target_lf_idx']
-            context_id_seq = token_vocab.get_ids(row['trimmed_tokens'].split())
+            context_id_seq = token_vocab.get_ids(row[context_col].split())
             num_context = len(context_id_seq)
             context_ids[batch_idx, :num_context] = context_id_seq
             num_contexts[batch_idx] = num_context

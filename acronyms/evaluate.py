@@ -58,7 +58,7 @@ def extract_smoothed_metadata_probs():
         return lf_metadata_counts
 
 
-def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0):
+def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0, sf=None):
     """
     :param args: argparse instance specifying evaluation configuration (including pre-trained model path)
     :param acronym_model: PyTorch model to rank candidate acronym expansions (an instance of model from ./modules/)
@@ -76,7 +76,7 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
         metadata_vocab = None
     else:
         prev_args, lm, token_vocab, metadata_vocab, _, _, _ = restore_func(args.lm_experiment)
-    train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(train_frac=train_frac)
+    train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(train_frac=train_frac, sf=sf)
 
     # Construct smoothed empirical probabilities of metadata conditioned on LF ~ p(metadata|LF)
     lf_metadata_counts = extract_smoothed_metadata_probs() if args.lm_type == 'lmc' else None
@@ -172,6 +172,7 @@ if __name__ == '__main__':
     args.device = 'cuda' if torch.cuda.is_available() and not args.cpu else 'cpu'
 
     if args.individual:
+        args.epochs = 2
         if args.dataset == 'mimic':
             mimic_fn = os.path.join(home_dir, 'preprocess/context_extraction/data/mimic_rs_preprocessed_sample.csv')
             sfs = pd.read_csv(mimic_fn)['sf'].unique().tolist()
@@ -182,16 +183,20 @@ if __name__ == '__main__':
         sf_results = []
         cols = None
         for sf in sfs:
-            metrics = run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.75, lf=lf)
-            k = metrics.keys()
+            metrics = run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.75, sf=sf)
+            k = list(metrics.keys())
             if cols is None:
                 cols = ['sf'] + k
             result = [sf]
             for c in cols[1:]:
                 result.append(metrics[c])
+            sf_results.append(result)
 
-        result = pd.DataFrame(result, columns=cols)
+        result = pd.DataFrame(sf_results, columns=cols)
+        print('\n\n')
         for col in cols[1:]:
             print(col, result[col].mean())
+        print('\n\n')
+        print('FINIT!')
     else:
         run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac=0.0)
