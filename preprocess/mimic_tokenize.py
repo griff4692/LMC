@@ -135,6 +135,7 @@ if __name__ == '__main__':
     arguments.add_argument('--mimic_fp', default=os.path.join(home_dir, 'preprocess/data/mimic/NOTEEVENTS'))
     arguments.add_argument('-debug', default=False, action='store_true')
     arguments.add_argument('-split_sentences', default=False, action='store_true')
+    arguments.add_argument('-filter_rs', default=False, action='store_true')
 
     args = arguments.parse_args()
     render_args(args)
@@ -145,6 +146,17 @@ if __name__ == '__main__':
     debug_str = '_mini' if args.debug else ''
     sentence_str = '_sentence' if args.split_sentences else ''
     df = pd.read_csv('{}{}.csv'.format(args.mimic_fp, debug_str))
+    N = df.shape[0]
+
+    if args.filter_rs:
+        rs_fn = 'context_extraction/data/mimic_rs_dataset.csv'
+        doc_ids = []
+        if os.path.exists(rs_fn):
+            doc_ids = [int(x) for x in pd.read_csv(rs_fn)['doc_id'].unique().tolist()]
+        prev_n = N
+        df = df[~df['ROW_ID'].isin(doc_ids)]
+        N = df.shape[0]
+        print('Removed {} documents used in reverse substitution dataset.'.format(prev_n - N))
 
     processor = preprocess_mimic
     if args.split_sentences:
