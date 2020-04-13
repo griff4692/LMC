@@ -10,20 +10,24 @@ sys.path.insert(0, os.path.join(home_dir, 'modules', 'lmc'))
 from lmc_model import LMC
 
 
-def restore_model(restore_name):
+def restore_model(restore_name, ckpt=None):
     """
     :param restore_name: Directory name within ~/LMC/weights/lmc where model weights are serialized
+    :param ckpt: Optional pre-specified epoch from which to restore checkpoint
     :return: state of the previously trained model, including model weights, training arguments, and vocabularies used
     """
     checkpoint_dir = os.path.join(home_dir, 'weights', 'lmc', restore_name)
     checkpoint_fns = os.listdir(checkpoint_dir)
-    checkpoint_fns = list(filter(lambda x: 'results' not in x, checkpoint_fns))
+    checkpoint_fns = list(filter(lambda x: 'results' not in x and 'metrics' not in x, checkpoint_fns))
     max_checkpoint_epoch, latest_checkpoint_idx = -1, -1
     for cidx, checkpoint_fn in enumerate(checkpoint_fns):
-        if 'best' in checkpoint_fn:  # Always select 'best' if it exists in weights directory
+        checkpoint_epoch = int(checkpoint_fn.split('_')[-1].split('.')[0])
+        if ckpt is not None and checkpoint_epoch == int(ckpt):
             latest_checkpoint_idx = cidx
             break
-        checkpoint_epoch = int(checkpoint_fn.split('_')[-1].split('.')[0])
+        if 'best' in checkpoint_fn and ckpt is None:  # Always select 'best' if it exists in weights directory
+            latest_checkpoint_idx = cidx
+            break
         max_checkpoint_epoch = max(max_checkpoint_epoch, checkpoint_epoch)
         if checkpoint_epoch == max_checkpoint_epoch:
             latest_checkpoint_idx = cidx

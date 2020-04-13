@@ -1,4 +1,4 @@
-# from allennlp.data.tokenizers.token import Token
+from allennlp.data.tokenizers.token import Token
 import numpy as np
 
 
@@ -18,9 +18,44 @@ class AcronymBatcherLoader:
     def get_prev_batch(self):
         return self.batches[self.batch_ct - 1]
 
-    # def elmo_tokenize(self, tokens, vocab, indexer):
-    #     tokens = list(map(lambda t: Token(t), tokens))
-    #     return indexer.tokens_to_indices(tokens, vocab, 'elmo')['elmo']
+    def elmo_tokenize(self, tokens, vocab, indexer):
+        tokens = list(map(lambda t: Token(t), tokens))
+        return indexer.tokens_to_indices(tokens, vocab, 'elmo')['elmo']
+
+    def bert_tokenize(self, str, tokenizer):
+        return tokenizer.encode(str)
+
+    def bert_next(self, tokenizer, sf_tokenized_lf_map):
+        max_lf_len = 10
+        max_context_len = 50
+        batch = self.batches[self.batch_ct]
+        self.batch_ct += 1
+        batch_size = batch.shape[0]
+        target_lf_ids = np.zeros([batch_size, ], dtype=int)
+        context_token_ct = np.zeros([batch_size])
+        num_outputs = [len(sf_tokenized_lf_map[sf]) for sf in batch['sf'].tolist()]
+        context_ids = np.zeros([batch_size, max_context_len])
+        max_output_length = max(num_outputs)
+        lf_token_ct = np.zeros([batch_size, max_output_length])
+        lf_ids = np.zeros([batch_size, max_output_length, max_lf_len], dtype=int)
+        for batch_idx, (_, row) in enumerate(batch.iterrows()):
+            row = row.to_dict()
+            sf = row['sf'].lower()
+            # Find target_sf index in sf_lf_map
+            target_lf_ids[batch_idx] = row['target_lf_idx']
+            context_tokens = sf + ' ' + row['trimmed_tokens']
+            context_id_seq = self.bert_tokenize(context_tokens, tokenizer)
+            trunc_context_len = min(len(context_id_seq), max_context_len)
+            context_ids[batch_idx, :trunc_context_len] = context_id_seq[:trunc_context_len]
+            context_token_ct[batch_idx] = trunc_context_len
+            candidate_lfs = sf_tokenized_lf_map[row['sf']]
+            for lf_idx, lf_toks in enumerate(candidate_lfs):
+                lf_id_seq = self.bert_tokenize(' '.join(lf_toks), tokenizer)
+                trunc_lf_len = min(len(lf_id_seq), max_lf_len)
+                lf_token_ct[batch_idx, lf_idx] = trunc_lf_len
+                lf_ids[batch_idx, lf_idx, :trunc_lf_len] = lf_id_seq[:trunc_lf_len]
+
+        return (context_ids, context_token_ct, lf_ids, lf_token_ct, target_lf_ids), num_outputs
 
     def elmo_next(self, vocab, indexer, sf_tokenized_lf_map):
         batch = self.batches[self.batch_ct]
@@ -28,10 +63,12 @@ class AcronymBatcherLoader:
         batch_size = batch.shape[0]
         target_lf_ids = np.zeros([batch_size, ], dtype=int)
         max_context_len = max([len(tt.split()) for tt in batch['trimmed_tokens'].tolist()])
+        context_token_ct = np.zeros([batch_size])
         num_outputs = [len(sf_tokenized_lf_map[sf]) for sf in batch['sf'].tolist()]
         context_ids = np.zeros([batch_size, max_context_len, 50])
         max_output_length = max(num_outputs)
-        max_lf_len = 5
+        max_lf_len = 7
+        lf_token_ct = np.zeros([batch_size, max_output_length])
         lf_ids = np.zeros([batch_size, max_output_length, max_lf_len, 50], dtype=int)
         for batch_idx, (_, row) in enumerate(batch.iterrows()):
             row = row.to_dict()
@@ -40,13 +77,17 @@ class AcronymBatcherLoader:
             target_lf_ids[batch_idx] = row['target_lf_idx']
             context_tokens = row['trimmed_tokens'].split()
             context_id_seq = self.elmo_tokenize(context_tokens, vocab, indexer)
-            context_ids[batch_idx, :len(context_id_seq), :] = context_id_seq
+            context_len = len(context_id_seq)
+            context_token_ct[batch_idx] = context_len
+            context_ids[batch_idx, :context_len, :] = context_id_seq
             candidate_lfs = sf_tokenized_lf_map[row['sf']]
             for lf_idx, lf_toks in enumerate(candidate_lfs):
                 lf_id_seq = self.elmo_tokenize(lf_toks, vocab, indexer)
-                lf_ids[batch_idx, lf_idx, :len(lf_id_seq), :] = lf_id_seq
+                lf_len = len(lf_id_seq)
+                lf_token_ct[batch_idx, lf_idx] = lf_len
+                lf_ids[batch_idx, lf_idx, :lf_len, :] = lf_id_seq
 
-        return (context_ids, lf_ids, target_lf_ids), num_outputs
+        return (context_ids, context_token_ct, lf_ids, lf_token_ct, target_lf_ids), num_outputs
 
     def next(self, token_vocab, sf_lf_map, sf_tokenized_lf_map, lf_metadata_counts, metadata_vocab=None):
         batch = self.batches[self.batch_ct]

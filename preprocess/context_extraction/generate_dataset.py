@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import pandas as pd
 
@@ -6,7 +7,12 @@ MAX_NUM = 500
 
 
 if __name__ == '__main__':
-    lfs_df = pd.read_csv('data/lfs_w_counts.csv')
+    arguments = argparse.ArgumentParser('Generate Subsampled Reverse Substitution Dataset from LF Contexts.')
+    arguments.add_argument('--dataset', default='mimic')
+
+    args = arguments.parse_args()
+
+    lfs_df = pd.read_csv('data/{}_lfs_w_counts.csv'.format(args.dataset))
 
     sfs = lfs_df['sf'].unique().tolist()
     lf_to_sf_map = lfs_df.set_index('target_label').to_dict()
@@ -19,7 +25,7 @@ if __name__ == '__main__':
             viable_sf_count += 1
             viable_sfs.append(sf)
     print('SFs with at least 2 contexts for every LF={}'.format(viable_sf_count))
-    contexts = pd.read_csv('data/mimic_contexts.csv')
+    contexts = pd.read_csv('data/{}_contexts.csv'.format(args.dataset))
     print('Number of contexts={}'.format(contexts.shape[0]))
     contexts['sf'] = contexts['lf'].apply(lambda lf: None if lf not in lf_to_sf_map['sf'] else lf_to_sf_map['sf'][lf])
     contexts = contexts[~contexts['sf'].isnull()]
@@ -51,4 +57,4 @@ if __name__ == '__main__':
     final_df = pd.concat(final_data)
     print('Number of contexts after subsampling={}'.format(final_df.shape[0]))
     final_df['is_train'] = final_df['is_train'].apply(lambda x: x == 1)
-    final_df.to_csv('data/mimic_rs_dataset.csv', index=False)
+    final_df.to_csv('data/{}_rs_dataset.csv'.format(args.dataset), index=False)
