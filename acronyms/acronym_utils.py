@@ -1,6 +1,7 @@
 from collections import Counter, defaultdict
 import json
 import os
+import random
 import re
 from string import punctuation
 import string
@@ -9,6 +10,7 @@ from time import sleep
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 import torch
 from tqdm import tqdm
@@ -27,6 +29,26 @@ TOKEN_BLACKLIST = set(string.punctuation).union(get_mimic_stopwords()).union(set
 UMLS_BLACKLIST = TOKEN_BLACKLIST.union(set(['unidentified', 'otherwise', 'specified', 'nos', 'procedure']))
 
 
+def add_section_headers_to_columbia():
+    in_fp = os.path.join(home_dir, 'preprocess/context_extraction/data/columbia_rs_dataset_preprocessed_window_10.csv')
+    df = pd.read_csv(in_fp)
+    section_map = pd.read_csv(
+        os.path.join(home_dir, 'preprocess/context_extraction/data/columbia_mimic_section_map.csv'))
+    section_map = section_map.set_index('columbia_section')['mimic_section'].to_dict()
+
+    headers = []
+    for columbia_section in df['section'].tolist():
+        if type(columbia_section) == float or len(columbia_section) == 0:
+            headers.append('<pad>')
+            continue
+        new_section = columbia_section
+        if columbia_section in section_map:
+            new_section = section_map[columbia_section]
+        headers.append(new_section)
+    df['section_mapped'] = headers
+    df.to_csv(in_fp, index=False)
+
+
 def add_section_headers_to_casi():
     """
     :return: None
@@ -36,7 +58,7 @@ def add_section_headers_to_casi():
     To adjust for this, we have curated a manual mapping from CASI section header to MIMIC in the event there is no
     exact match.  This function just adds a column 'section_mapped' to the already preprocessed CASI dataset.
     """
-    in_fp = os.path.join(home_dir, 'acronyms/data/casi/preprocessed_dataset_window_10.csv')
+    in_fp = os.path.join(home_dir, 'shared_data/casi/preprocessed_dataset_window_10.csv')
     df = pd.read_csv(in_fp)
 
     freq_sections = pd.read_csv(os.path.join(home_dir, 'preprocess/data/mimic/section_freq.csv'))['section'].tolist()
@@ -84,7 +106,7 @@ def eval_tokenize(str, unique_only=False):
     return tokens
 
 
-def load_casi(prev_args, train_frac=1.0):
+def load_casi(prev_args, train_frac=1.0, batch_size=32):
     """
     :param prev_args: argparse instance from pre-trained language model
     :param train_frac: If you want to fine tune the model, this should be about 0.8.
@@ -115,19 +137,27 @@ def load_casi(prev_args, train_frac=1.0):
 
     if train_frac == 1.0 or train_frac == 0.0:
         train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(df, batch_size=512)
+        test_batcher = AcronymBatcherLoader(df, batch_size=batch_size)
         train_df = df
         test_df = df
     else:
-        train_df, test_df = train_test_split(df, random_state=1992, test_size=1.0 - train_frac)
+        train_df, test_df = train_test_split(df, test_size=1.0 - train_frac)
         train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=512)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=batch_size)
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
-def load_mimic(prev_args, train_frac=1.0):
+def load_columbia(prev_args, train_frac=1.0, batch_size=None):
+    return load_rs('columbia', train_frac, batch_size=batch_size)
+
+
+def load_mimic(prev_args, train_frac=1.0, batch_size=None):
+    return load_rs('mimic', train_frac, batch_size=batch_size)
+
+
+def load_rs(dataset, train_frac=1.0, batch_size=None):
     """
-    :param prev_args: argparse instance from pre-trained language model
+    :param dataset: mimic or columbia
     :param train_frac: If you want to fine tune the model, this should be about 0.8.
     :return: train_batcher, test_batcher, train_df, test_df, sf_lf_map
 
@@ -138,25 +168,22 @@ def load_mimic(prev_args, train_frac=1.0):
         sf_lf_map = json.load(fd)
     used_sf_lf_map = {}
     df = pd.read_csv(os.path.join(
-        home_dir, 'preprocess/context_extraction/data/mimic_rs_dataset_preprocessed_window_10.csv'))
-    df['category'] = df['category'].apply(create_document_token)
-    if prev_args.metadata == 'category':
-        df['metadata'] = df['category']
-    else:
-        df['metadata'] = df['section']
-        df['metadata'].fillna('<pad>', inplace=True)
+        home_dir, 'preprocess/context_extraction/data/{}_rs_dataset_preprocessed_window_10.csv'.format(dataset)))
+    if 'section_mapped' in df.columns:
+        df['section'] = df['section_mapped']
+    df['section'].fillna('<pad>', inplace=True)
     sfs = df['sf'].unique().tolist()
     for sf in sfs:
         used_sf_lf_map[sf] = sf_lf_map[sf]
-    train_df = df[df['is_train']]
-    test_df = df[~df['is_train']]
 
     if train_frac == 1.0 or train_frac == 0.0:
+        train_df, test_df = df, df
         train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(df, batch_size=512)
+        test_batcher = AcronymBatcherLoader(df, batch_size=batch_size)
     else:
+        train_df, test_df = train_test_split(df, test_size=1.0 - train_frac)
         train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=512)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=batch_size)
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
@@ -359,6 +386,61 @@ def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, 
     return batch_loss, num_examples, num_correct, scores, rel_weights
 
 
+def render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_counts, sf_lf_map):
+    accuracies = []
+    macro_f1s = []
+    weighted_f1s = []
+    for sf, lfs in sf_lf_map.items():
+        n = 0
+        max_p = defaultdict(int)
+        predicted_class = {}
+        dominant_class = {}
+        max_freq = 0
+        for lf in lfs:
+            c = sum(train_lf_metadata_counts[lf]['count'])
+            max_freq = max(max_freq, c)
+            if max_freq == c:
+                dominant_class[sf] = lf
+            for name, p in zip(train_lf_metadata_counts[lf]['section'], train_lf_metadata_counts[lf]['p']):
+                max_p[name] = max(max_p[name], p)
+                if p == max_p[name]:
+                    predicted_class[name] = lf
+        for lf in lfs:
+            dominant_class[lf] = dominant_class[sf]
+
+        y_true = []
+        y_pred = []
+        for lf in lfs:
+            if lf in val_lf_metadata_counts:
+                n += sum(val_lf_metadata_counts[lf]['count'])
+                for count, name in zip(val_lf_metadata_counts[lf]['count'], val_lf_metadata_counts[lf]['section']):
+                    if not name in predicted_class:
+                        pred_lf = dominant_class[lf]
+                    else:
+                        pred_lf = predicted_class[name]
+                    y_true += [lf] * count
+                    y_pred += [pred_lf] * count
+        sf_results = classification_report(y_true, y_pred, output_dict=True)
+        macro_nonzero = defaultdict(float)
+        num_nonzero = 0
+        for lf in list(sf_results.keys()):
+            d = sf_results[lf]
+            if type(d) == dict and d['support'] > 0:
+                macro_nonzero['f1-score'] += d['f1-score']
+                num_nonzero += 1
+        accuracy = sf_results['accuracy']
+        macro_f1 = macro_nonzero['f1-score'] / float(num_nonzero)
+        weighted_f1 = sf_results['weighted avg']['f1-score']
+        accuracies.append(accuracy)
+        macro_f1s.append(macro_f1)
+        weighted_f1s.append(weighted_f1)
+
+    acc = np.array(accuracies).mean()
+    wf1 = np.array(weighted_f1s).mean()
+    mf1 = np.array(macro_f1s).mean()
+    print('Dominant section header accuracy={}. weighted F1={}. macro F1={}'.format(acc, wf1, mf1))
+
+
 def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
                sf_lf_map, token_metadata_counts):
     """
@@ -389,7 +471,7 @@ def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_v
     test_acc = test_correct / float(test_examples)
     print('Test Loss={}. Accuracy={}'.format(test_loss, test_acc))
     sleep(0.1)
-    return test_loss
+    return test_loss, test_acc
 
 
 def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_vocab, metadata_vocab, sf_tokenized_lf_map,
@@ -431,6 +513,50 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_voca
     print('Train Loss={}. Accuracy={}'.format(train_loss, train_acc))
     sleep(0.1)
     return train_loss
+
+
+def split_marginals(lf_metadata_counts):
+    train_marginals = {}
+    val_marginals = {}
+
+    train_frac = 0.75
+    smooth_factor = 1
+
+    for lf, items in lf_metadata_counts.items():
+        train_marginals[lf] = {
+            'section': items['section'],
+            'count': [],
+            'p': []
+        }
+        val_marginals[lf] = {
+            'section': items['section'],
+            'count': [],
+            'p': []
+        }
+
+        full_sections = []
+        for s, c in zip(items['section'], items['count']):
+            full_sections += [s] * c
+        random.shuffle(full_sections)
+        N = len(full_sections)
+        split_idx = int(train_frac * N)
+        train_set, val_set = full_sections[:split_idx], full_sections[split_idx:]
+
+        train_counts = Counter(train_set)
+        val_counts = Counter(val_set)
+
+        for s in items['section']:
+            tct = smooth_factor if s not in train_counts else smooth_factor + train_counts[s]
+            vct = smooth_factor if s not in val_counts else smooth_factor + val_counts[s]
+
+            train_marginals[lf]['count'].append(tct)
+            val_marginals[lf]['count'].append(vct)
+
+        tsum = float(sum(train_marginals[lf]['count']))
+        vsum = float(sum(val_marginals[lf]['count']))
+        train_marginals[lf]['p'] = [c / tsum for c in train_marginals[lf]['count']]
+        val_marginals[lf]['p'] = [c / vsum for c in val_marginals[lf]['count']]
+    return train_marginals, val_marginals
 
 
 def target_lf_sense(target_lf, sf, sf_lf_map):

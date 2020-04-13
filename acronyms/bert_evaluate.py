@@ -4,41 +4,27 @@ from shutil import rmtree
 import sys
 from time import sleep
 
-from allennlp.data.token_indexers.elmo_indexer import ELMoTokenCharactersIndexer
-from allennlp.modules.token_embedders.bidirectional_language_model_token_embedder import (
-    BidirectionalLanguageModelTokenEmbedder)
+
 import argparse
 import numpy as np
 import pandas as pd
 from scipy.stats import describe
 import torch
 from tqdm import tqdm
+from transformers import AutoModel, AutoTokenizer
 
 home_dir = os.path.expanduser('~/LMC/')
-os.environ['BIDIRECTIONAL_LM_VOCAB_PATH'] = os.path.join('modules', 'elmo')
-os.environ['BIDIRECTIONAL_LM_TRAIN_PATH'] = os.path.join('modules', 'elmo')
-
 sys.path.insert(0, os.path.join(home_dir, 'acronyms', 'modules'))
 sys.path.insert(0, os.path.join(home_dir, 'preprocess'))
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
 from acronym_utils import lf_tokenizer
-from elmo_acronym_expander import ELMoAcronymExpander
-from error_analysis import elmo_analyze
+from bert_acronym_expander import BERTAcronymExpander
+from error_analysis import bert_analyze
 from evaluate import load_casi, load_columbia, load_mimic
 from model_utils import tensor_to_np
 
 
-def get_pretrained_elmo(lm_model_file='~/allennlp/output_path/model.tar.gz'):
-    return BidirectionalLanguageModelTokenEmbedder(
-        archive_file=lm_model_file,
-        dropout=0.2,
-        bos_eos_tokens=["<S>", "</S>"],
-        remove_bos_eos=True,
-        requires_grad=True
-    )
-
-
-def elmo_evaluate(args, loader, train_frac=0.0):
+def bert_evaluate(args, loader, train_frac=0.0):
     args.metadata = None
     train_batcher, test_batcher, train_df, test_df, used_sf_lf_map = loader(
         args, batch_size=args.batch_size, train_frac=train_frac)
@@ -53,25 +39,11 @@ def elmo_evaluate(args, loader, train_frac=0.0):
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
-    elmo_model_path = '~/allennlp/{}/model.tar.gz'.format(args.lm_experiment)
-    elmo = get_pretrained_elmo(lm_model_file=elmo_model_path)
+    tokenizer = AutoTokenizer.from_pretrained('emilyalsentzer/Bio_ClinicalBERT')
+    bert_model = AutoModel.from_pretrained('emilyalsentzer/Bio_ClinicalBERT')
+    model = BERTAcronymExpander(bert_model)
     device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-    if args.ckpt is not None:
-        ckpt_str = 'best' if args.ckpt == 'best' else 'model_state_epoch_{}'.format(args.ckpt)
-        ckpt_fp = os.path.join(os.path.expanduser('~'), 'allennlp/{}/{}.th'.format(args.lm_experiment, ckpt_str))
-
-        state_dict = torch.load(ckpt_fp)
-        model_dict = elmo.state_dict()
-        updated_state_dict = {('_lm.' + k): v for k, v in state_dict.items() if '_lm.' + k in model_dict}
-        # 2. overwrite entries in the existing state dict
-        model_dict.update(updated_state_dict)
-        # 3. load the new state dict
-        elmo.load_state_dict(model_dict)
-
-    model = ELMoAcronymExpander(elmo).to(device_str)
-    indexer = ELMoTokenCharactersIndexer()
-    vocab = elmo._lm.vocab
+    model.to(device_str)
 
     sf_tokenized_lf_map = defaultdict(list)
     for sf, lf_list in used_sf_lf_map.items():
@@ -79,17 +51,18 @@ def elmo_evaluate(args, loader, train_frac=0.0):
             tokens = lf_tokenizer(lf)
             sf_tokenized_lf_map[sf].append(tokens)
 
-    return elmo_analyze(
-        test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=results_dir)
+    return bert_analyze(
+        test_batcher, model, used_sf_lf_map, tokenizer, sf_tokenized_lf_map, results_dir=results_dir)
 
 
 def run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, loss_func):
+    device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     model.eval()  # just sets .requires_grad = True
     test_batcher.reset(shuffle=False)
     test_epoch_loss, test_examples, test_correct = 0.0, 0, 0
     for _ in tqdm(range(test_batcher.num_batches())):
         batch_input, num_outputs = test_batcher.elmo_next(vocab, indexer, sf_tokenized_lf_map)
-        batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0).to('cuda'), batch_input))
+        batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0).to(device_str), batch_input))
         with torch.no_grad():
             scores, target = model(*batch_input + [num_outputs])
         num_correct = len(np.where(tensor_to_np(torch.argmax(scores, 1)) == tensor_to_np(target))[0])
@@ -108,12 +81,11 @@ def run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, los
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('Main script for Acronym Evaluation on Pre-Trained ELMo')
+    parser = argparse.ArgumentParser('Main script for Acronym Evaluation on Pre-Trained ClinicalBERT')
 
     # Functional Arguments
     parser.add_argument('-debug', action='store_true', default=False)
-    parser.add_argument('--experiment', default='elmo', help='Save path in weights/ for experiment.')
-    parser.add_argument('--lm_experiment', default='output_path')
+    parser.add_argument('--experiment', default='bert', help='Save path in weights/ for experiment.')
     parser.add_argument('--dataset', default='casi', help='casi or mimic')
 
     # Training Hyperparameters
@@ -139,14 +111,14 @@ if __name__ == '__main__':
     cols = ['accuracy', 'weighted_f1', 'macro_f1', 'log_loss']
     if args.bootstrap:
         train_frac = 0.2
-        iters = 100
+        iters = 25
     else:
         iters = 1
         train_frac = 0.0
 
     agg_metrics = []
     for i in range(iters):
-        metrics = elmo_evaluate(args, dataset_loader, train_frac=train_frac)
+        metrics = bert_evaluate(args, dataset_loader, train_frac=train_frac)
         metric_row = [metrics[col] for col in cols]
         agg_metrics.append(metric_row)
 

@@ -1,6 +1,8 @@
 import os
 import sys
 
+import torch
+
 home_dir = os.path.expanduser('~/LMC/')
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
 from compute_utils import compute_att
