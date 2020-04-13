@@ -3,10 +3,12 @@ import json
 import os
 import sys
 
+import numpy as np
 import pandas as pd
 from pycm import ConfusionMatrix
 from sklearn.metrics import classification_report
 import torch
+from torch import nn
 from tqdm import tqdm
 
 
@@ -14,6 +16,13 @@ home_dir = os.path.expanduser('~/LMC/')
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
 from acronym_utils import process_batch
 from model_utils import tensor_to_np
+
+
+def get_rare_lfs(threshold=5):
+    df = pd.read_csv(os.path.join(home_dir, 'preprocess/context_extraction/data/lfs_w_counts.csv'))
+    df = df[df['count'] > 0]
+    df = df[df['count'] < threshold]
+    return df['target_lf_sense'].unique().tolist()
 
 
 def _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, rel_weights):
@@ -56,6 +65,8 @@ def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion
     summary_fp = os.path.join(results_dir, 'summary.csv')
     id_fp = os.path.join(results_dir, 'error_tracker.json')
     df = defaultdict(list)
+    rare_lfs = get_rare_lfs()
+    rare_recalls = []
     cols = [
         'sf',
         'experiment',
@@ -92,7 +103,9 @@ def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion
 
         macro_nonzero = defaultdict(float)
         num_nonzero = 0
-        for lf in labels_trunc:
+        for orig_lf, lf in zip(labels, labels_trunc):
+            if orig_lf in rare_lfs:
+                rare_recalls.append(sf_results[lf]['recall'])
             d = sf_results[lf]
             if d['support'] > 0:
                 macro_nonzero['precision'] += d['precision']
@@ -137,11 +150,13 @@ def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion
 
     suffixes = ['precision', 'recall', 'f1']
     types = ['weighted', 'macro']
+    agg_metrics = {}
     for t in types:
         for suffix in suffixes:
             key = '{}_{}'.format(t, suffix)
             avg_val = summary_df[key].mean()
             print('Global {} --> {}'.format(key, avg_val))
+            agg_metrics[key] = avg_val
 
     num_targets = summary_df['num_targets'].unique().tolist()
     print('Num Targets, Macro F1, Weighted F1')
@@ -149,6 +164,11 @@ def _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion
         avg_macro_f1 = summary_df[summary_df['num_targets'] == t]['macro_f1'].mean()
         avg_weighted_f1 = summary_df[summary_df['num_targets'] == t]['weighted_f1'].mean()
         print('{},{},{}'.format(t, avg_macro_f1, avg_weighted_f1))
+
+    rare_recall = sum(rare_recalls) / float(len(rare_recalls))
+    num_rare = len(rare_recalls)
+    print('Recall on {} rare long forms: {}'.format(num_rare, rare_recall))
+    return agg_metrics
 
 
 def _render_example(sf, target_lf, converted_target_lf, pred_lf, context_window, full_context, row_idx, rel_weight):
@@ -192,18 +212,26 @@ def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metada
     sf_confusion = defaultdict(lambda: ([], []))
     id_map = {'correct': [], 'error': []}
     errors_str, correct_str = defaultdict(str), defaultdict(str)
+    total_ll, num_correct, num_examples = 0.0, 0.0, 0.0
     for _ in range(test_batcher.num_batches()):
         with torch.no_grad():
-            _, _, _, batch_scores, rel_weights = process_batch(
+            batch_loss, batch_examples, batch_correct, batch_scores, rel_weights = process_batch(
                 args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
                 token_metadata_counts)
+        num_correct += batch_correct
+        num_examples += batch_examples
+        total_ll += batch_loss
         batch_data = test_batcher.get_prev_batch()
         pred_lf_idxs = tensor_to_np(torch.argmax(batch_scores, 1))
         if rel_weights is not None:
             rel_weights = tensor_to_np(rel_weights)
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, rel_weights)
 
-    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment=args.experiment)
+    avg_test_ll = total_ll / float(test_batcher.num_batches())
+    avg_test_acc = num_correct / float(num_examples)
+    print('Test Loss={}. Accuracy={}'.format(avg_test_ll, avg_test_acc))
+    return _analyze_stats(
+        results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment=args.experiment)
 
 
 def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=None):
@@ -223,16 +251,29 @@ def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, ind
     sf_confusion = defaultdict(lambda: ([], []))
     id_map = {'correct': [], 'error': []}
     errors_str, correct_str = defaultdict(str), defaultdict(str)
+    loss_func = nn.CrossEntropyLoss()
+
+    total_ll, num_correct, num_examples = 0.0, 0.0, 0.0
 
     for _ in tqdm(range(test_batcher.num_batches())):
         batch_input, num_outputs = test_batcher.elmo_next(vocab, indexer, sf_tokenized_lf_map)
         batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0).to('cuda'), batch_input))
         with torch.no_grad():
             scores, target = model(*batch_input + [num_outputs])
+        batch_correct = len(np.where(tensor_to_np(torch.argmax(scores, 1)) == tensor_to_np(target))[0])
+        batch_examples = len(num_outputs)
+        batch_loss = loss_func.forward(scores, target)
+
+        num_correct += batch_correct
+        num_examples += batch_examples
+        total_ll += batch_loss.item()
         pred_lf_idxs = tensor_to_np(torch.argmax(scores, 1))
         batch_data = test_batcher.get_prev_batch()
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, None)
-    _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment='elmo')
+    avg_test_ll = total_ll / float(test_batcher.num_batches())
+    avg_test_acc = num_correct / float(num_examples)
+    print('Test Loss={}. Accuracy={}'.format(avg_test_ll, avg_test_acc))
+    return _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment='elmo')
 
 
 def render_test_statistics(df, sf_lf_map):

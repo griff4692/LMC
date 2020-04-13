@@ -23,15 +23,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # Load Data
     debug_str = '_mini' if args.debug else ''
-    vocab_infile = '../../../preprocess/data/vocab{}.pk'.format(debug_str)
+    vocab_infile = os.path.join(home_dir, 'preprocess/data/vocab{}.pk'.format(debug_str))
     print('Loading vocabulary from {}...'.format(vocab_infile))
     with open(vocab_infile, 'rb') as fd:
         vocab = pickle.load(fd)
-    print('Loaded vocabulary of size={}...'.format(vocab.separator_start_vocab_id))
+    split_idx = min(vocab.section_start_vocab_id, vocab.category_start_vocab_id)
+    print('Loaded vocabulary of size={}...'.format(split_idx))
     vocab_order = ['</S>', '<S>', '@@UNKNOWN@@']
-
-    tokens = vocab.i2w[1:vocab.separator_start_vocab_id]
-    supports = vocab.support[1:vocab.separator_start_vocab_id]
+    tokens = vocab.i2w[1:split_idx]
+    supports = vocab.support[1:split_idx]
 
     token_order = np.argsort(-np.array(supports))
     tokens_ordered = list(np.array(tokens)[token_order])

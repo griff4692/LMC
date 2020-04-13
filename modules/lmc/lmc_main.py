@@ -1,9 +1,9 @@
+import csv
 import os
 import pickle
-
 from shutil import rmtree
 import sys
-from time import sleep
+from time import sleep, time
 
 import argparse
 import numpy as np
@@ -15,14 +15,19 @@ from torch.nn.utils import clip_grad_norm_
 from transformers import BertTokenizer, AdamW
 
 home_dir = os.path.expanduser('~/LMC/')
+sys.path.insert(0, os.path.join(home_dir, 'acronyms'))
+sys.path.insert(0, os.path.join(home_dir, 'acronyms/modules'))
 sys.path.insert(0, os.path.join(home_dir, 'preprocess'))
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
+from acronym_utils import load_mimic, load_casi
+from compute_sections import enumerate_metadata_ids_lmc
+from evaluate import run_evaluation
+from lmc_acronym_expander import LMCAcronymExpander
 from lmc_model import LMC, LMCBERT
 from lmc_prebatch import create_tokenizer_maps, DistributedDataset, generate_metadata_samples
-from lmc_utils import save_checkpoint
-from model_utils import get_git_revision_hash, render_args
+from lmc_utils import restore_model, save_checkpoint
+from model_utils import block_print, enable_print, get_git_revision_hash, render_args, render_num_params
 from vocab import Vocab
-from compute_sections import enumerate_metadata_ids_lmc
 
 
 def _prepare_data(args, token_vocab, ids):
@@ -113,7 +118,7 @@ if __name__ == '__main__':
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=1024, type=int)
-    parser.add_argument('--epochs', default=4, type=int)
+    parser.add_argument('--epochs', default=5, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('-multi_gpu', default=False, action='store_true')
 
@@ -162,6 +167,7 @@ if __name__ == '__main__':
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
     model = model_prototype(  # Either LMC or LMCBERT
         args, kwargs['token_vocab_size'], metadata_vocab_size=kwargs['metadata_vocab'].size()).to(args.device)
+    render_num_params(model, kwargs['metadata_vocab'].size())
 
     if args.multi_gpu and torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
@@ -177,6 +183,15 @@ if __name__ == '__main__':
         print('Clearing out previous weights in {}'.format(weights_dir))
         rmtree(weights_dir)
     os.mkdir(weights_dir)
+
+    metric_cols = ['examples', 'lm_kl', 'lm_recon', 'epoch', 'hours', 'dataset', 'log_loss', 'accuracy', 'macro_f1',
+                   'weighted_f1']
+    metrics_file = open(os.path.join(weights_dir, 'metrics.csv'), mode='w')
+    metrics_writer = csv.writer(metrics_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    metrics_writer.writerow(metric_cols)
+    metrics_file.flush()
+
+    start_time = time()
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
@@ -205,6 +220,8 @@ if __name__ == '__main__':
 
             checkpoint_interval = 10000
             if (i + 1) % checkpoint_interval == 0:
+                duration_in_hours = (time() - start_time) / (60. * 60.)
+                full_example_ct = (((epoch - 1) * float(num_batches)) + i + 1) * args.batch_size
                 print('Saving Checkpoint at Batch={}'.format(i + 1))
                 d = float(i + 1)
                 # Serializing everything from model weights and optimizer state, to to loss function and arguments
@@ -217,6 +234,34 @@ if __name__ == '__main__':
                 if epoch < 10:
                     save_checkpoint(args, model, optimizer, token_vocab, losses_dict, kwargs['token_metadata_counts'],
                                     checkpoint_fp=checkpoint_fp, metadata_vocab=kwargs['metadata_vocab'])
+
+                experiments = [(load_casi, 'casi'), (load_mimic, 'mimic')]
+                prev_epoch_ct = args.epochs
+                prev_batch_size = args.batch_size
+                for loader, dataset in experiments:
+                    args.lm_type = 'lmc'
+                    args.lm_experiment = args.experiment
+                    args.ckpt = None
+                    args.device = device_str
+                    args.epochs = 0
+                    args.dataset = dataset
+                    args.batch_size = 128
+                    block_print()
+                    metrics = run_evaluation(args, LMCAcronymExpander, loader, restore_model, train_frac=0)
+                    enable_print()
+                    metrics['dataset'] = dataset
+                    metrics['hours'] = duration_in_hours
+                    metrics['examples'] = full_example_ct
+                    metrics['epoch'] = epoch
+                    metrics['lm_recon'] = losses_dict['losses']['recon']
+                    metrics['lm_kl'] = losses_dict['losses']['kl']
+                    row = [metrics[col] for col in metric_cols]
+                    metrics_writer.writerow(row)
+                    print(metric_cols)
+                    print(row)
+                    metrics_file.flush()
+                args.batch_size = prev_batch_size
+                args.epochs = prev_epoch_ct
 
         epoch_joint_loss /= float(num_batches)
         epoch_kl_loss /= float(num_batches)
@@ -232,3 +277,4 @@ if __name__ == '__main__':
         if epoch < 10:  # Epoch >= 10 usually only happens when debugging in which we case we don't want to keep saving
             save_checkpoint(args, model, optimizer, token_vocab, losses_dict, kwargs['token_metadata_counts'],
                             checkpoint_fp=checkpoint_fp, metadata_vocab=kwargs['metadata_vocab'])
+    metrics_file.close()

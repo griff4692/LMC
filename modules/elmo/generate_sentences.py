@@ -33,12 +33,13 @@ if __name__ == '__main__':
     chunk = 0
     print('Separating sentences...')
     for i in tqdm(range(len(data))):
-        _, doc = data[i]
-        doc_sentences = re.split(r'\bheader=SENTENCES|header=SENTENCESTART|header=SENTENCEEND\b', doc)
+        doc_sentences = re.split(r'\bheader=SENTENCE\b', data[i])
         for sentence in doc_sentences:
             sentence = sentence.strip()
             tokens = sentence.split()
-            if len(tokens) > 1 and len(list(filter(lambda x: 'header' not in x, tokens))) > 0:
+            tokens = list(filter(lambda x: 'header' not in x and 'document' not in x, tokens))
+            sentence = ' '.join(tokens)
+            if len(tokens) > 1:
                 sentences.append(sentence)
                 if len(sentences) % 1000000 == 0:
                     with open('data/chunks/sentences{}_{}.txt'.format(debug_str, chunk), 'w') as fd:
@@ -46,7 +47,7 @@ if __name__ == '__main__':
                     sentences = []
                     chunk += 1
     if len(sentences) > 0:
-        with open('data/sentences{}_{}.txt'.format(debug_str, chunk), 'w') as fd:
+        with open('data/chunks/sentences{}_{}.txt'.format(debug_str, chunk), 'w') as fd:
             fd.write('\n'.join(list(sentences)))
         sentences = []
         chunk += 1
