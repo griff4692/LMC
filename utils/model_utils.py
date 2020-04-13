@@ -1,4 +1,6 @@
+import os
 import subprocess
+import sys
 
 
 def get_git_revision_hash():
@@ -29,3 +31,15 @@ def tensor_to_np(tens):
         return tens.numpy()
     except TypeError:
         return tens.cpu().numpy()
+
+
+# Disable
+def block_print():
+    sys.stdout = open(os.devnull, 'w')
+    sys.stderr = open(os.devnull, 'w')
+
+
+# Restore
+def enable_print():
+    sys.stdout = sys.__stdout__
+    sys.stderr = sys.__stderr__

@@ -18,7 +18,7 @@ from model_utils import render_args
 from compute_sections import HEADER_SEARCH_REGEX
 
 # Loaded so it's available inside scope of preprocess MIMIC without re-loading for every document or having to pickle
-section_df = pd.read_csv('../preprocess/data/mimic/section_freq.csv').dropna()
+section_df = pd.read_csv(os.path.join(home_dir, 'preprocess/data/mimic/section_freq.csv')).dropna()
 SECTION_NAMES = list(set(list(sorted(section_df['section'].tolist()))))
 nlp = None
 

@@ -119,7 +119,7 @@ def load_casi(prev_args, train_frac=1.0):
         train_df = df
         test_df = df
     else:
-        train_df, test_df = train_test_split(df, random_state=1992, test_size=1.0 - train_frac)
+        train_df, test_df = train_test_split(df, test_size=1.0 - train_frac)
         train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
         test_batcher = AcronymBatcherLoader(test_df, batch_size=512)
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
@@ -389,7 +389,7 @@ def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_v
     test_acc = test_correct / float(test_examples)
     print('Test Loss={}. Accuracy={}'.format(test_loss, test_acc))
     sleep(0.1)
-    return test_loss
+    return test_loss, test_acc
 
 
 def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_vocab, metadata_vocab, sf_tokenized_lf_map,

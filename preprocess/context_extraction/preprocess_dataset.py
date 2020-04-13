@@ -153,7 +153,7 @@ def preprocess_mimic_rs(window=10):
 
     Filters out invalid examples, tokenizes, and returns preprocessed dataset ready for evaluation.
     """
-    casi_dir = os.path.join(home_dir, 'shared_weights', 'casi')
+    casi_dir = os.path.join(home_dir, 'shared_data', 'casi')
     with open(os.path.join(casi_dir, 'sf_lf_map.json'), 'r') as fd:
         sf_lf_map = json.load(fd)
 
