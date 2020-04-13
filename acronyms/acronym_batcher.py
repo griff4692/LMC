@@ -1,4 +1,4 @@
-# from allennlp.data.tokenizers.token import Token
+from allennlp.data.tokenizers.token import Token
 import numpy as np
 
 
@@ -18,9 +18,9 @@ class AcronymBatcherLoader:
     def get_prev_batch(self):
         return self.batches[self.batch_ct - 1]
 
-    # def elmo_tokenize(self, tokens, vocab, indexer):
-    #     tokens = list(map(lambda t: Token(t), tokens))
-    #     return indexer.tokens_to_indices(tokens, vocab, 'elmo')['elmo']
+    def elmo_tokenize(self, tokens, vocab, indexer):
+        tokens = list(map(lambda t: Token(t), tokens))
+        return indexer.tokens_to_indices(tokens, vocab, 'elmo')['elmo']
 
     def elmo_next(self, vocab, indexer, sf_tokenized_lf_map):
         batch = self.batches[self.batch_ct]

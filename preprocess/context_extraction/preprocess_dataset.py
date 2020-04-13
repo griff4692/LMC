@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import re
@@ -8,10 +9,16 @@ import pandas as pd
 
 home_dir = os.path.expanduser('~/LMC/')
 sys.path.insert(0, os.path.join(home_dir, 'preprocess'))
-from mimic_tokenize import SECTION_NAMES, clean_text, tokenize_str, create_section_token
+from extract_contexts import read_columbia_dataset
+from mimic_tokenize import clean_text, tokenize_str, create_section_token
 
 
-def _is_header(sectioned_text, idx):
+def get_section_names(dataset):
+    section_df = pd.read_csv(os.path.join(home_dir, 'preprocess/data/{}/section_freq.csv'.format(dataset))).dropna()
+    return list(set(list(sorted(section_df['section'].tolist()))))
+
+
+def _is_header(sectioned_text, idx, section_names):
     """
     :param sectioned_text: List of tokens
     :param idx: index into sectioned_text
@@ -19,12 +26,12 @@ def _is_header(sectioned_text, idx):
     """
     if idx == len(sectioned_text):
         return False
-    return sectioned_text[idx] in SECTION_NAMES and idx + 1 < len(sectioned_text) and sectioned_text[idx + 1] == ':'
+    return sectioned_text[idx] in section_names and idx + 1 < len(sectioned_text) and sectioned_text[idx + 1] == ':'
 
 
-def get_header_from_full_context(mimic_df, context, lf_match, doc_id, header_regexes):
+def get_header_from_full_context(data_df, context, lf_match, doc_id, header_regexes, section_names):
     """
-    :param mimic_df: NOTEEVENTS.csv dataframe
+    :param data_df: dataframe of dataset
     :param context: local context surrounding expansion
     :param lf_match: target LF (center of context)
     :param doc_id: ROW_ID in which context was found
@@ -34,17 +41,14 @@ def get_header_from_full_context(mimic_df, context, lf_match, doc_id, header_reg
     Sometimes the window of text returned contains no section headers, which means we must go back and search through
     whole document to find appropriate section header.
     """
-    full_contexts = mimic_df[mimic_df['ROW_ID'] == doc_id]['TEXT'].tolist()
+    full_contexts = data_df[data_df['ROW_ID'] == doc_id]['TEXT'].tolist()
     assert len(full_contexts) == 1
     full_context = re.sub(r'\s+', ' ', full_contexts[0])
     context_repl = context.replace('TARGETWORD', lf_match)
     try:
         pre_idx = full_context.index(context_repl)
     except:
-        try:
-            pre_idx = full_context.index(context.split('TARGETWORD')[0].strip()[:-2])
-        except:
-            print('here')
+        pre_idx = full_context.index(context.split('TARGETWORD')[0].strip()[:-2])
     relevant_context = full_context[:pre_idx]
     sep_symbol = ' headersep '
     sectioned_text = relevant_context.upper()
@@ -55,17 +59,17 @@ def get_header_from_full_context(mimic_df, context, lf_match, doc_id, header_reg
 
     headers = []
     for tok_idx, toks in enumerate(sectioned_tokens):
-        is_header = _is_header(sectioned_tokens, tok_idx)
+        is_header = _is_header(sectioned_tokens, tok_idx, section_names)
         if is_header:
             header_stripped = toks.strip().strip(':').upper()
-            if header_stripped in SECTION_NAMES:
+            if header_stripped in section_names:
                 headers.append(create_section_token(header_stripped))
     if len(headers) == 0:
         return '<pad>'
     return headers[-1]
 
 
-def tokenize_mimic_rs(text, header_regexes=None):
+def tokenize_rs(text, section_names, header_regexes=None):
     """
     :param text: string, window of text surrounding acronym SF
     :param header_regexes: list of regexes to extract section headers (see #unpack_section_names for explanation)
@@ -82,14 +86,14 @@ def tokenize_mimic_rs(text, header_regexes=None):
         if toks == ':':
             continue
 
-        is_header = _is_header(sectioned_tokens, tok_idx)
-        is_next_header = _is_header(sectioned_tokens, tok_idx + 1)
+        is_header = _is_header(sectioned_tokens, tok_idx, section_names)
+        is_next_header = _is_header(sectioned_tokens, tok_idx + 1, section_names)
 
         if is_header and is_next_header:
             continue
         if is_header:
             header_stripped = toks.strip().strip(':').upper()
-            if header_stripped in SECTION_NAMES:
+            if header_stripped in section_names:
                 tokenized_text += [create_section_token(header_stripped)]
             else:
                 toks = clean_text(toks)
@@ -106,7 +110,7 @@ def tokenize_mimic_rs(text, header_regexes=None):
     return tokenized_no_dup
 
 
-def unpack_section_names():
+def unpack_section_names(section_names):
     """
     :return: list of LFs where LFs at level i are not string subsets of any LFs at levels [0, i - 1].
 
@@ -119,20 +123,23 @@ def unpack_section_names():
         with open(fn, 'r') as fd:
             return json.load(fd)
 
-    sn_len = np.array(list(map(len, SECTION_NAMES)))
+    sn_len = np.array(list(map(len, section_names)))
     sn_order = np.argsort(-sn_len)
 
     levels = []
     for _ in range(10):
         levels.append(set())
     for idx in sn_order:
-        section = SECTION_NAMES[idx]
+        section = section_names[idx]
         section = re.sub('\[\]', '', section)
         section = re.sub(r'\s+', ' ', section)
         for level_idx, level in enumerate(levels):
             any_matches = False
             for n in level:
-                m = re.match(r'.+?' + section, n)
+                try:
+                    m = re.match(r'.+?' + section, n)
+                except re.error:
+                    continue
                 if m and m.endpos == len(n):
                     any_matches = True
                     break
@@ -146,32 +153,38 @@ def unpack_section_names():
     return level_list
 
 
-def preprocess_mimic_rs(window=10):
+def preprocess_rs(dataset, window=10):
     """
     :param window: target context window surrounding LF
     :return: None
 
     Filters out invalid examples, tokenizes, and returns preprocessed dataset ready for evaluation.
     """
-    casi_dir = os.path.join(home_dir, 'shared_weights', 'casi')
+    casi_dir = os.path.join(home_dir, 'shared_data', 'casi')
     with open(os.path.join(casi_dir, 'sf_lf_map.json'), 'r') as fd:
         sf_lf_map = json.load(fd)
 
-    mimic_df = pd.read_csv(os.path.join(home_dir, 'preprocess/data/mimic/NOTEEVENTS.csv'))
-    df = pd.read_csv('data/mimic_rs_dataset.csv')
+    if dataset == 'mimic':
+        data_df = pd.read_csv(os.path.join(home_dir, 'preprocess/data/mimic/NOTEEVENTS.csv'))
+    else:
+        data_df = read_columbia_dataset()
+
+    section_names = get_section_names(args.dataset)
+
+    df = pd.read_csv('data/{}_rs_dataset.csv'.format(dataset))
     N = df.shape[0]
     tokenized_contexts = []
     sections = []
     trimmed_contexts = []
 
-    section_levels = unpack_section_names()
+    section_levels = unpack_section_names(section_names)
     header_regexes = list(map(lambda level: r'\b({})(:)'.format('|'.join(level)), section_levels))
     print('Tokenizing and extracting context windows...')
     is_valid = []
     for row_idx, row in df.iterrows():
         row = row.to_dict()
         context = row['context']
-        tokens = tokenize_mimic_rs(context, header_regexes=header_regexes)
+        tokens = tokenize_rs(context, section_names, header_regexes=header_regexes)
         is_header = list(map(lambda x: 'header=' in x, tokens))
         header_locs = np.where(np.array(is_header))[0]
 
@@ -213,7 +226,7 @@ def preprocess_mimic_rs(window=10):
 
             if left_header is None:
                 left_header = get_header_from_full_context(
-                    mimic_df, context, row['lf_match'], row['doc_id'], header_regexes=header_regexes)
+                    data_df, context, row['lf_match'], row['doc_id'], header_regexes, section_names)
 
             right_header_boundary = len(tokens) if right_header_window is None else right_header_window
 
@@ -246,8 +259,12 @@ def preprocess_mimic_rs(window=10):
     df.drop_duplicates(subset=['target_lf', 'tokenized_context'], inplace=True)
     N = df.shape[0]
     print('Removing {} duplicate rows. Saving {}'.format(prev_N - N, N))
-    df.to_csv('data/mimic_rs_dataset_preprocessed_window_{}.csv'.format(window), index=False)
+    df.to_csv('data/{}_rs_dataset_preprocessed_window_{}.csv'.format(args.dataset, window), index=False)
 
 
 if __name__ == '__main__':
-    preprocess_mimic_rs()
+    arguments = argparse.ArgumentParser('Preprocess Reverse Substitution Dataset.')
+    arguments.add_argument('--dataset', default='mimic')
+
+    args = arguments.parse_args()
+    preprocess_rs(args.dataset, window=10)
