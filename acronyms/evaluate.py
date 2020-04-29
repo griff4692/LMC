@@ -120,14 +120,15 @@ def render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_c
         y_true = []
         y_pred = []
         for lf in lfs:
-            n += sum(val_lf_metadata_counts[lf]['count'])
-            for count, name in zip(val_lf_metadata_counts[lf]['count'], val_lf_metadata_counts[lf]['section']):
-                if not name in predicted_class:
-                    pred_lf = dominant_class[lf]
-                else:
-                    pred_lf = predicted_class[name]
-                y_true += [lf] * count
-                y_pred += [pred_lf] * count
+            if lf in val_lf_metadata_counts:
+                n += sum(val_lf_metadata_counts[lf]['count'])
+                for count, name in zip(val_lf_metadata_counts[lf]['count'], val_lf_metadata_counts[lf]['section']):
+                    if not name in predicted_class:
+                        pred_lf = dominant_class[lf]
+                    else:
+                        pred_lf = predicted_class[name]
+                    y_true += [lf] * count
+                    y_pred += [pred_lf] * count
         sf_results = classification_report(y_true, y_pred, output_dict=True)
         macro_nonzero = defaultdict(float)
         num_nonzero = 0
@@ -322,7 +323,7 @@ if __name__ == '__main__':
 
     cols = ['accuracy', 'weighted_f1', 'macro_f1', 'log_loss']
     if args.bootstrap:
-        train_frac = 0.1
+        train_frac = 0.2
         iters = 100
     else:
         iters = 1
@@ -339,3 +340,7 @@ if __name__ == '__main__':
         for col in cols:
             print(col)
             print(describe(df[col].tolist()))
+        results_dir = os.path.join(home_dir, 'weights', 'acronyms', args.experiment, 'results')
+        bootstrap_fn = os.path.join(results_dir, 'bootstrap.csv')
+        print('Saving bootstrap results to {}'.format(bootstrap_fn))
+        df.to_csv(bootstrap_fn, index=False)
