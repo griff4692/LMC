@@ -108,10 +108,18 @@ def preprocess_mimic(input, split_sentences=False):
                 tokenized_text += tokenize_str(toks, stopwords=stopwords)
         else:
             if args.split_sentences:
-                for sentence in nlp(toks).sents:
-                    tokens = tokenize_str(str(sentence), stopwords=stopwords)
-                    if len(tokens) > 1:
-                        tokenized_text += [create_section_token('SENTENCE')] + tokens
+                # for sentence in nlp(toks).sents:
+                #     tokens = tokenize_str(str(sentence), stopwords=stopwords)
+                #     if len(tokens) > 1:
+                #         tokenized_text += [create_section_token('SENTENCE')] + tokens
+
+                sentence_tok = create_section_token('SENTENCE')
+                split_toks = list(filter(lambda x: len(x) > 0, re.split(SEP_REGEX, toks)))
+                tokenized_text = list(map(
+                    lambda toks: ([sentence_tok] if toks[0] > 0 and toks[0] < len(split_toks) - 1 else []) +
+                                 tokenize_str(clean_text(toks[1]), stopwords=stopwords), enumerate(split_toks)))
+                tokenized_text_flat = list(itertools.chain(*tokenized_text))
+                tokenized_text += tokenized_text_flat
             else:
                 toks = clean_text(toks)
                 tokenized_text += tokenize_str(toks, stopwords=stopwords)
