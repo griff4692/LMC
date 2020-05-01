@@ -1,4 +1,5 @@
 from collections import defaultdict
+import itertools
 import json
 from multiprocessing import Pool
 import os
@@ -10,7 +11,6 @@ from time import time
 import argparse
 from nltk.corpus import stopwords
 import pandas as pd
-import spacy
 
 home_dir = os.path.expanduser('~/LMC/')
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
@@ -20,7 +20,7 @@ from compute_sections import HEADER_SEARCH_REGEX
 # Loaded so it's available inside scope of preprocess MIMIC without re-loading for every document or having to pickle
 section_df = pd.read_csv(os.path.join(home_dir, 'preprocess/data/mimic/section_freq.csv')).dropna()
 SECTION_NAMES = list(set(list(sorted(section_df['section'].tolist()))))
-nlp = None
+SEP_REGEX = r'\.\s|\n{2,}|^\s{0,}\d{1,2}\s{0,}[-).]\s{1,}'
 
 
 def clean_text(text):
@@ -107,18 +107,13 @@ def preprocess_mimic(input, split_sentences=False):
                 toks = clean_text(toks)
                 tokenized_text += tokenize_str(toks, stopwords=stopwords)
         else:
-            if args.split_sentences:
-                # for sentence in nlp(toks).sents:
-                #     tokens = tokenize_str(str(sentence), stopwords=stopwords)
-                #     if len(tokens) > 1:
-                #         tokenized_text += [create_section_token('SENTENCE')] + tokens
-
+            if split_sentences:
                 sentence_tok = create_section_token('SENTENCE')
                 split_toks = list(filter(lambda x: len(x) > 0, re.split(SEP_REGEX, toks)))
-                tokenized_text = list(map(
-                    lambda toks: ([sentence_tok] if toks[0] > 0 and toks[0] < len(split_toks) - 1 else []) +
-                                 tokenize_str(clean_text(toks[1]), stopwords=stopwords), enumerate(split_toks)))
-                tokenized_text_flat = list(itertools.chain(*tokenized_text))
+                tt = list(map(
+                    lambda t: ([sentence_tok] if t[0] > 0 and t[0] < len(split_toks) - 1 else []) +
+                                 tokenize_str(clean_text(t[1]), stopwords=stopwords), enumerate(split_toks)))
+                tokenized_text_flat = list(itertools.chain(*tt))
                 tokenized_text += tokenized_text_flat
             else:
                 toks = clean_text(toks)
@@ -166,10 +161,7 @@ if __name__ == '__main__':
         N = df.shape[0]
         print('Removed {} documents used in reverse substitution dataset.'.format(prev_n - N))
 
-    processor = preprocess_mimic
-    if args.split_sentences:
-        nlp = spacy.load('en_core_sci_sm')
-        processor = preprocess_mimic_split_sentences
+    processor = preprocess_mimic_split_sentences if args.split_sentences else preprocess_mimic
 
     print('Loaded {} rows of data. Tokenizing...'.format(df.shape[0]))
     categories = df['CATEGORY'].tolist()
