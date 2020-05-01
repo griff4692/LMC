@@ -150,6 +150,7 @@ def load_mimic(prev_args, train_frac=1.0):
         used_sf_lf_map[sf] = sf_lf_map[sf]
 
     if train_frac == 1.0 or train_frac == 0.0:
+        train_df, test_df = df, df
         train_batcher = AcronymBatcherLoader(df, batch_size=32)
         test_batcher = AcronymBatcherLoader(df, batch_size=512)
     else:
