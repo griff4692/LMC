@@ -3,10 +3,12 @@ import json
 import os
 import sys
 
+import numpy as np
 import pandas as pd
 from pycm import ConfusionMatrix
 from sklearn.metrics import classification_report
 import torch
+from torch import nn
 from tqdm import tqdm
 
 
@@ -210,17 +212,24 @@ def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metada
     sf_confusion = defaultdict(lambda: ([], []))
     id_map = {'correct': [], 'error': []}
     errors_str, correct_str = defaultdict(str), defaultdict(str)
+    total_ll, num_correct, num_examples = 0.0, 0.0, 0.0
     for _ in range(test_batcher.num_batches()):
         with torch.no_grad():
-            _, _, _, batch_scores, rel_weights = process_batch(
+            batch_loss, batch_examples, batch_correct, batch_scores, rel_weights = process_batch(
                 args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_lf_map, sf_tokenized_lf_map,
                 token_metadata_counts)
+        num_correct += batch_correct
+        num_examples += batch_examples
+        total_ll += batch_loss
         batch_data = test_batcher.get_prev_batch()
         pred_lf_idxs = tensor_to_np(torch.argmax(batch_scores, 1))
         if rel_weights is not None:
             rel_weights = tensor_to_np(rel_weights)
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, rel_weights)
 
+    avg_test_ll = total_ll / float(test_batcher.num_batches())
+    avg_test_acc = num_correct / float(num_examples)
+    print('Test Loss={}. Accuracy={}'.format(avg_test_ll, avg_test_acc))
     return _analyze_stats(
         results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment=args.experiment)
 
@@ -242,15 +251,28 @@ def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, ind
     sf_confusion = defaultdict(lambda: ([], []))
     id_map = {'correct': [], 'error': []}
     errors_str, correct_str = defaultdict(str), defaultdict(str)
+    loss_func = nn.CrossEntropyLoss()
+
+    total_ll, num_correct, num_examples = 0.0, 0.0, 0.0
 
     for _ in tqdm(range(test_batcher.num_batches())):
         batch_input, num_outputs = test_batcher.elmo_next(vocab, indexer, sf_tokenized_lf_map)
         batch_input = list(map(lambda x: torch.LongTensor(x).clamp_min_(0).to('cuda'), batch_input))
         with torch.no_grad():
             scores, target = model(*batch_input + [num_outputs])
+        batch_correct = len(np.where(tensor_to_np(torch.argmax(scores, 1)) == tensor_to_np(target))[0])
+        batch_examples = len(num_outputs)
+        batch_loss = loss_func.forward(scores, target)
+
+        num_correct += batch_correct
+        num_examples += batch_examples
+        total_ll += batch_loss.item()
         pred_lf_idxs = tensor_to_np(torch.argmax(scores, 1))
         batch_data = test_batcher.get_prev_batch()
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, None)
+    avg_test_ll = total_ll / float(test_batcher.num_batches())
+    avg_test_acc = num_correct / float(num_examples)
+    print('Test Loss={}. Accuracy={}'.format(avg_test_ll, avg_test_acc))
     return _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment='elmo')
 
 
