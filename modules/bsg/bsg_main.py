@@ -22,7 +22,7 @@ from bsg_model import BSG
 from bsg_utils import restore_model, save_checkpoint
 from compute_sections import enumerate_metadata_ids_multi_bsg
 from evaluate import run_evaluation
-from model_utils import block_print, enable_print, get_git_revision_hash, render_args
+from model_utils import block_print, enable_print, get_git_revision_hash, render_args, render_num_params
 
 
 if __name__ == '__main__':
@@ -101,6 +101,7 @@ if __name__ == '__main__':
 
     # Instantiate PyTorch BSG Model
     model = BSG(args, vocab.size()).to(device_str)
+    render_num_params(model, vocab.size())
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
