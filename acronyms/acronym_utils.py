@@ -155,6 +155,9 @@ def load_rs(prev_args, dataset, train_frac=1.0, batch_size=None):
     else:
         df['metadata'] = df['section']
         df['metadata'].fillna('<pad>', inplace=True)
+
+        # TOOD remove
+        df['section_mapped'] = ['<pad>'] * df.shape[0]
     sfs = df['sf'].unique().tolist()
     for sf in sfs:
         used_sf_lf_map[sf] = sf_lf_map[sf]

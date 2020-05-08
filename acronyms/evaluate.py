@@ -106,7 +106,8 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
         prev_args.metadata = None
     else:
         prev_args, lm, token_vocab, metadata_vocab, _, _, _ = restore_func(args.lm_experiment, ckpt=args.ckpt)
-    train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(prev_args, train_frac=train_frac)
+    train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(
+        prev_args, train_frac=train_frac, batch_size=args.batch_size)
     args.metadata = prev_args.metadata
 
     # Construct smoothed empirical probabilities of metadata conditioned on LF ~ p(metadata|LF)
@@ -133,13 +134,13 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
 
     render_test_statistics(test_df, sf_lf_map)
 
-    if lf_metadata_counts is not None:
-        if args.dataset == 'mimic':
-            train_lf_metadata_counts, val_lf_metadata_counts = split_marginals(lf_metadata_counts)
-        else:
-            train_lf_metadata_counts = lf_metadata_counts
-            val_lf_metadata_counts = _generate_marginals(test_df)
-        render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_counts, sf_lf_map)
+    # if lf_metadata_counts is not None:
+    #     if args.dataset == 'mimic':
+    #         train_lf_metadata_counts, val_lf_metadata_counts = split_marginals(lf_metadata_counts)
+    #     else:
+    #         train_lf_metadata_counts = lf_metadata_counts
+    #         val_lf_metadata_counts = _generate_marginals(test_df)
+    #     render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_counts, sf_lf_map)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join(home_dir, 'weights', 'acronyms', args.experiment)
