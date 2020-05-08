@@ -106,12 +106,7 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
         prev_args.metadata = None
     else:
         prev_args, lm, token_vocab, metadata_vocab, _, _, _ = restore_func(args.lm_experiment, ckpt=args.ckpt)
-<<<<<<< HEAD
-    train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(
-        prev_args, train_frac=train_frac, batch_size=args.batch_size)
-=======
     train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(prev_args, train_frac=train_frac)
->>>>>>> a4de899... - Refactor Evaluation
     args.metadata = prev_args.metadata
 
     # Construct smoothed empirical probabilities of metadata conditioned on LF ~ p(metadata|LF)
