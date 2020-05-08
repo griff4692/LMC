@@ -273,7 +273,10 @@ def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, ind
     avg_test_ll = total_ll / float(test_batcher.num_batches())
     avg_test_acc = num_correct / float(num_examples)
     print('Test Loss={}. Accuracy={}'.format(avg_test_ll, avg_test_acc))
-    return _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment='elmo')
+    metrics = _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment='elmo')
+    metrics['accuracy'] = avg_test_acc
+    metrics['log_loss'] = avg_test_ll
+    return metrics
 
 
 def render_test_statistics(df, sf_lf_map):

@@ -9,6 +9,8 @@ from allennlp.modules.token_embedders.bidirectional_language_model_token_embedde
     BidirectionalLanguageModelTokenEmbedder)
 import argparse
 import numpy as np
+import pandas as pd
+from scipy.stats import describe
 import torch
 import torch.nn as nn
 from tqdm import tqdm
@@ -27,7 +29,7 @@ from evaluate import load_casi, load_mimic
 from model_utils import tensor_to_np
 
 
-def get_pretrained_elmo(lm_model_file='~/allennlp-0.9.0/output_path/model.tar.gz'):
+def get_pretrained_elmo(lm_model_file='~/allennlp/output_path/model.tar.gz'):
     return BidirectionalLanguageModelTokenEmbedder(
         archive_file=lm_model_file,
         dropout=0.2,
@@ -37,9 +39,10 @@ def get_pretrained_elmo(lm_model_file='~/allennlp-0.9.0/output_path/model.tar.gz
     )
 
 
-def elmo_evaluate(args, loader):
+def elmo_evaluate(args, loader, train_frac=0.0):
     args.metadata = None
-    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map = loader(args)
+    train_batcher, test_batcher, train_df, test_df, used_sf_lf_map = loader(
+        args, batch_size=args.batch_size, train_frac=train_frac)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join(home_dir, 'weights', 'acronyms', args.experiment)
@@ -51,20 +54,18 @@ def elmo_evaluate(args, loader):
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
 
-    elmo_model_path = '~/allennlp-0.9.0/{}/model.tar.gz'.format(args.lm_experiment)
+    elmo_model_path = '~/allennlp/{}/model.tar.gz'.format(args.lm_experiment)
     elmo = get_pretrained_elmo(lm_model_file=elmo_model_path)
     device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     if args.ckpt is not None:
         ckpt_str = 'best' if args.ckpt == 'best' else 'model_state_epoch_{}'.format(args.ckpt)
-        ckpt_fp = os.path.join(
-            os.path.expanduser('~'), 'allennlp-0.9.0/{}/{}.th'.format(args.lm_experiment, ckpt_str))
+        ckpt_fp = os.path.join(os.path.expanduser('~'), 'allennlp/{}/{}.th'.format(args.lm_experiment, ckpt_str))
 
         state_dict = torch.load(ckpt_fp)
         model_dict = elmo.state_dict()
         updated_state_dict = {('_lm.' + k): v for k, v in state_dict.items() if '_lm.' + k in model_dict}
         # 2. overwrite entries in the existing state dict
-        print(len(updated_state_dict))
         model_dict.update(updated_state_dict)
         # 3. load the new state dict
         elmo.load_state_dict(model_dict)
@@ -79,7 +80,8 @@ def elmo_evaluate(args, loader):
             tokens = lf_tokenizer(lf)
             sf_tokenized_lf_map[sf].append(tokens)
 
-    elmo_analyze(test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=results_dir)
+    return elmo_analyze(
+        test_batcher, model, used_sf_lf_map, vocab, sf_tokenized_lf_map, indexer, results_dir=results_dir)
 
 
 def run_test_epoch(model, test_batcher, indexer, vocab, sf_tokenized_lf_map, loss_func):
@@ -117,6 +119,7 @@ if __name__ == '__main__':
 
     # Training Hyperparameters
     parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('-bootstrap', default=False, action='store_true')
     parser.add_argument('--ckpt', default=None)
     parser.add_argument('--epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
@@ -124,5 +127,28 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     args.experiment += '_{}'.format(args.dataset)
-    loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
-    elmo_evaluate(args, loader)
+    dataset_loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
+
+    cols = ['accuracy', 'weighted_f1', 'macro_f1', 'log_loss']
+    if args.bootstrap:
+        train_frac = 0.2
+        iters = 100
+    else:
+        iters = 1
+        train_frac = 0.0
+
+    agg_metrics = []
+    for i in range(iters):
+        metrics = elmo_evaluate(args, dataset_loader, train_frac=train_frac)
+        metric_row = [metrics[col] for col in cols]
+        agg_metrics.append(metric_row)
+
+    if args.bootstrap:
+        df = pd.DataFrame(agg_metrics, columns=cols)
+        for col in cols:
+            print(col)
+            print(describe(df[col].tolist()))
+        results_dir = os.path.join(home_dir, 'weights', 'acronyms', args.experiment, 'results')
+        bootstrap_fn = os.path.join(results_dir, 'bootstrap.csv')
+        print('Saving bootstrap results to {}'.format(bootstrap_fn))
+        df.to_csv(bootstrap_fn, index=False)

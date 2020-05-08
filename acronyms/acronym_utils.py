@@ -84,7 +84,7 @@ def eval_tokenize(str, unique_only=False):
     return tokens
 
 
-def load_casi(prev_args, train_frac=1.0):
+def load_casi(prev_args, train_frac=1.0, batch_size=32):
     """
     :param prev_args: argparse instance from pre-trained language model
     :param train_frac: If you want to fine tune the model, this should be about 0.8.
@@ -115,17 +115,17 @@ def load_casi(prev_args, train_frac=1.0):
 
     if train_frac == 1.0 or train_frac == 0.0:
         train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(df, batch_size=512)
+        test_batcher = AcronymBatcherLoader(df, batch_size=batch_size)
         train_df = df
         test_df = df
     else:
         train_df, test_df = train_test_split(df, test_size=1.0 - train_frac)
         train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=512)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=batch_size)
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 
-def load_mimic(prev_args, train_frac=1.0):
+def load_mimic(prev_args, train_frac=1.0, batch_size=32):
     """
     :param prev_args: argparse instance from pre-trained language model
     :param train_frac: If you want to fine tune the model, this should be about 0.8.
@@ -152,11 +152,11 @@ def load_mimic(prev_args, train_frac=1.0):
     if train_frac == 1.0 or train_frac == 0.0:
         train_df, test_df = df, df
         train_batcher = AcronymBatcherLoader(df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(df, batch_size=512)
+        test_batcher = AcronymBatcherLoader(df, batch_size=batch_size)
     else:
         train_df, test_df = train_test_split(df, test_size=1.0 - train_frac)
         train_batcher = AcronymBatcherLoader(train_df, batch_size=32)
-        test_batcher = AcronymBatcherLoader(test_df, batch_size=512)
+        test_batcher = AcronymBatcherLoader(test_df, batch_size=batch_size)
     return train_batcher, test_batcher, train_df, test_df, used_sf_lf_map
 
 

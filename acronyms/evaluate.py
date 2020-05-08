@@ -204,7 +204,8 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
         prev_args.metadata = None
     else:
         prev_args, lm, token_vocab, metadata_vocab, _, _, _ = restore_func(args.lm_experiment, ckpt=args.ckpt)
-    train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(prev_args, train_frac=train_frac)
+    train_batcher, test_batcher, train_df, test_df, sf_lf_map = dataset_loader(
+        prev_args, train_frac=train_frac, batch_size=args.batch_size)
     args.metadata = prev_args.metadata
 
     # Construct smoothed empirical probabilities of metadata conditioned on LF ~ p(metadata|LF)
@@ -307,6 +308,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', default='casi', help='casi or mimic')
 
     # Training Hyperparameters
+    parser.add_argument('--batch_size', default=512, type=int)
     parser.add_argument('-cpu', default=False, action='store_true')
     parser.add_argument('--epochs', default=0, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
