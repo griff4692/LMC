@@ -21,7 +21,8 @@ sys.path.insert(0, os.path.join(home_dir, 'modules', 'bsg'))
 sys.path.insert(0, os.path.join(home_dir, 'modules', 'lmc'))
 sys.path.insert(0, os.path.join(home_dir, 'preprocess'))
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
-from acronym_utils import load_casi, load_mimic, lf_tokenizer, run_test_epoch, run_train_epoch
+from acronym_utils import (load_casi, load_mimic, lf_tokenizer, render_dominant_section_accuracy, split_marginals,
+                           run_test_epoch, run_train_epoch)
 from bsg_acronym_expander import BSGAcronymExpander
 from bsg_utils import restore_model as restore_bsg
 from error_analysis import analyze, render_test_statistics
@@ -49,105 +50,6 @@ def _generate_marginals_from_casi(df):
         marginals[lf]['section'] = names
         marginals[lf]['p'] = [c / tsum for c in counts]
     return marginals
-
-
-def _split_marginals(lf_metadata_counts):
-    train_marginals = {}
-    val_marginals = {}
-
-    train_frac = 0.75
-    smooth_factor = 1
-
-    for lf, items in lf_metadata_counts.items():
-        train_marginals[lf] = {
-            'section': items['section'],
-            'count': [],
-            'p': []
-        }
-        val_marginals[lf] = {
-            'section': items['section'],
-            'count': [],
-            'p': []
-        }
-
-        full_sections = []
-        for s, c in zip(items['section'], items['count']):
-            full_sections += [s] * c
-        random.shuffle(full_sections)
-        N = len(full_sections)
-        split_idx = int(train_frac * N)
-        train_set, val_set = full_sections[:split_idx], full_sections[split_idx:]
-
-        train_counts = Counter(train_set)
-        val_counts = Counter(val_set)
-
-        for s in items['section']:
-            tct = smooth_factor if s not in train_counts else smooth_factor + train_counts[s]
-            vct = smooth_factor if s not in val_counts else smooth_factor + val_counts[s]
-
-            train_marginals[lf]['count'].append(tct)
-            val_marginals[lf]['count'].append(vct)
-
-        tsum = float(sum(train_marginals[lf]['count']))
-        vsum = float(sum(val_marginals[lf]['count']))
-        train_marginals[lf]['p'] = [c / tsum for c in train_marginals[lf]['count']]
-        val_marginals[lf]['p'] = [c / vsum for c in val_marginals[lf]['count']]
-    return train_marginals, val_marginals
-
-
-def render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_counts, sf_lf_map):
-    accuracies = []
-    macro_f1s = []
-    weighted_f1s = []
-    for sf, lfs in sf_lf_map.items():
-        n = 0
-        max_p = defaultdict(int)
-        predicted_class = {}
-        dominant_class = {}
-        max_freq = 0
-        for lf in lfs:
-            c = sum(train_lf_metadata_counts[lf]['count'])
-            max_freq = max(max_freq, c)
-            if max_freq == c:
-                dominant_class[sf] = lf
-            for name, p in zip(train_lf_metadata_counts[lf]['section'], train_lf_metadata_counts[lf]['p']):
-                max_p[name] = max(max_p[name], p)
-                if p == max_p[name]:
-                    predicted_class[name] = lf
-        for lf in lfs:
-            dominant_class[lf] = dominant_class[sf]
-
-        y_true = []
-        y_pred = []
-        for lf in lfs:
-            if lf in val_lf_metadata_counts:
-                n += sum(val_lf_metadata_counts[lf]['count'])
-                for count, name in zip(val_lf_metadata_counts[lf]['count'], val_lf_metadata_counts[lf]['section']):
-                    if not name in predicted_class:
-                        pred_lf = dominant_class[lf]
-                    else:
-                        pred_lf = predicted_class[name]
-                    y_true += [lf] * count
-                    y_pred += [pred_lf] * count
-        sf_results = classification_report(y_true, y_pred, output_dict=True)
-        macro_nonzero = defaultdict(float)
-        num_nonzero = 0
-        for lf in list(sf_results.keys()):
-            d = sf_results[lf]
-            if type(d) == dict and d['support'] > 0:
-                macro_nonzero['f1-score'] += d['f1-score']
-                num_nonzero += 1
-        accuracy = sf_results['accuracy']
-        macro_f1 = macro_nonzero['f1-score'] / float(num_nonzero)
-        weighted_f1 = sf_results['weighted avg']['f1-score']
-        accuracies.append(accuracy)
-        macro_f1s.append(macro_f1)
-        weighted_f1s.append(weighted_f1)
-
-    acc = np.array(accuracies).mean()
-    wf1 = np.array(weighted_f1s).mean()
-    mf1 = np.array(macro_f1s).mean()
-    print('Dominant section header accuracy={}. weighted F1={}. macro F1={}'.format(acc, wf1, mf1))
 
 
 def extract_smoothed_metadata_probs(metadata='section'):
@@ -237,7 +139,7 @@ def run_evaluation(args, acronym_model, dataset_loader, restore_func, train_frac
             train_lf_metadata_counts = lf_metadata_counts
             val_lf_metadata_counts = _generate_marginals_from_casi(test_df)
         else:
-            train_lf_metadata_counts, val_lf_metadata_counts = _split_marginals(lf_metadata_counts)
+            train_lf_metadata_counts, val_lf_metadata_counts = split_marginals(lf_metadata_counts)
         render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_counts, sf_lf_map)
 
     # Create model experiments directory or clear if it already exists

@@ -19,7 +19,7 @@ from model_utils import tensor_to_np
 
 
 def get_rare_lfs(threshold=5):
-    df = pd.read_csv('../preprocess/context_extraction/data/lfs_w_counts.csv')
+    df = pd.read_csv(os.path.join(home_dir, 'preprocess/context_extraction/data/lfs_w_counts.csv'))
     df = df[df['count'] > 0]
     df = df[df['count'] < threshold]
     return df['target_lf_sense'].unique().tolist()

@@ -44,6 +44,7 @@ def elmo_evaluate(args, loader, train_frac=0.0):
     train_batcher, test_batcher, train_df, test_df, used_sf_lf_map = loader(
         args, batch_size=args.batch_size, train_frac=train_frac)
 
+
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join(home_dir, 'weights', 'acronyms', args.experiment)
     if os.path.exists(weights_dir):
@@ -53,15 +54,14 @@ def elmo_evaluate(args, loader, train_frac=0.0):
     results_dir = os.path.join(weights_dir, 'results')
     os.mkdir(results_dir)
     os.mkdir(os.path.join(results_dir, 'confusion'))
-
     elmo_model_path = '~/allennlp/{}/model.tar.gz'.format(args.lm_experiment)
+
     elmo = get_pretrained_elmo(lm_model_file=elmo_model_path)
     device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     if args.ckpt is not None:
         ckpt_str = 'best' if args.ckpt == 'best' else 'model_state_epoch_{}'.format(args.ckpt)
         ckpt_fp = os.path.join(os.path.expanduser('~'), 'allennlp/{}/{}.th'.format(args.lm_experiment, ckpt_str))
-
         state_dict = torch.load(ckpt_fp)
         model_dict = elmo.state_dict()
         updated_state_dict = {('_lm.' + k): v for k, v in state_dict.items() if '_lm.' + k in model_dict}

@@ -1,6 +1,7 @@
 from collections import Counter, defaultdict
 import json
 import os
+import random
 import re
 from string import punctuation
 import string
@@ -9,6 +10,7 @@ from time import sleep
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 import torch
 from tqdm import tqdm
@@ -359,6 +361,61 @@ def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, 
     return batch_loss, num_examples, num_correct, scores, rel_weights
 
 
+def render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_counts, sf_lf_map):
+    accuracies = []
+    macro_f1s = []
+    weighted_f1s = []
+    for sf, lfs in sf_lf_map.items():
+        n = 0
+        max_p = defaultdict(int)
+        predicted_class = {}
+        dominant_class = {}
+        max_freq = 0
+        for lf in lfs:
+            c = sum(train_lf_metadata_counts[lf]['count'])
+            max_freq = max(max_freq, c)
+            if max_freq == c:
+                dominant_class[sf] = lf
+            for name, p in zip(train_lf_metadata_counts[lf]['section'], train_lf_metadata_counts[lf]['p']):
+                max_p[name] = max(max_p[name], p)
+                if p == max_p[name]:
+                    predicted_class[name] = lf
+        for lf in lfs:
+            dominant_class[lf] = dominant_class[sf]
+
+        y_true = []
+        y_pred = []
+        for lf in lfs:
+            if lf in val_lf_metadata_counts:
+                n += sum(val_lf_metadata_counts[lf]['count'])
+                for count, name in zip(val_lf_metadata_counts[lf]['count'], val_lf_metadata_counts[lf]['section']):
+                    if not name in predicted_class:
+                        pred_lf = dominant_class[lf]
+                    else:
+                        pred_lf = predicted_class[name]
+                    y_true += [lf] * count
+                    y_pred += [pred_lf] * count
+        sf_results = classification_report(y_true, y_pred, output_dict=True)
+        macro_nonzero = defaultdict(float)
+        num_nonzero = 0
+        for lf in list(sf_results.keys()):
+            d = sf_results[lf]
+            if type(d) == dict and d['support'] > 0:
+                macro_nonzero['f1-score'] += d['f1-score']
+                num_nonzero += 1
+        accuracy = sf_results['accuracy']
+        macro_f1 = macro_nonzero['f1-score'] / float(num_nonzero)
+        weighted_f1 = sf_results['weighted avg']['f1-score']
+        accuracies.append(accuracy)
+        macro_f1s.append(macro_f1)
+        weighted_f1s.append(weighted_f1)
+
+    acc = np.array(accuracies).mean()
+    wf1 = np.array(weighted_f1s).mean()
+    mf1 = np.array(macro_f1s).mean()
+    print('Dominant section header accuracy={}. weighted F1={}. macro F1={}'.format(acc, wf1, mf1))
+
+
 def run_test_epoch(args, test_batcher, model, loss_func, token_vocab, metadata_vocab, sf_tokenized_lf_map,
                sf_lf_map, token_metadata_counts):
     """
@@ -431,6 +488,50 @@ def run_train_epoch(args, train_batcher, model, loss_func, optimizer, token_voca
     print('Train Loss={}. Accuracy={}'.format(train_loss, train_acc))
     sleep(0.1)
     return train_loss
+
+
+def split_marginals(lf_metadata_counts):
+    train_marginals = {}
+    val_marginals = {}
+
+    train_frac = 0.75
+    smooth_factor = 1
+
+    for lf, items in lf_metadata_counts.items():
+        train_marginals[lf] = {
+            'section': items['section'],
+            'count': [],
+            'p': []
+        }
+        val_marginals[lf] = {
+            'section': items['section'],
+            'count': [],
+            'p': []
+        }
+
+        full_sections = []
+        for s, c in zip(items['section'], items['count']):
+            full_sections += [s] * c
+        random.shuffle(full_sections)
+        N = len(full_sections)
+        split_idx = int(train_frac * N)
+        train_set, val_set = full_sections[:split_idx], full_sections[split_idx:]
+
+        train_counts = Counter(train_set)
+        val_counts = Counter(val_set)
+
+        for s in items['section']:
+            tct = smooth_factor if s not in train_counts else smooth_factor + train_counts[s]
+            vct = smooth_factor if s not in val_counts else smooth_factor + val_counts[s]
+
+            train_marginals[lf]['count'].append(tct)
+            val_marginals[lf]['count'].append(vct)
+
+        tsum = float(sum(train_marginals[lf]['count']))
+        vsum = float(sum(val_marginals[lf]['count']))
+        train_marginals[lf]['p'] = [c / tsum for c in train_marginals[lf]['count']]
+        val_marginals[lf]['p'] = [c / vsum for c in val_marginals[lf]['count']]
+    return train_marginals, val_marginals
 
 
 def target_lf_sense(target_lf, sf, sf_lf_map):

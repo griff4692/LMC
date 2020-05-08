@@ -26,7 +26,7 @@ from lmc_acronym_expander import LMCAcronymExpander
 from lmc_model import LMC, LMCBERT
 from lmc_prebatch import create_tokenizer_maps, DistributedDataset, generate_metadata_samples
 from lmc_utils import restore_model, save_checkpoint
-from model_utils import block_print, enable_print, get_git_revision_hash, render_args
+from model_utils import block_print, enable_print, get_git_revision_hash, render_args, render_num_params
 from vocab import Vocab
 
 
@@ -167,6 +167,7 @@ if __name__ == '__main__':
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
     model = model_prototype(  # Either LMC or LMCBERT
         args, kwargs['token_vocab_size'], metadata_vocab_size=kwargs['metadata_vocab'].size()).to(args.device)
+    render_num_params(model, kwargs['metadata_vocab'].size())
 
     if args.multi_gpu and torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
@@ -235,17 +236,19 @@ if __name__ == '__main__':
                                     checkpoint_fp=checkpoint_fp, metadata_vocab=kwargs['metadata_vocab'])
 
                 experiments = [(load_casi, 'casi'), (load_mimic, 'mimic')]
+                prev_epoch_ct = args.epochs
+                prev_batch_size = args.batch_size
                 for loader, dataset in experiments:
-                    args.lm_type = 'bsg'
+                    args.lm_type = 'lmc'
                     args.lm_experiment = args.experiment
                     args.ckpt = None
                     args.device = device_str
-                    prev_epoch_ct = args.epochs
                     args.epochs = 0
+                    args.dataset = dataset
+                    args.batch_size = 128
                     block_print()
                     metrics = run_evaluation(args, LMCAcronymExpander, loader, restore_model, train_frac=0)
                     enable_print()
-                    args.epochs = prev_epoch_ct
                     metrics['dataset'] = dataset
                     metrics['hours'] = duration_in_hours
                     metrics['examples'] = full_example_ct
@@ -257,7 +260,8 @@ if __name__ == '__main__':
                     print(metric_cols)
                     print(row)
                     metrics_file.flush()
-
+                args.batch_size = prev_batch_size
+                args.epochs = prev_epoch_ct
         epoch_joint_loss /= float(num_batches)
         epoch_kl_loss /= float(num_batches)
         epoch_recon_loss /= float(num_batches)
