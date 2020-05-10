@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(home_dir, 'utils'))
 from acronym_utils import lf_tokenizer
 from elmo_acronym_expander import ELMoAcronymExpander
 from error_analysis import elmo_analyze
-from evaluate import load_casi, load_mimic
+from evaluate import load_casi, load_columbia, load_mimic
 from model_utils import tensor_to_np
 
 
@@ -127,7 +127,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     args.experiment += '_{}'.format(args.dataset)
-    dataset_loader = load_casi if args.dataset.lower() == 'casi' else load_mimic
+    dl = args.dataset.lower()
+    if dl == 'mimic':
+        dataset_loader = load_mimic
+    elif dl == 'casi':
+        dataset_loader = load_casi
+    elif dl == 'columbia':
+        dataset_loader = load_columbia
+    else:
+        raise Exception('Didn\'t recognize datset={}'.format(dl))
 
     cols = ['accuracy', 'weighted_f1', 'macro_f1', 'log_loss']
     if args.bootstrap:
