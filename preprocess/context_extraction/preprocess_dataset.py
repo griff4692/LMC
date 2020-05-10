@@ -9,7 +9,7 @@ import pandas as pd
 
 home_dir = os.path.expanduser('~/LMC/')
 sys.path.insert(0, os.path.join(home_dir, 'preprocess'))
-from extract_contexts import read_columbia_dataset
+from mimic_contexts import read_columbia_dataset
 from mimic_tokenize import clean_text, tokenize_str, create_section_token
 
 
