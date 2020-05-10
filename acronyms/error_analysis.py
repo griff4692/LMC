@@ -269,6 +269,7 @@ def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, ind
     loss_func = nn.CrossEntropyLoss()
 
     total_ll, num_correct, num_examples = 0.0, 0.0, 0.0
+    correct_top3 = [0, 0, 0]
 
     for _ in tqdm(range(test_batcher.num_batches())):
         batch_input, num_outputs = test_batcher.elmo_next(vocab, indexer, sf_tokenized_lf_map)
@@ -279,15 +280,31 @@ def elmo_analyze(test_batcher, model, sf_lf_map, vocab, sf_tokenized_lf_map, ind
         batch_examples = len(num_outputs)
         batch_loss = loss_func.forward(scores, target)
 
+        batch_data = test_batcher.get_prev_batch()
         num_correct += batch_correct
         num_examples += batch_examples
         total_ll += batch_loss.item()
         pred_lf_idxs = tensor_to_np(torch.argmax(scores, 1))
+        target_lf_idxs = np.array(batch_data['target_lf_idx'].tolist())
         batch_data = test_batcher.get_prev_batch()
+
+        top_num = min(scores.size()[-1], 3)
+        top_3_pred_lf_idxs = tensor_to_np(torch.topk(scores, top_num)[1])
+        tc = 0
+        for i in range(top_num):
+            tc += len(np.where(top_3_pred_lf_idxs[:, i] == target_lf_idxs)[0])
+            correct_top3[i] += tc
+        for i in range(top_num, 3):
+            correct_top3[i] += len(target_lf_idxs)
+
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, None)
+
     avg_test_ll = total_ll / float(test_batcher.num_batches())
     avg_test_acc = num_correct / float(num_examples)
+    avg_top3_acc = list(map(lambda nc: str(nc / float(num_examples)), correct_top3))
+    avg_top3_acc_str = '/'.join(avg_top3_acc)
     print('Test Loss={}. Accuracy={}'.format(avg_test_ll, avg_test_acc))
+    print('Top 3 Accuracy={}'.format(avg_top3_acc_str))
     metrics = _analyze_stats(results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment='elmo')
     metrics['accuracy'] = avg_test_acc
     metrics['log_loss'] = avg_test_ll
