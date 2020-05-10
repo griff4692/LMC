@@ -120,7 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=1024, type=int)
     parser.add_argument('--epochs', default=5, type=int)
     parser.add_argument('--lr', default=0.001, type=float)
-    parser.add_argument('-multi_gpu', default=False, action='store_true')
+    parser.add_argument('--num_gpu', default=1, type=int)
 
     # Model Hyperparameters
     parser.add_argument('-bert', default=False, action='store_true')
@@ -147,7 +147,7 @@ if __name__ == '__main__':
 
     # If we are using multiple GPUs, let's keep a uniform batch_size for each GPU
     # Or else, there is no real speed-up gain from using multiple GPUs
-    if args.multi_gpu and torch.cuda.device_count() > 1:
+    if args.num_gpu > 1 and torch.cuda.device_count() > 1:
         args.batch_size *= torch.cuda.device_count()
 
     ids_infile = os.path.join(home_dir, 'preprocess', 'data', 'ids{}.npy'.format(debug_str))
@@ -169,7 +169,7 @@ if __name__ == '__main__':
         args, kwargs['token_vocab_size'], metadata_vocab_size=kwargs['metadata_vocab'].size()).to(args.device)
     render_num_params(model, kwargs['metadata_vocab'].size())
 
-    if args.multi_gpu and torch.cuda.device_count() > 1:
+    if args.num_gpu > 1 and torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         model = nn.DataParallel(model)
 
