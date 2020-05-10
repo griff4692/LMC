@@ -213,6 +213,7 @@ def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metada
     id_map = {'correct': [], 'error': []}
     errors_str, correct_str = defaultdict(str), defaultdict(str)
     total_ll, num_correct, num_examples = 0.0, 0.0, 0.0
+    correct_top3 = [0, 0, 0]
     for _ in range(test_batcher.num_batches()):
         with torch.no_grad():
             batch_loss, batch_examples, batch_correct, batch_scores, rel_weights = process_batch(
@@ -222,14 +223,28 @@ def analyze(args, test_batcher, model, sf_lf_map, loss_func, token_vocab, metada
         num_examples += batch_examples
         total_ll += batch_loss
         batch_data = test_batcher.get_prev_batch()
+        target_lf_idxs = np.array(batch_data['target_lf_idx'].tolist())
         pred_lf_idxs = tensor_to_np(torch.argmax(batch_scores, 1))
+
+        top_num = min(batch_scores.size()[-1], 3)
+        top_3_pred_lf_idxs = tensor_to_np(torch.topk(batch_scores, top_num)[1])
+        tc = 0
+        for i in range(top_num):
+            tc += len(np.where(top_3_pred_lf_idxs[:, i] == target_lf_idxs)[0])
+            correct_top3[i] += tc
+        for i in range(top_num, 3):
+            correct_top3[i] += len(target_lf_idxs)
+
         if rel_weights is not None:
             rel_weights = tensor_to_np(rel_weights)
         _analyze_batch(batch_data, sf_lf_map, pred_lf_idxs, correct_str, errors_str, sf_confusion, id_map, rel_weights)
 
     avg_test_ll = total_ll / float(test_batcher.num_batches())
-    avg_test_acc = num_correct / float(num_examples)
-    print('Test Loss={}. Accuracy={}'.format(avg_test_ll, avg_test_acc))
+    avg_acc = num_correct / float(num_examples)
+    avg_top3_acc = list(map(lambda nc: str(nc / float(num_examples)), correct_top3))
+    avg_top3_acc_str = '/'.join(avg_top3_acc)
+    print('Test Loss={}. Accuracy={}'.format(avg_test_ll, avg_acc))
+    print('Top 3 Accuracy={}'.format(avg_top3_acc_str))
     return _analyze_stats(
         results_dir, sf_lf_map, correct_str, errors_str, sf_confusion, id_map, experiment=args.experiment)
 

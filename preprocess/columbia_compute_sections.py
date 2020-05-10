@@ -124,7 +124,7 @@ if __name__ == '__main__':
 
     # Expand home path (~) so that pandas knows where to look
     print('Loading data...')
-    in_fp = '/nlp/projects/BERT_corpus_250M/corpusFiles/train/corpus.txt'
+    in_fp = '/nlp/projects/BERT_corpus_icu_250M/corpusFiles/train/corpus.txt'
     print('Loading Columbia data from {}'.format(in_fp))
 
     texts = []

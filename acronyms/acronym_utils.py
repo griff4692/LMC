@@ -148,16 +148,16 @@ def load_casi(prev_args, train_frac=1.0, batch_size=32):
 
 
 def load_columbia(prev_args, train_frac=1.0, batch_size=None):
-    return load_rs(prev_args, 'columbia', train_frac, batch_size=batch_size)
+    return load_rs('columbia', train_frac, batch_size=batch_size)
 
 
 def load_mimic(prev_args, train_frac=1.0, batch_size=None):
-    return load_rs(prev_args, 'mimic', train_frac, batch_size=batch_size)
+    return load_rs('mimic', train_frac, batch_size=batch_size)
 
 
-def load_rs(prev_args, dataset, train_frac=1.0, batch_size=None):
+def load_rs(dataset, train_frac=1.0, batch_size=None):
     """
-    :param prev_args: argparse instance from pre-trained language model
+    :param dataset: mimic or columbia
     :param train_frac: If you want to fine tune the model, this should be about 0.8.
     :return: train_batcher, test_batcher, train_df, test_df, sf_lf_map
 
@@ -169,12 +169,9 @@ def load_rs(prev_args, dataset, train_frac=1.0, batch_size=None):
     used_sf_lf_map = {}
     df = pd.read_csv(os.path.join(
         home_dir, 'preprocess/context_extraction/data/{}_rs_dataset_preprocessed_window_10.csv'.format(dataset)))
-    df['category'] = df['category'].apply(create_document_token)
-    if prev_args.metadata == 'category':
-        df['metadata'] = df['category']
-    else:
-        df['metadata'] = df['section']
-        df['metadata'].fillna('<pad>', inplace=True)
+    if 'section_mapped' in df.columns:
+        df['section'] = df['section_mapped']
+    df['section'].fillna('<pad>', inplace=True)
     sfs = df['sf'].unique().tolist()
     for sf in sfs:
         used_sf_lf_map[sf] = sf_lf_map[sf]

@@ -137,7 +137,7 @@ def get_mimic_chunk(chunk, chunksize, debug):
 
 def read_columbia_dataset():
     columbia_data = defaultdict(list)
-    in_fp = '/nlp/projects/BERT_corpus_250M/corpusFiles/train/corpus.txt'
+    in_fp = '/nlp/projects/BERT_corpus_icu_250M/corpusFiles/train/corpus.txt'
     print('Loading Columbia data from {}'.format(in_fp))
     curr_doc = ''
     with open(in_fp, 'r') as fd:
@@ -146,7 +146,7 @@ def read_columbia_dataset():
             if len(line) == 0 and len(curr_doc) > 0:
                 columbia_data['ROW_ID'].append(i)
                 columbia_data['TEXT'].append(curr_doc.strip())
-                columbia_data['CATEGORY'].append('Columbia Notes')
+                columbia_data['CATEGORY'].append('Columbia ICU/CCU Notes')
                 curr_doc = ''
             else:
                 curr_doc += line + ' '
@@ -157,6 +157,7 @@ def read_columbia_dataset():
         columbia_data['TEXT'].append(curr_doc.strip())
         columbia_data['CATEGORY'].append('Columbia Notes')
     columbia_df = pd.DataFrame(columbia_data)
+    print('Loaded {} documents'.format(columbia_df.shape[0]))
     return columbia_df
 
 
