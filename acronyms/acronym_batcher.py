@@ -43,7 +43,7 @@ class AcronymBatcherLoader:
             sf = row['sf'].lower()
             # Find target_sf index in sf_lf_map
             target_lf_ids[batch_idx] = row['target_lf_idx']
-            context_tokens = row['trimmed_tokens']
+            context_tokens = sf + ' ' + row['trimmed_tokens']
             context_id_seq = self.bert_tokenize(context_tokens, tokenizer)
             trunc_context_len = min(len(context_id_seq), max_context_len)
             context_ids[batch_idx, :trunc_context_len] = context_id_seq[:trunc_context_len]

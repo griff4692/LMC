@@ -41,7 +41,6 @@ def bert_evaluate(args, loader, train_frac=0.0):
 
     tokenizer = AutoTokenizer.from_pretrained('emilyalsentzer/Bio_ClinicalBERT')
     bert_model = AutoModel.from_pretrained('emilyalsentzer/Bio_ClinicalBERT')
-
     model = BERTAcronymExpander(bert_model)
     device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     model.to(device_str)
