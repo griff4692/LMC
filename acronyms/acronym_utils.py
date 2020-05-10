@@ -29,6 +29,26 @@ TOKEN_BLACKLIST = set(string.punctuation).union(get_mimic_stopwords()).union(set
 UMLS_BLACKLIST = TOKEN_BLACKLIST.union(set(['unidentified', 'otherwise', 'specified', 'nos', 'procedure']))
 
 
+def add_section_headers_to_columbia():
+    in_fp = os.path.join(home_dir, 'preprocess/context_extraction/data/columbia_rs_dataset_preprocessed_window_10.csv')
+    df = pd.read_csv(in_fp)
+    section_map = pd.read_csv(
+        os.path.join(home_dir, 'preprocess/context_extraction/data/columbia_mimic_section_map.csv'))
+    section_map = section_map.set_index('columbia_section')['mimic_section'].to_dict()
+
+    headers = []
+    for columbia_section in df['section'].tolist():
+        if type(columbia_section) == float or len(columbia_section) == 0:
+            headers.append('<pad>')
+            continue
+        new_section = columbia_section
+        if columbia_section in section_map:
+            new_section = section_map[columbia_section]
+        headers.append(new_section)
+    df['section_mapped'] = headers
+    df.to_csv(in_fp, index=False)
+
+
 def add_section_headers_to_casi():
     """
     :return: None
@@ -38,7 +58,7 @@ def add_section_headers_to_casi():
     To adjust for this, we have curated a manual mapping from CASI section header to MIMIC in the event there is no
     exact match.  This function just adds a column 'section_mapped' to the already preprocessed CASI dataset.
     """
-    in_fp = os.path.join(home_dir, 'acronyms/data/casi/preprocessed_dataset_window_10.csv')
+    in_fp = os.path.join(home_dir, 'shared_data/casi/preprocessed_dataset_window_10.csv')
     df = pd.read_csv(in_fp)
 
     freq_sections = pd.read_csv(os.path.join(home_dir, 'preprocess/data/mimic/section_freq.csv'))['section'].tolist()
