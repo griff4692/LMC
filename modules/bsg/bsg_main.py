@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(home_dir, 'acronyms'))
 sys.path.insert(0, os.path.join(home_dir, 'acronyms', 'modules'))
 sys.path.insert(0, os.path.join(home_dir, 'preprocess'))
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
-from acronym_utils import load_mimic, load_casi
+from acronym_utils import load_mimic, load_casi, load_columbia
 from bsg_acronym_expander import BSGAcronymExpander
 from bsg_batcher import BSGBatchLoader
 from bsg_model import BSG
@@ -162,7 +162,7 @@ if __name__ == '__main__':
                 checkpoint_fp = os.path.join(weights_dir, 'checkpoint_{}.pth'.format(epoch))
                 save_checkpoint(args, model, optimizer, vocab, losses_dict, checkpoint_fp=checkpoint_fp)
 
-                experiments = [(load_casi, 'casi'), (load_mimic, 'mimic')]
+                experiments = [(load_casi, 'casi'), (load_mimic, 'mimic'), (load_columbia, 'columbia')]
                 for loader, dataset in experiments:
                     args.lm_type = 'bsg'
                     args.lm_experiment = args.experiment

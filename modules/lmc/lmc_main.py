@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(home_dir, 'acronyms'))
 sys.path.insert(0, os.path.join(home_dir, 'acronyms/modules'))
 sys.path.insert(0, os.path.join(home_dir, 'preprocess'))
 sys.path.insert(0, os.path.join(home_dir, 'utils'))
-from acronym_utils import load_mimic, load_casi
+from acronym_utils import load_mimic, load_casi, load_columbia
 from compute_sections import enumerate_metadata_ids_lmc
 from evaluate import run_evaluation
 from lmc_acronym_expander import LMCAcronymExpander
@@ -235,7 +235,7 @@ if __name__ == '__main__':
                     save_checkpoint(args, model, optimizer, token_vocab, losses_dict, kwargs['token_metadata_counts'],
                                     checkpoint_fp=checkpoint_fp, metadata_vocab=kwargs['metadata_vocab'])
 
-                experiments = [(load_casi, 'casi'), (load_mimic, 'mimic')]
+                experiments = [(load_casi, 'casi'), (load_mimic, 'mimic'), (load_columbia, 'columbia')]
                 prev_epoch_ct = args.epochs
                 prev_batch_size = args.batch_size
                 for loader, dataset in experiments:
