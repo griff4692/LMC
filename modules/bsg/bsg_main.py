@@ -45,6 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('--multi_weights', default='0.7,0.2,0.1')
     parser.add_argument('--mask_p', default=None, type=float, help=(
         'Mask Encoder tokens with probability mask_p if a float.  Otherwise, default is no masking.'))
+    parser.add_argument('-restore', default=False, action='store_true')
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()
@@ -100,19 +101,31 @@ if __name__ == '__main__':
     batcher = BSGBatchLoader(len(ids), all_metadata_pos_idxs, batch_size=args.batch_size)
 
     # Instantiate PyTorch BSG Model
-    model = BSG(args, vocab.size()).to(device_str)
+    if args.restore:
+        print('Restoring from latest checkpoint...')
+        epoch_shift = 5  # TODO determine from checkpoints
+        _, model, _, optimizer_state = restore_model(args.experiment)
+        model = model.to(device_str)
+    else:
+        epoch_shift = 0
+        model = BSG(args, vocab.size()).to(device_str)
+        optimizer_state = None
     render_num_params(model, vocab.size())
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
     optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
+    if optimizer_state is not None:
+        print('Loading previous optimizer state')
+        optimizer.load_state_dict(optimizer_state)
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join(home_dir, 'weights', 'bsg', args.experiment)
-    if os.path.exists(weights_dir):
-        print('Clearing out previous weights in {}'.format(weights_dir))
-        rmtree(weights_dir)
-    os.mkdir(weights_dir)
+    # if not args.restore:
+    #     if os.path.exists(weights_dir):
+    #         print('Clearing out previous weights in {}'.format(weights_dir))
+    #         rmtree(weights_dir)
+    #     os.mkdir(weights_dir)
 
     metric_cols = ['examples', 'lm_kl', 'lm_recon', 'epoch', 'hours', 'dataset', 'log_loss', 'accuracy', 'macro_f1',
                    'weighted_f1']
@@ -125,7 +138,7 @@ if __name__ == '__main__':
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(1 + epoch_shift, args.epochs + epoch_shift + 1):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
         print('Starting Epoch={}'.format(epoch))
         batcher.reset()

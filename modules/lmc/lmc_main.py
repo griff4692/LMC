@@ -147,8 +147,8 @@ if __name__ == '__main__':
 
     # If we are using multiple GPUs, let's keep a uniform batch_size for each GPU
     # Or else, there is no real speed-up gain from using multiple GPUs
-    if args.num_gpu > 1 and torch.cuda.device_count() > 1:
-        args.batch_size *= torch.cuda.device_count()
+    # if args.num_gpu > 1 and torch.cuda.device_count() > 1:
+    #     args.batch_size *= torch.cuda.device_count()
 
     ids_infile = os.path.join(home_dir, 'preprocess', 'data', 'ids{}.npy'.format(debug_str))
     print('Loading data from {}...'.format(ids_infile))
