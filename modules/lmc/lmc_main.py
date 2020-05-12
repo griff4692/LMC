@@ -129,6 +129,7 @@ if __name__ == '__main__':
     parser.add_argument('--metadata_samples', default=3, type=int)
     parser.add_argument('--window', default=10, type=int)
     parser.add_argument('-pool_bert', default=False, action='store_true')
+    parser.add_argument('-restore', default=False, action='store_true')
 
     args = parser.parse_args()
     args.git_hash = get_git_revision_hash()
@@ -147,8 +148,8 @@ if __name__ == '__main__':
 
     # If we are using multiple GPUs, let's keep a uniform batch_size for each GPU
     # Or else, there is no real speed-up gain from using multiple GPUs
-    # if args.num_gpu > 1 and torch.cuda.device_count() > 1:
-    #     args.batch_size *= torch.cuda.device_count()
+    if args.num_gpu > 1 and torch.cuda.device_count() > 1:
+        args.batch_size *= torch.cuda.device_count()
 
     ids_infile = os.path.join(home_dir, 'preprocess', 'data', 'ids{}.npy'.format(debug_str))
     print('Loading data from {}...'.format(ids_infile))
@@ -165,28 +166,43 @@ if __name__ == '__main__':
     kwargs = _prepare_data(args, token_vocab, ids)
     dataset = DistributedDataset(**kwargs)
     data_loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=4)
-    model = model_prototype(  # Either LMC or LMCBERT
-        args, kwargs['token_vocab_size'], metadata_vocab_size=kwargs['metadata_vocab'].size()).to(args.device)
+
+    # Instantiate PyTorch LMC Model
+    if args.restore:
+        print('Restoring from latest checkpoint...')
+        epoch_shift = 5  # TODO determine from checkpoints
+        _, model, _, _, _, optimizer_state, _ = restore_model(args.experiment)
+    else:
+        epoch_shift = 0
+        model = model_prototype(  # Either LMC or LMCBERT
+            args, kwargs['token_vocab_size'], metadata_vocab_size=kwargs['metadata_vocab'].size())
+        optimizer_state = None
+    model = model.to(args.device)
     render_num_params(model, kwargs['metadata_vocab'].size())
 
-    if args.num_gpu > 1 and torch.cuda.device_count() > 1:
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
+    num_gpu_available = torch.cuda.device_count()
+    if args.num_gpu > 1 and num_gpu_available > 1:
+        print("Let's use", num_gpu_available, "GPUs!")
         model = nn.DataParallel(model)
 
     # Instantiate Adam optimizer
     trainable_params = filter(lambda x: x.requires_grad, model.parameters())
     optimizer = torch.optim.Adam(trainable_params, lr=args.lr)
 
+    if optimizer_state is not None:
+        optimizer.load_state_dict(optimizer_state)
+
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join(home_dir, 'weights', 'lmc', args.experiment)
-    if os.path.exists(weights_dir):
-        print('Clearing out previous weights in {}'.format(weights_dir))
-        rmtree(weights_dir)
-    os.mkdir(weights_dir)
+    # if not args.restore:
+    #     if os.path.exists(weights_dir):
+    #         print('Clearing out previous weights in {}'.format(weights_dir))
+    #         rmtree(weights_dir)
+    #     os.mkdir(weights_dir)
 
     metric_cols = ['examples', 'lm_kl', 'lm_recon', 'epoch', 'hours', 'dataset', 'log_loss', 'accuracy', 'macro_f1',
                    'weighted_f1']
-    metrics_file = open(os.path.join(weights_dir, 'metrics.csv'), mode='w')
+    metrics_file = open(os.path.join(weights_dir, 'metrics.csv'), mode='a')
     metrics_writer = csv.writer(metrics_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     metrics_writer.writerow(metric_cols)
     metrics_file.flush()
@@ -195,7 +211,7 @@ if __name__ == '__main__':
 
     # Make sure it's calculating gradients
     model.train()  # just sets .requires_grad = True
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(1 + epoch_shift, args.epochs + epoch_shift + 1):
         sleep(0.1)  # Make sure logging is synchronous with tqdm progress bar
         print('Starting Epoch={}'.format(epoch))
         num_batches = len(data_loader)
