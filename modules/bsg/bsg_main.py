@@ -103,7 +103,7 @@ if __name__ == '__main__':
     # Instantiate PyTorch BSG Model
     if args.restore:
         print('Restoring from latest checkpoint...')
-        epoch_shift = 5  # TODO determine from checkpoints
+        epoch_shift = 7  # TODO determine from checkpoints
         _, model, _, optimizer_state = restore_model(args.experiment)
         model = model.to(device_str)
     else:
@@ -129,7 +129,7 @@ if __name__ == '__main__':
 
     metric_cols = ['examples', 'lm_kl', 'lm_recon', 'epoch', 'hours', 'dataset', 'log_loss', 'accuracy', 'macro_f1',
                    'weighted_f1']
-    metrics_file = open(os.path.join(weights_dir, 'metrics.csv'), mode='w')
+    metrics_file = open(os.path.join(weights_dir, 'metrics.csv'), mode='a')
     metrics_writer = csv.writer(metrics_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     metrics_writer.writerow(metric_cols)
     metrics_file.flush()
