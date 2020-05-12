@@ -103,7 +103,7 @@ if __name__ == '__main__':
     # Instantiate PyTorch BSG Model
     if args.restore:
         print('Restoring from latest checkpoint...')
-        epoch_shift = 5  # TODO determine from checkpoints
+        epoch_shift = 7  # TODO determine from checkpoints
         _, model, _, optimizer_state = restore_model(args.experiment)
         model = model.to(device_str)
     else:
