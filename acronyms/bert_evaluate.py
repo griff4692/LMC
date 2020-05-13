@@ -111,7 +111,7 @@ if __name__ == '__main__':
     cols = ['accuracy', 'weighted_f1', 'macro_f1', 'log_loss']
     if args.bootstrap:
         train_frac = 0.2
-        iters = 100
+        iters = 25
     else:
         iters = 1
         train_frac = 0.0

@@ -19,7 +19,7 @@ if __name__ == '__main__':
     results_df = []
 
     for experiment in experiments:
-        df = pd.read_csv(os.path.join(args.lm_type, experiment, 'metrics_5.csv'))
+        df = pd.read_csv(os.path.join(args.lm_type, experiment, 'metrics.csv'))
         df['joint_loss'] = df['lm_kl'] + df['lm_recon']
         best = df[df['joint_loss'] == df['joint_loss'].min()]
         for dataset in datasets:
