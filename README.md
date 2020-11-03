@@ -1,23 +1,21 @@
 # Latent Meaning Cells
 This is the main repository for the Latent Meaning Cells (LMC) Model.
 
-The LMC is a Deep Generative Model for Jointly Modeling Words and Document Metadata.
+The LMC is a Latent Variable Model for Jointly Modeling Words and Document Metadata.
 
-## Overview of Generative Process
+This is the codebase for the paper "Zero-Shot Clinical Acronym Expansion via Latent Meaning Cells" presented at the NeurIPS 2020 Machine Learning for Healthcare Workshop (ML4H).
 
-The generative process of the LMC model is shown in plate notation below:
+## Notation
 
-![plate notation](shared_data/graphics/marginalization.jpg)
+A word is the atomic unit of discrete data and represents an item from a fixed vocabulary.
 
-```
-For k in 1...D
-    Draw metadata d_k ~ p(d_k)
-    For i in 1...N_k:
-        Draw word w_ik ~ p(w_ik)
-        Draw latent meaning z_ik|w_ik,d_k ~ p(z_ik|w_ik, d_k)
-    For j in 1...2W:
-        Draw context word c_ijk|z_ik ~ p(c_ijk|z_ik)
-```
+A word is denoted as <img src="https://render.githubusercontent.com/render/math?math=w"> when representing a center word, and <img src="https://render.githubusercontent.com/render/math?math=c"> for a context word.  <img src="https://render.githubusercontent.com/render/math?math=\boldsymbol{c}"> represents the set of context words relative to a center word <img src="https://render.githubusercontent.com/render/math?math=w">.  In different contexts, each word operates as both a center word and a context word.  For our purposes, metadata are pseudo-documents which contain a sequence of <img src="https://render.githubusercontent.com/render/math?math=N"> words denoted by <img src="https://render.githubusercontent.com/render/math?math=m = (w_1, w_2, ..., w_N)"> where <img src="https://render.githubusercontent.com/render/math?math=w_n"> is the <img src="https://render.githubusercontent.com/render/math?math=n^{th}"> word. A corpus is a collection of <img src="https://render.githubusercontent.com/render/math?math=K$.
+
+## Overview of Psuedo-Generative Process
+
+The psuedo-generative process of the LMC model is shown in plate notation and story form below:
+
+![plate notation](shared_data/graphics/plate_story.png)
 
 Please refer to the paper for more information on the distributions and model parameters.
 
