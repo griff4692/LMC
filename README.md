@@ -1,7 +1,7 @@
 # Latent Meaning Cells
 This is the main repository for the Latent Meaning Cells (LMC) Model. The LMC is a Latent Variable Model for Jointly Modeling Words and Document Metadata.
 
-This is the official PyTorch codebase for the paper "[Zero-Shot Clinical Acronym Expansion via Latent Meaning Cells](https://arxiv.org/pdf/2010.02010.pdf)" presented at the NeurIPS 2020 Machine Learning for Healthcare Workshop (ML4H).
+This is the official PyTorch codebase for the paper "[Zero-Shot Clinical Acronym Expansion via Latent Meaning Cells](https://arxiv.org/pdf/2010.02010.pdf)" presented at the [NeurIPS 2020 Machine Learning for Healthcare (ML4H) Workshop](https://ml4health.github.io/2020/).
 
 ## Notation
 
