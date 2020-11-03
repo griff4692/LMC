@@ -1,9 +1,7 @@
 # Latent Meaning Cells
-This is the main repository for the Latent Meaning Cells (LMC) Model.
+This is the main repository for the Latent Meaning Cells (LMC) Model. The LMC is a Latent Variable Model for Jointly Modeling Words and Document Metadata.
 
-The LMC is a Latent Variable Model for Jointly Modeling Words and Document Metadata.
-
-This is the codebase for the paper "Zero-Shot Clinical Acronym Expansion via Latent Meaning Cells" presented at the NeurIPS 2020 Machine Learning for Healthcare Workshop (ML4H).
+This is the official PyTorch codebase for the paper "[Zero-Shot Clinical Acronym Expansion via Latent Meaning Cells](https://arxiv.org/pdf/2010.02010.pdf)" presented at the NeurIPS 2020 Machine Learning for Healthcare Workshop (ML4H).
 
 ## Notation
 
@@ -19,11 +17,11 @@ The psuedo-generative process of the LMC model is shown in plate notation and st
 
 Please refer to the paper for more information on the distributions and model parameters.
 
-### D
-represents the set of metadata in the corpus.  This could be the number of unique section headers or even simply the number of documents in the corpus, depending on the modeling choice.
+### K
+represents the number of unique metadata in the corpus.  This could be the number of unique section headers or even simply the number of documents in the corpus, depending on the modeling choice.
 
-### d<sub>k</sub>
-represents the k<sup>th</sup> metadata
+### m<sub>k</sub>
+represents the k<sup>th</sup> metadata.
 
 ### N<sub>k</sub>
 
@@ -35,12 +33,11 @@ represents the i<sup>th</sup> center word belonging to the k<sup>th</sup> metada
 
 ### z<sub>ik</sub>|w<sub>ik</sub>,d<sub>k</sub>
 
-represents the latent meaning given the center word **w<sub>ik</sub>** and metadata **d<sub>k</sub>**
+represents the latent meaning cell (lmc) given the center word **w<sub>ik</sub>** and metadata **m<sub>k</sub>**
 
-### W
+### S
 
 denotes the window size. That is, the number of words drawn from the left and right side of the center word. 
-
 
 ### c<sub>ijk</sub>|z<sub>ik</sub>
 
@@ -146,4 +143,8 @@ The code is compatible with two acronym expansion datasets:
 
 Each dataset is runnable with the same script by toggling the flag `--dataset {mimic, casi}`.
 
+# Contact
 
+Please raise a Github issue if you encounter any issues running the code.  Please feel free to issue a pull requests for bug fixes or feature requests as well.
+
+If you want to discuss the paper and modeling approach more, please contact me at griffin.adams@columbia.edu.
