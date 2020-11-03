@@ -387,14 +387,6 @@ def process_batch(args, batcher, model, loss_func, token_vocab, metadata_vocab, 
 
 
 def render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_counts, sf_lf_map):
-    tlmc = {}
-    vlmc = {}
-    for k in train_lf_metadata_counts:
-        if k in val_lf_metadata_counts:
-            tlmc[k] = train_lf_metadata_counts[k]
-            vlmc[k] = val_lf_metadata_counts[k]
-    train_lf_metadata_counts, val_lf_metadata_counts = tlmc, vlmc
-
     accuracies = []
     macro_f1s = []
     weighted_f1s = []
@@ -405,18 +397,16 @@ def render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_c
         dominant_class = {}
         max_freq = 0
         for lf in lfs:
-            if lf in train_lf_metadata_counts:
-                c = sum(train_lf_metadata_counts[lf]['count'])
-                max_freq = max(max_freq, c)
-                if max_freq == c:
-                    dominant_class[sf] = lf
-                for name, p in zip(train_lf_metadata_counts[lf]['section'], train_lf_metadata_counts[lf]['p']):
-                    max_p[name] = max(max_p[name], p)
-                    if p == max_p[name]:
-                        predicted_class[name] = lf
+            c = sum(train_lf_metadata_counts[lf]['count'])
+            max_freq = max(max_freq, c)
+            if max_freq == c:
+                dominant_class[sf] = lf
+            for name, p in zip(train_lf_metadata_counts[lf]['section'], train_lf_metadata_counts[lf]['p']):
+                max_p[name] = max(max_p[name], p)
+                if p == max_p[name]:
+                    predicted_class[name] = lf
         for lf in lfs:
-            if lf in train_lf_metadata_counts:
-                dominant_class[lf] = dominant_class[sf]
+            dominant_class[lf] = dominant_class[sf]
 
         y_true = []
         y_pred = []
@@ -430,8 +420,7 @@ def render_dominant_section_accuracy(train_lf_metadata_counts, val_lf_metadata_c
                         pred_lf = predicted_class[name]
                     y_true += [lf] * count
                     y_pred += [pred_lf] * count
-        if len(y_true) == 0:
-            continue
+
         sf_results = classification_report(y_true, y_pred, output_dict=True)
         macro_nonzero = defaultdict(float)
         num_nonzero = 0

@@ -36,7 +36,8 @@ def _generate_marginals(df):
 
     marginals = {}
     for lf in lfs:
-        sections = df[df['target_lf_sense'] == lf]['section'].tolist()
+        col = 'section' if 'section' in df.columns else 'section_mapped'
+        sections = df[df['target_lf_sense'] == lf][col].tolist()
         section_counts = Counter(sections)
         counts = []
         names = []

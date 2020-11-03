@@ -194,11 +194,11 @@ if __name__ == '__main__':
 
     # Create model experiments directory or clear if it already exists
     weights_dir = os.path.join(home_dir, 'weights', 'lmc', args.experiment)
-    # if not args.restore:
-    #     if os.path.exists(weights_dir):
-    #         print('Clearing out previous weights in {}'.format(weights_dir))
-    #         rmtree(weights_dir)
-    #     os.mkdir(weights_dir)
+    if not args.restore:
+        if os.path.exists(weights_dir):
+            print('Clearing out previous weights in {}'.format(weights_dir))
+            rmtree(weights_dir)
+        os.mkdir(weights_dir)
 
     metric_cols = ['examples', 'lm_kl', 'lm_recon', 'epoch', 'hours', 'dataset', 'log_loss', 'accuracy', 'macro_f1',
                    'weighted_f1']
